@@ -19,6 +19,7 @@
 # SOFTWARE.
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any, List, Tuple
 
@@ -29,6 +30,21 @@ from tokenspeed_kernel._triton import tl, triton
 from tokenspeed_kernel.platform import current_platform
 
 logger = logging.getLogger(__file__)
+
+
+# Selects which fused AllReduce+residual+RMSNorm backend the AMD path uses, so
+# the three implementations can be A/B/C benchmarked without code changes:
+#   "auto"         (default) -- current production behavior: Iris, then the
+#                               native symm_mem kernel as fallback.
+#   "iris"         -- force the Iris backend only (unfused fallback otherwise).
+#   "triton_shmem" -- force the vendored triton-shmem fused kernels on PyTorch
+#                     symmetric memory (the migrated backend) only.
+#   "symm_mem"     -- force the native torch symmetric-memory kernel only.
+_ARNORM_BACKEND_ENV = "TS_ARNORM_BACKEND"
+
+
+def _arnorm_backend() -> str:
+    return os.environ.get(_ARNORM_BACKEND_ENV, "auto").strip().lower()
 
 __all__ = [
     "create_state",
@@ -1544,10 +1560,12 @@ def allreduce_residual_rmsnorm(
             return None, None, None, None
 
         token_num, hidden_dim = input_tensor.shape
+        backend = _arnorm_backend()
 
-        from . import iris as _iris_mod
-
-        if (
+        # Shared eligibility for the two symmetric-heap fused backends (Iris and
+        # triton-shmem). The native symm_mem path re-checks via its own
+        # ``allreduce_residual_rmsnorm_can_run``.
+        eligible = (
             input_tensor.is_cuda
             and residual.is_cuda
             and weight.is_cuda
@@ -1560,8 +1578,44 @@ def allreduce_residual_rmsnorm(
             and weight.shape == (hidden_dim,)
             and group.size() > 1
             and token_num <= max_token_num
-        ):
-            key = (id(group), max_token_num, hidden_dim, input_tensor.dtype)
+        )
+        key = (id(group), max_token_num, hidden_dim, input_tensor.dtype)
+
+        # --- triton_shmem fused path (vendored triton-shmem kernels on PyTorch
+        # symmetric memory): opt-in for A/B benchmarking.
+        if backend == "triton_shmem":
+            if eligible:
+                from . import triton_shmem as _ts_mod
+
+                ts_state = _ts_mod.TRITON_SHMEM_AR_RMSNORM_STATES.get(key)
+                if ts_state is None:
+                    ts_state = _ts_mod.create_triton_shmem_ar_rmsnorm_state(
+                        group=group,
+                        rank_in_group=rank,
+                        max_token_num=max_token_num,
+                        hidden_dim=hidden_dim,
+                        dtype=input_tensor.dtype,
+                    )
+                    if ts_state is not None:
+                        _ts_mod.TRITON_SHMEM_AR_RMSNORM_STATES[key] = ts_state
+                if ts_state is not None:
+                    norm_out, residual_out = (
+                        _ts_mod.triton_shmem_allreduce_residual_rmsnorm(
+                            ts_state,
+                            input_tensor=input_tensor,
+                            residual=residual,
+                            weight=weight,
+                            eps=eps,
+                        )
+                    )
+                    return norm_out, residual_out, None, None
+            # Forced backend but ineligible/unavailable -> unfused fallback.
+            return None, None, None, None
+
+        # --- Iris fused path: default "auto" preference, or forced "iris".
+        if backend in ("auto", "iris") and eligible:
+            from . import iris as _iris_mod
+
             iris_state = _iris_mod.IRIS_AR_RMSNORM_STATES.get(key)
             if iris_state is None:
                 iris_state = _iris_mod.create_iris_ar_rmsnorm_state(
@@ -1581,6 +1635,11 @@ def allreduce_residual_rmsnorm(
             )
             return norm_out, residual_out, None, None
 
+        if backend == "iris":
+            # Forced Iris but ineligible -> unfused fallback.
+            return None, None, None, None
+
+        # --- Native symm_mem kernel: backend "symm_mem", or "auto" fall-through.
         state = allreduce_residual_rmsnorm_get_state(
             group=group,
             rank_in_group=rank,
