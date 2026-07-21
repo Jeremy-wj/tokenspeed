@@ -36,11 +36,11 @@ barrier -> copy-out) for each backend selectable through the
 
 For each config it CUDA-event-times every rank, reports the collective latency
 as the **max p50 across ranks** (a collective is bounded by its slowest rank)
-plus cross-rank skew, and prints the fused-vs-RCCL speedup. Axes mirror the
-external ``triton-shmem`` reference bench
-(``benchmark/results/ar_rmsnorm_opt_sweep/reverified_baseline.csv``) so the
-migrated numbers can be compared against the rocSHMEM port directly:
-``num_ranks in {2,4,8}``, ``M,N`` power-of-two, ``fusion=residual``, bf16.
+plus cross-rank skew, and prints the fused-vs-RCCL speedup. The default N axis
+is modeled after the row widths encountered by the fused AR+RMSNorm / comm+norm
+ops in the targeted large models (gpt-oss-120B, GLM-4.6, DeepSeek-V3/V4, Kimi-K2
+-- hidden and MLA-compressed shapes; see the axis note below), and M spans
+decode through the production chunked-prefill fusion cap.
 
 Correctness is asserted (fp32 reference, 2e-2 tol) on the first iteration of
 every config for every backend before timing, so a numerically-broken backend
@@ -68,23 +68,6 @@ import torch.nn.functional as F
 
 _EPS = 1e-6
 
-# Axes (mirror the triton-shmem reverified_baseline.csv grid). ``2880`` is the
-# production gpt-oss hidden size (non-pow2 -> exercises the blocked kernels);
-# the power-of-two Ns additionally reach oneshot_wholerow at ws<=2.
-_DEFAULT_WORLD_SIZES: List[int] = [2, 4, 8]
-_M_VALUES: List[int] = [1024, 4096, 16384]
-_N_VALUES: List[int] = [1024, 2880, 4096, 16384]
-_DEFAULT_BACKENDS: List[str] = ["rccl_unfused", "triton_shmem", "symm_mem", "iris"]
-
-_N_WARMUP = 25
-_N_REPEAT = 100
-
-
-def _get_open_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("", 0))
-        return sock.getsockname()[1]
-
 
 def _env_list(name: str, default: List) -> List:
     raw = os.environ.get(name)
@@ -94,6 +77,49 @@ def _env_list(name: str, default: List) -> List:
     if default and isinstance(default[0], int):
         return [int(p) for p in parts]
     return parts
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    return int(raw) if raw else default
+
+
+# Axes. The N grid is modeled after the *actually encounterable* row widths of
+# the AR+RMSNorm / fused comm+norm ops in the targeted large models rather than
+# a synthetic power-of-two sweep:
+#     512  -- DeepSeek-V3/V4 & Kimi-K2 kv_lora_rank (compressed-KV latent norm);
+#             also GLM-4.x-lite kv_lora_rank. Power-of-two -> reaches
+#             oneshot_wholerow at ws<=2.
+#    1536  -- DeepSeek/Kimi q_lora_rank (compressed-Q latent norm); = GLM
+#             moe_intermediate_size. Non-pow2 -> blocked kernels.
+#    2880  -- gpt-oss-120B hidden size (dense residual stream).
+#    5120  -- GLM-4.6 hidden size.
+#    7168  -- DeepSeek-V3/V4 & Kimi-K2 hidden size (the big residual stream).
+# The M grid spans representative inference token counts: decode/low-concurrency
+# (1..128), chunked-prefill up to the production fusion cap (256..2048), and one
+# point past the cap (4096) to show the trend beyond where fusion is served. All
+# axes are env-overridable (BENCH_M_VALUES / BENCH_N_VALUES / BENCH_WORLD_SIZES /
+# BENCH_BACKENDS); the triton_shmem kernels take arbitrary M and N (blocked
+# variants mask N; two-shot cdiv-shards M), so there is no size gate to respect.
+_DEFAULT_WORLD_SIZES: List[int] = [2, 4, 8]
+_M_VALUES: List[int] = _env_list(
+    "BENCH_M_VALUES", [1, 8, 32, 128, 256, 512, 1024, 2048, 4096]
+)
+_N_VALUES: List[int] = _env_list("BENCH_N_VALUES", [512, 1536, 2880, 5120, 7168])
+_DEFAULT_BACKENDS: List[str] = ["rccl_unfused", "triton_shmem"]
+
+# Noise control: high warmup/repeat (this box cannot pin GPU clocks -- sysfs is
+# read-only in the unprivileged container -- so we lean on sample count + a
+# steady-state warmup and quantify the residual noise with a 2-pass variance
+# floor; see benchmark/run_ar_rmsnorm_noise_controlled.sh).
+_N_WARMUP = _env_int("BENCH_N_WARMUP", 50)
+_N_REPEAT = _env_int("BENCH_N_REPEAT", 300)
+
+
+def _get_open_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("", 0))
+        return sock.getsockname()[1]
 
 
 def _reference(x, residual, weight, world_size, hidden, device):
@@ -170,6 +196,25 @@ def _time_backend(backend, x, residual, weight, rank, group, max_token_num) -> f
     return statistics.median(times)
 
 
+def _presize_iris_heap(max_token_num: int) -> None:
+    """Pre-create the process-global iris context sized for the ENTIRE sweep.
+
+    The iris shim uses a module-level singleton context whose heap is fixed at
+    first use and never grows; each distinct (max_token_num, hidden_dim) state
+    allocates a buffer from it and is cached forever. Left to the per-config
+    default sizing, the singleton is sized for the first (smallest) config and
+    later configs overflow it -- the reason iris was previously excluded from the
+    multi-config sweep. Sizing it up front for the sum of all N buffers removes
+    that harness limitation (it is not an iris kernel/input-size limit).
+    """
+    from tokenspeed_kernel.ops.communication import iris as iris_mod
+
+    itemsize = torch.tensor([], dtype=torch.bfloat16).element_size()
+    sum_bytes = sum(max_token_num * n * itemsize for n in _N_VALUES)
+    heap = max(1 << 28, 4 * sum_bytes + (256 << 20))
+    iris_mod._get_or_create_iris_context(heap)
+
+
 def _worker_fn(rank, world_size, port, backends, result_dict, error_dict):
     try:
         _worker_main(rank, world_size, port, backends, result_dict)
@@ -189,6 +234,8 @@ def _worker_main(rank, world_size, port, backends, result_dict):
     try:
         group = dist.group.WORLD
         max_token_num = max(_M_VALUES)
+        if "iris" in backends:
+            _presize_iris_heap(max_token_num)
         for n in _N_VALUES:
             weight = torch.linspace(0.5, 1.5, n, dtype=torch.bfloat16, device=device)
             for m in _M_VALUES:

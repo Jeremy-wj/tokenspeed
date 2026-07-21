@@ -33,12 +33,13 @@ logger = logging.getLogger(__file__)
 
 
 # Selects which fused AllReduce+residual+RMSNorm backend the AMD path uses, so
-# the three implementations can be A/B/C benchmarked without code changes:
-#   "auto"         (default) -- current production behavior: Iris, then the
-#                               native symm_mem kernel as fallback.
-#   "iris"         -- force the Iris backend only (unfused fallback otherwise).
-#   "triton_shmem" -- force the vendored triton-shmem fused kernels on PyTorch
-#                     symmetric memory (the migrated backend) only.
+# the implementations can be A/B/C benchmarked without code changes:
+#   "auto"         (default) -- production behavior: the vendored triton-shmem
+#                               fused kernels on PyTorch symmetric memory (the
+#                               migrated backend), then the native symm_mem
+#                               kernel as fallback. This supersedes Iris.
+#   "triton_shmem" -- force the triton-shmem fused kernels only.
+#   "iris"         -- force the (superseded) Iris backend only; retained for A/B.
 #   "symm_mem"     -- force the native torch symmetric-memory kernel only.
 _ARNORM_BACKEND_ENV = "TS_ARNORM_BACKEND"
 
@@ -1582,64 +1583,73 @@ def allreduce_residual_rmsnorm(
         key = (id(group), max_token_num, hidden_dim, input_tensor.dtype)
 
         # --- triton_shmem fused path (vendored triton-shmem kernels on PyTorch
-        # symmetric memory): opt-in for A/B benchmarking.
-        if backend == "triton_shmem":
-            if eligible:
-                from . import triton_shmem as _ts_mod
+        # symmetric memory): the default "auto" backend, or forced "triton_shmem".
+        # This is the migrated production path and supersedes Iris; the kernels
+        # take arbitrary (M, N) so there is no input-size gate beyond the shared
+        # eligibility above (bf16 contract + the caller's token-count cap).
+        if backend in ("auto", "triton_shmem") and eligible:
+            from . import triton_shmem as _ts_mod
 
-                ts_state = _ts_mod.TRITON_SHMEM_AR_RMSNORM_STATES.get(key)
-                if ts_state is None:
-                    ts_state = _ts_mod.create_triton_shmem_ar_rmsnorm_state(
-                        group=group,
-                        rank_in_group=rank,
-                        max_token_num=max_token_num,
-                        hidden_dim=hidden_dim,
-                        dtype=input_tensor.dtype,
-                    )
-                    if ts_state is not None:
-                        _ts_mod.TRITON_SHMEM_AR_RMSNORM_STATES[key] = ts_state
-                if ts_state is not None:
-                    norm_out, residual_out = (
-                        _ts_mod.triton_shmem_allreduce_residual_rmsnorm(
-                            ts_state,
-                            input_tensor=input_tensor,
-                            residual=residual,
-                            weight=weight,
-                            eps=eps,
-                        )
-                    )
-                    return norm_out, residual_out, None, None
-            # Forced backend but ineligible/unavailable -> unfused fallback.
-            return None, None, None, None
-
-        # --- Iris fused path: default "auto" preference, or forced "iris".
-        if backend in ("auto", "iris") and eligible:
-            from . import iris as _iris_mod
-
-            iris_state = _iris_mod.IRIS_AR_RMSNORM_STATES.get(key)
-            if iris_state is None:
-                iris_state = _iris_mod.create_iris_ar_rmsnorm_state(
+            ts_state = _ts_mod.TRITON_SHMEM_AR_RMSNORM_STATES.get(key)
+            if ts_state is None:
+                ts_state = _ts_mod.create_triton_shmem_ar_rmsnorm_state(
                     group=group,
                     rank_in_group=rank,
                     max_token_num=max_token_num,
                     hidden_dim=hidden_dim,
                     dtype=input_tensor.dtype,
                 )
-                _iris_mod.IRIS_AR_RMSNORM_STATES[key] = iris_state
-            norm_out, residual_out = _iris_mod.iris_allreduce_residual_rmsnorm(
-                iris_state,
-                input_tensor=input_tensor,
-                residual=residual,
-                weight=weight,
-                eps=eps,
-            )
-            return norm_out, residual_out, None, None
+                if ts_state is not None:
+                    _ts_mod.TRITON_SHMEM_AR_RMSNORM_STATES[key] = ts_state
+            if ts_state is not None:
+                norm_out, residual_out = (
+                    _ts_mod.triton_shmem_allreduce_residual_rmsnorm(
+                        ts_state,
+                        input_tensor=input_tensor,
+                        residual=residual,
+                        weight=weight,
+                        eps=eps,
+                    )
+                )
+                return norm_out, residual_out, None, None
+            # triton_shmem unavailable: "auto" falls through to native symm_mem;
+            # a forced request degrades to the unfused caller fallback.
+            if backend == "triton_shmem":
+                return None, None, None, None
 
+        if backend == "triton_shmem":
+            # Forced triton_shmem but ineligible -> unfused fallback.
+            return None, None, None, None
+
+        # --- Iris fused path: forced "iris" only (superseded by triton_shmem as
+        # the "auto" default; retained so the two can still be A/B benchmarked).
         if backend == "iris":
+            if eligible:
+                from . import iris as _iris_mod
+
+                iris_state = _iris_mod.IRIS_AR_RMSNORM_STATES.get(key)
+                if iris_state is None:
+                    iris_state = _iris_mod.create_iris_ar_rmsnorm_state(
+                        group=group,
+                        rank_in_group=rank,
+                        max_token_num=max_token_num,
+                        hidden_dim=hidden_dim,
+                        dtype=input_tensor.dtype,
+                    )
+                    _iris_mod.IRIS_AR_RMSNORM_STATES[key] = iris_state
+                norm_out, residual_out = _iris_mod.iris_allreduce_residual_rmsnorm(
+                    iris_state,
+                    input_tensor=input_tensor,
+                    residual=residual,
+                    weight=weight,
+                    eps=eps,
+                )
+                return norm_out, residual_out, None, None
             # Forced Iris but ineligible -> unfused fallback.
             return None, None, None, None
 
-        # --- Native symm_mem kernel: backend "symm_mem", or "auto" fall-through.
+        # --- Native symm_mem kernel: backend "symm_mem", or "auto" fall-through
+        # (only reached when triton_shmem was ineligible or unavailable).
         state = allreduce_residual_rmsnorm_get_state(
             group=group,
             rank_in_group=rank,

@@ -209,22 +209,35 @@ def fused_ar_rmsnorm_oneshot_wholerow_kernel(
     residual_out,
     add_in,
     M,
+    signal_pad,
     N: tl.constexpr,
     ws: tl.constexpr,
     NUM_SMS: tl.constexpr,
     HAS_RESIDUAL: tl.constexpr,
     HAS_ADD: tl.constexpr,
+    RANK: tl.constexpr = 0,
+    INKERNEL_BARRIER: tl.constexpr = False,
 ):
     """One-shot pull, whole-row. Every PE reduces all rows by pulling each peer's
     ``input`` and writes only its own local ``output`` / ``residual_out`` (no
     push). ``N`` must be a power of two. Only ``input`` is symmetric, so a single
-    peer-pointer table (``heap_bases``) is used."""
+    peer-pointer table (``heap_bases``) is used.
+
+    ``INKERNEL_BARRIER`` folds the leading + trailing signal-pad barriers into the
+    kernel (per-block at index ``pid``), removing two separate barrier-kernel
+    launches — the dominant small-M/decode overhead (companion doc §6). Safe here
+    because this kernel is pull-only (reads peers, writes local): entry acquire
+    makes peers' copy-in visible before the pull; exit release lets peers know we
+    finished reading our symmetric input before the next call overwrites it. Same
+    pattern as the native ``amd_allreduce_residual_rmsnorm_kernel``."""
     tl.static_assert(
         (N & (N - 1)) == 0,
         "fused_ar_rmsnorm_oneshot_wholerow_kernel requires N to be a power of two; "
         "use fused_ar_rmsnorm_oneshot_blocked_kernel for arbitrary N",
     )
     pid = tl.program_id(0)
+    if INKERNEL_BARRIER:
+        symm_mem_barrier(signal_pad, pid, RANK, ws)
 
     offsets_n = tl.max_contiguous(tl.multiple_of(tl.arange(0, N), N), N)
     gamma_row = tl.load(gamma + offsets_n).to(tl.float32)
@@ -247,6 +260,9 @@ def fused_ar_rmsnorm_oneshot_wholerow_kernel(
         rms_norm = (acc * norm_factor * gamma_row).to(output.dtype.element_ty)
         tl.store(output + offsets_io, rms_norm)
 
+    if INKERNEL_BARRIER:
+        symm_mem_barrier(signal_pad, pid, RANK, ws)
+
 
 @triton.jit
 def fused_ar_rmsnorm_twoshot_blocked_kernel(
@@ -264,24 +280,37 @@ def fused_ar_rmsnorm_twoshot_blocked_kernel(
     add_in,
     M,
     N,
+    signal_pad,
     BLOCK_N: tl.constexpr,
     ws: tl.constexpr,
     NUM_SMS: tl.constexpr,
     HAS_RESIDUAL: tl.constexpr,
     HAS_ADD: tl.constexpr,
+    RANK: tl.constexpr = 0,
+    INKERNEL_BARRIER: tl.constexpr = False,
 ):
     """Two-pass, N-blocked. Contiguous row ownership: PE ``my_pe`` owns rows
     ``[my_pe*M_shard, (my_pe+1)*M_shard)``, reduces them by pulling every peer's
     ``input``, and pushes the pre-norm ``residual_out`` and normalized ``output``
     into every peer. ``input``, ``output`` and ``residual_out`` are all symmetric
     and each is translated with **its own** peer-pointer table (the sole device
-    change vs. the rocSHMEM upstream, which shared one ``heap_bases``). A trailing
-    barrier (issued by the caller) makes the peer pushes visible before copy-out."""
+    change vs. the rocSHMEM upstream, which shared one ``heap_bases``).
+
+    ``INKERNEL_BARRIER`` folds the leading + trailing signal-pad barriers into the
+    kernel (per-block at ``pid``), removing two separate barrier-kernel launches.
+    The leading barrier makes peers' copy-in visible before the pull; the trailing
+    barrier makes peers' pushes into our ``output``/``residual_out`` visible before
+    the caller's copy-out. Two-shot serves M>oneshot_max_m (eager prefill only; not
+    inside a decode graph), where TP ranks always share M -- so the barrier
+    participant set (``NUM_SMS`` blocks) matches across ranks. Same M-divergence
+    caveat as the one-shot path (companion doc §6 plan)."""
     tl.static_assert(
         (BLOCK_N & (BLOCK_N - 1)) == 0,
         "fused_ar_rmsnorm_twoshot_blocked_kernel requires BLOCK_N to be a power of two",
     )
     pid = tl.program_id(0)
+    if INKERNEL_BARRIER:
+        symm_mem_barrier(signal_pad, pid, RANK, ws)
     M_shard = tl.cdiv(M, ws)
     shard_row_offset = M_shard * my_pe
     n_blocks = tl.cdiv(N, BLOCK_N)
@@ -330,6 +359,9 @@ def fused_ar_rmsnorm_twoshot_blocked_kernel(
                         peer_ptr = symmetric_ptr(output, my_pe, peer, output_bases)
                         tl.store(peer_ptr + offs, rms_norm, mask=mask)
 
+    if INKERNEL_BARRIER:
+        symm_mem_barrier(signal_pad, pid, RANK, ws)
+
 
 @triton.jit
 def fused_ar_rmsnorm_oneshot_blocked_kernel(
@@ -345,22 +377,32 @@ def fused_ar_rmsnorm_oneshot_blocked_kernel(
     add_in,
     M,
     N,
+    signal_pad,
     BLOCK_N: tl.constexpr,
     ws: tl.constexpr,
     NUM_SMS: tl.constexpr,
     HAS_RESIDUAL: tl.constexpr,
     HAS_ADD: tl.constexpr,
+    RANK: tl.constexpr = 0,
+    INKERNEL_BARRIER: tl.constexpr = False,
 ):
     """One-shot pull, two-pass, N-blocked (arbitrary ``N``). No row ownership, no
     peer push. Every PE reduces all rows by pulling each peer's ``input`` and
     writes the full result to its own local ``output`` / ``residual_out``.
     ``scratch`` is a local fp32 ``(NUM_SMS, N)`` buffer (one slot per program).
-    Only ``input`` is symmetric, so a single peer-pointer table is used."""
+    Only ``input`` is symmetric, so a single peer-pointer table is used.
+
+    ``INKERNEL_BARRIER`` folds the leading + trailing signal-pad barriers into the
+    kernel (per-block at ``pid``), removing two separate barrier-kernel launches
+    (companion doc §6). Pull-only ⇒ same proven pattern as the native
+    ``amd_allreduce_residual_rmsnorm_kernel`` (no cross-thread push to order)."""
     tl.static_assert(
         (BLOCK_N & (BLOCK_N - 1)) == 0,
         "fused_ar_rmsnorm_oneshot_blocked_kernel requires BLOCK_N to be a power of two",
     )
     pid = tl.program_id(0)
+    if INKERNEL_BARRIER:
+        symm_mem_barrier(signal_pad, pid, RANK, ws)
     n_blocks = tl.cdiv(N, BLOCK_N)
     col = tl.arange(0, BLOCK_N)
     scratch_off = pid * N
@@ -395,3 +437,6 @@ def fused_ar_rmsnorm_oneshot_blocked_kernel(
             block_g = tl.load(gamma + cols, mask=mask, other=0.0).to(tl.float32)
             rms_norm = (reduced * norm_factor * block_g).to(output.dtype.element_ty)
             tl.store(output + offs, rms_norm, mask=mask)
+
+    if INKERNEL_BARRIER:
+        symm_mem_barrier(signal_pad, pid, RANK, ws)

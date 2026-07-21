@@ -1,30 +1,131 @@
 # Fused AllReduce + Residual + RMSNorm: triton-shmem → PyTorch Symmetric Memory
 
-**Status:** Phases 0–4 complete through microbenchmarking; end-to-end server run
-**held** (no local model fits the ~57 GB free disk; gpt-oss-120B needs ~240 GB —
-awaiting instruction). The migrated backend is named **`triton_shmem`** (after its
-source repo; the old rocSHMEM port that previously held that name is **deleted** —
-see §7 Phase 4). It is wired into the `TS_ARNORM_BACKEND` dispatch and **passes on
-8× MI300X**: packaged comm test (ws=4, two-shot), dedicated sweep ws=1/2/4/8 +
-power-of-two whole-row (all three kernel variants), and HIP graph capture+replay at
-ws=2 (one-shot) and ws=8 (two-shot). Code: `ops/communication/triton_shmem.py` +
-`ops/communication/_triton_shmem_kernels.py`; test
-`test/ops/test_triton_shmem_communication.py`; microbench
-`benchmark/bench_triton_shmem_ar_rmsnorm.py`. No new runtime deps; no
-`rocshmem4py`/upstream-`triton_shmem` imports.
+**Status:** Migration complete + microbench-validated (MI300X §8) **and e2e-validated on
+8× MI350X gpt-oss-120b** (§0.3 + companion doc `AR_RMSNORM_MI350X_E2E_BENCHMARKS.md`).
+The e2e gate is DONE: `triton_shmem` auto-selects and is numerically correct end-to-end.
+On MI350X fusion originally lost ~15–20% decode TPOT at ws=4 (staging overhead, not
+compute). Two shipped fixes close it: **M-aware one-shot dispatch**
+(`TS_TRITON_SHMEM_ONESHOT_MAX_M=256`, drops the two-shot copy-out) + **in-kernel barriers,
+now DEFAULT ON** (`TS_TRITON_SHMEM_INKERNEL_BARRIER=1`, drops the two barrier-kernel
+launches). Result: the ws=4 decode op drops ~0.088→~0.048 ms; fusion is **parity-to-winning
+vs the real unfused path for ws=4 decode** (e2e: parity at conc16, win at conc32) and **wins
+broadly at ws=2**. **Recommendation: enable fusion for ws=2 and ws=4 decode
+(`comm_fusion_max_num_tokens>0`).** The remaining gap is small and bounded — folding barriers
+reclaimed only the *launches*; the barrier *work* and **copy-in (~0.012 ms)** remain — so the
+next levers are **avoid copy-in** and a **fixed-participant barrier** (companion §7).
+**Caveat:** the in-kernel barrier's slot range is M-dependent, so it deadlocks only if TP
+ranks replay **different-M graphs simultaneously**, which pure TP (dp=1,
+`overlap_schedule_depth=1`) never does; set `INKERNEL_BARRIER=0` under DP / overlap>1 /
+spec-decode until the fixed-participant barrier lands. Full record + plan: companion doc.
+The migrated backend is named **`triton_shmem`** (after its source repo; the old rocSHMEM
+port that previously held that name is **deleted**). It is the AMD fused default in the
+`TS_ARNORM_BACKEND` dispatch and **passes on 8× MI300X**: packaged comm test, dedicated
+sweep ws=1/2/4/8 (all three kernel variants), and HIP graph capture+replay (ws=2 one-shot,
+ws=8 two-shot). Code: `ops/communication/triton_shmem.py` +
+`ops/communication/_triton_shmem_kernels.py` + `ops/communication/_coarse_shmem.py`;
+test `test/ops/test_triton_shmem_communication.py`; microbench
+`benchmark/bench_triton_shmem_ar_rmsnorm.py` + driver
+`benchmark/run_ar_rmsnorm_noise_controlled.sh`. No new runtime deps.
 
-> **HEADLINE FINDING (§8):** correctness and graph-capture safety are solid, but
-> torch symm_mem on ROCm hands back **fine-grained** memory (~105 GB/s bulk local
-> vs. ~3200 GB/s coarse-grained), so this backend is **2–25× slower than RCCL**
-> and slower than the rocSHMEM reference for large tensors. It is faster than the
-> already-shipping native `symm_mem` kernel (2–7×). The regression is a substrate
-> property, not a port bug. Read §8 before shipping.
+> **HEADLINE (§8).** torch symm_mem on ROCm hands back **fine-grained** memory
+> (~107 GB/s bulk local vs ~3255 GB/s coarse, 30×), which crippled bulk transfer.
+> **Fixed** by backing the *data* buffers with **coarse-grained HBM shared over HIP
+> IPC** (rocSHMEM's own model), signal pad only left fine-grained
+> (`TS_TRITON_SHMEM_COARSE=1`, default). Noise-controlled result (8× MI300X, ≥0.5 ms
+> configs trustworthy): `triton_shmem` is **parity-to-winning vs RCCL at ws=2**,
+> **0.6–0.7× RCCL at ws=4/8** (the rocSHMEM envelope), and **1.7–5.4× faster than iris
+> at ws≥4**. Dispatch now routes `auto → triton_shmem` (iris demoted to explicit-only);
+> a **model-targeted sweep** (DeepSeek/Kimi/GLM/gpt-oss hidden + MLA-compressed widths)
+> shows fusion is profitable vs RCCL only at ws=2 (M≳256), peaking at moderate M and
+> eroding with M/ws at ws=4/8 (§8.6). Correctness + graph capture pass. See §8.
 **Branch:** `jeremwan/triton-shmem-experiments` (tokenspeed repo)
-**Hardware:** dev box is 8× AMD Instinct MI300X (gfx942); work runs in a ROCm 7.2 +
-torch 2.11 container (§5.1). MI300X is sufficient — the MI350X(gfx950)-only attention
-kernels are dispatch-gated and untouched by this migration.
+**Hardware (MI300X, prior):** 8× AMD Instinct MI300X (gfx942); ROCm 7.2 + torch 2.11
+container (§5.1). MI300X microbench + correctness complete (§8).
+**Hardware (MI350X, active):** 8× AMD Instinct MI350X (gfx950); host ROCm **7.1.1**
+driver. gfx950 attention/MoE kernels are present on this branch — **gpt-oss-120b serves
+end-to-end** (§0.3). AR+RMSNorm migration code is arch-agnostic (`ArchProfile`
+auto-selects MI350X tuning; verified in the serve log).
 **Audience:** engineering agents continuing this migration. Read top-to-bottom before
-touching code. Environment setup is done and documented in §5 — just follow it.
+touching code. MI300X env: §5. MI350X env: §0.
+
+---
+
+## 0. MI350X environment (Jul 2026 — active box)
+
+Repo copied file-for-file from the MI300X dev box. Relative in-repo paths unchanged;
+host paths outside the repo differ.
+
+### 0.1 Docker
+
+| Image | torch | Notes |
+|-------|-------|-------|
+| **`diprajap-tokenspeed:serve-base`** | **2.11.0+rocm7.2** | **Use this.** Pre-built ROCm 7.2 userspace + torch 2.11; prior `diprajap-tokenspeed-serve` container used it with `/data` bind-mount. |
+| `rocm/pytorch:rocm7.2_ubuntu22.04_py3.10_pytorch_release_2.9.1` | 2.9.1+rocm7.2 | Fallback base; needs torch 2.11 upgrade via §5.2 install. |
+| `rocm/pytorch:rocm7.2.4_ubuntu24.04_py3.12_pytorch_release_2.10.0` | 2.10.0+rocm7.2.4 | Available; not validated for this project. |
+
+The MI300X-validated base (`rocm/pytorch:rocm7.2.2_ubuntu22.04_py3.10_pytorch_release_2.7.1`)
+is **not** present locally. The §5.2 install recipe upgrades any ROCm 7.2 base to torch 2.11.
+
+**Active container:** `ts-migrate-mi350x` (`diprajap-tokenspeed:serve-base`, 8 GPUs visible,
+mounts `/home/jeremwan` + `/data`, `HSA_ENABLE_IPC_MODE_LEGACY=1`). Re-create:
+
+```
+docker run -d --name ts-migrate-mi350x \
+  --device=/dev/kfd --device=/dev/dri --group-add video --group-add render \
+  --ipc=host --shm-size=16g --network=host \
+  --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
+  -v /home/jeremwan:/home/jeremwan -v /data:/data \
+  -w /home/jeremwan/tokenspeed -e HSA_ENABLE_IPC_MODE_LEGACY=1 \
+  diprajap-tokenspeed:serve-base sleep infinity
+```
+
+Re-install in-tree packages before e2e (`GFX_ARCH=gfx950 bash test/ci_system/install_deps_rocm.sh`;
+subset in §5.2 suffices for comm-op work). **Install notes (Jul 2026):** run `apt-get update`
+first (stale apt cache 404s); Step 5 (`pip install -e ./python`) fails on private dep
+`tokenspeed-mooncake` — the image's preinstalled `tokenspeed==0.1.0` is sufficient for serve;
+use **`pip install -e tokenspeed-kernel/python/`** (editable) so uncommitted migration changes
+(`triton.py` dispatch, `_coarse_shmem.py`) are live. Phase-0 probes (`symm_probe.py`, etc.)
+were **not** copied to this box — re-run comm tests (`test_triton_shmem_communication.py`) instead.
+
+### 0.2 Models & disk
+
+**Storage layout on this box:** `/data/dev/<user>/` is per-user (requires admin to create
+a new dir — no `jeremwan` entry). **`/data/models/`** is the team model store; bringup
+scripts (`fw-bringup/scripts/mi450-gptoss-setup.sh`, `perf-tracking/scripts/serve.sh`) use
+paths under it. Personal downloads go in `$HOME` (~502 GB free on `/`).
+
+**E2e checkpoint (use this):** **`/data/models/openai/gpt-oss-120b`** — admin symlink to
+the on-disk weights at `/data/dev/morhuang/models/gpt-oss-120b` (183 GB, complete
+`openai/gpt-oss-120b` BF16 safetensors, H=2880, matches §8.6). Read-only for all users;
+TokenSpeed with a local `--model` path does not write into the weight tree. This is the
+canonical shared path — not a private dev-only location.
+
+```
+GPT_OSS_MODEL=/data/models/openai/gpt-oss-120b
+GPT_OSS_WORLD_SIZE=8
+```
+
+See `test/runtime/models/test_gpt_oss.py`. Coordinate GPU use on the shared node before
+an 8-GPU serve; disk I/O is read-only.
+
+**Do not use for this e2e:** `amd/gpt-oss-120b-w-mxfp4-a-fp8` (CI perf target, ~65 GB on
+HF, not gated) — quantized weight/MoE path skews end-to-end timing and is not representative
+of the full-precision serve this gate targets. Microbench already covers the comm op.
+
+**Fallbacks:** download `openai/gpt-oss-120b` to `$HOME/models/` if the shared symlink
+breaks (no HF credentials required — public model). Smoke-test only: `openai/gpt-oss-20b`
+(~41 GB) in `$HOME/models/` — different scale, not a substitute for this gate.
+
+### 0.3 E2e gate — DONE (see `AR_RMSNORM_MI350X_E2E_BENCHMARKS.md`)
+
+Served gpt-oss-120b on MI350X; `triton_shmem` auto-selected + correct e2e. Key results,
+methodology, serve gotchas, and the fusion-threshold decision live in the companion doc.
+Two setup facts needed beyond §5.2: (1) the serve package also needs editing in —
+`pip install -e /home/jeremwan/tokenspeed/python --no-deps --no-build-isolation` (the
+baked editable `tokenspeed` points at an unmounted path → `import tokenspeed` fails);
+(2) serve needs `--policy round_robin --kvstore-size 8` (see companion §1 gotchas).
+**Bottom line:** fusion is not a served win on gfx950 (loses ws=4/8, helps ws=2 M≳384);
+**set `comm_fusion_max_num_tokens=0` at ws≥4.**
 
 ---
 
@@ -36,7 +137,7 @@ production AMD path, but **backed by PyTorch symmetric memory
 (`torch.distributed._symmetric_memory`) instead of rocSHMEM (`rocshmem4py`)**.
 
 Why migrate the backend (four independent reasons, strongest last):
-
+ 
 1. **Dependency avoidance.** `rocshmem4py` is *not* pip-installable. It requires apt
    deps (openmpi, cmake, ninja), a from-source build of the rocSHMEM C library with
    specific GPU targets, and `ROCSHMEM_HOME`-pointed editable install (see
@@ -78,6 +179,8 @@ originally carried this name has been deleted — see §7 Phase 4).
   rocSHMEM, no library import).
 - **`ops/communication/_triton_shmem_kernels.py`** (untracked): vendored `@triton.jit`
   kernels + host tuning helpers + the signal-pad barrier kernel.
+- **`ops/communication/_coarse_shmem.py`** (untracked): coarse-grained + HIP-IPC
+  peer-buffer allocator (`alloc_coarse_symm`, `CoarseSymmBuffer`) — the §8.1 perf fix.
 - **`ops/communication/triton.py`**: adds a `TS_ARNORM_BACKEND` env switch
   (`auto`|`iris`|`triton_shmem`|`symm_mem`) inside `allreduce_residual_rmsnorm` that
   routes to the migrated backend.
@@ -190,14 +293,12 @@ Barriers:
 
 ---
 
-## 5. Environment setup (validated end-to-end)
+## 5. Environment setup (validated end-to-end on MI300X)
 
-Everything runs in **one ROCm 7.2 container**. The dev box is 8× MI300X (gfx942) on a
+Everything runs in **one ROCm 7.2 container**. The MI300X dev box is 8× gfx942 on a
 ROCm 7.1 host driver; the container ships its own ROCm 7.2 userspace, so the host
-version is irrelevant. MI300X is fully sufficient for this migration — the only
-MI350X(gfx950)-specific code is the attention kernels, which are dispatch-gated by arch
-and never execute on this path (they register at import, then get filtered out on
-gfx942).
+version is irrelevant. For **MI350X**, use §0.1 container recipe instead of §5.1 base
+image (or reuse `diprajap-tokenspeed:serve-base` which already ships torch 2.11).
 
 ### 5.1 Container
 No single `rocm/pytorch` tag ships both ROCm 7.2 **and** torch 2.11 (the torch-2.11
@@ -278,26 +379,23 @@ no group opt-in here (plain `empty`+`rendezvous` works).
   triton-shmem venv with rocSHMEM. Use it to confirm kernel logic before/after the
   symmetric_ptr edits, but it is torchrun+rocSHMEM-bound.
 
-### 6.2 Microbenchmark — does not exist; build a small one
-- The `tokenspeed_kernel.benchmark` framework (`BenchmarkRunner`, `KernelRegistry`,
-  `benchmark_op`) is **single-process / single-GPU / registry-based** (GEMM/attention).
-  It cannot benchmark a distributed collective without major surgery — **do not** force
-  the op into it.
-- **Recommendation:** one self-contained multi-process microbench (~200–300 lines,
-  one file), modeled on `test_iris_communication.py` Suite 3 but timing with CUDA
-  events, comparing backends via `TS_ARNORM_BACKEND` (iris / symm_mem native /
-  triton_shmem migrated) plus an RCCL `dist.all_reduce` + `F.rms_norm` baseline. Report
-  p50 latency + skew across ranks. Environment: torch.distributed + 8 GPUs; **no new
-  deps** post-migration. **Built and run — see `bench_triton_shmem_ar_rmsnorm.py` and
-  §8.**
-- Upstream `triton-shmem/benchmark/bench_fused_ar_rmsnorm.py` + `benchmark/bench.py`
-  is a reference for axis sweeps and the RCCL baseline design (native-dtype comm for a
-  fair comparison), but it is rocSHMEM/torchrun-bound; port ideas, not the harness.
+### 6.2 Microbenchmark — built (`bench_triton_shmem_ar_rmsnorm.py`)
+Self-contained multi-process bench: CUDA-event p50 + cross-rank skew, per-config
+correctness-gated, backends via `TS_ARNORM_BACKEND` (triton_shmem / iris / native
+symm_mem) plus an RCCL-unfused baseline. Env-overridable axes; run under noise control
+with `benchmark/run_ar_rmsnorm_noise_controlled.sh`. All backends (incl. iris — its
+singleton heap is pre-sized for the sweep) share one process per config so cross-backend
+noise cancels. Results + interpretation: §8.
 
-### 6.3 End-to-end (final gate)
-Run the model server with `TS_ARNORM_BACKEND=triton_shmem`, compare tokens/s and output
-correctness against `iris` and the native `symm_mem` kernel. This is validation, not
-part of the core migration. **HELD** — see §7 Phase 4 (no model fits disk).
+### 6.3 End-to-end (final gate) — DONE on MI350X
+Completed on 8× MI350X gpt-oss-120b; full record in
+`AR_RMSNORM_MI350X_E2E_BENCHMARKS.md`. `triton_shmem` auto-selects and is correct e2e.
+The honest unfused baseline on AMD is the auto all-reduce (**triton custom-AR for ≤512 KiB
+≈ ≤91 tokens at H=2880, else RCCL**) + triton fused add-RMSNorm — `custom_all_reduce` and
+`trtllm_allreduce` are NVIDIA-only and disabled. Fusion is served only for
+`num_tokens ≤ comm_fusion_max_num_tokens`. Verdict: fusion is **not** a served throughput
+win on gfx950 (ws=4 ~20% decode regression when on); disable at ws≥4. (MI300X e2e never
+run — no disk.)
 
 ---
 
@@ -325,14 +423,14 @@ pass on hardware. Nothing left to discover here — follow §5 to reproduce the 
 - Allocation via `_alloc_symm` (`symm_mem.empty` under `inference_mode(False)` +
   `rendezvous`); per-tensor `buffer_ptrs_dev` via `_peer_ptrs_dev` (both reused from
   `triton.py`). one-shot builds 1 table (input); two-shot builds 3.
-- **Decision — barriers are a dedicated signal-pad kernel, leading + trailing on
-  EVERY variant.** `symm_grid_barrier_kernel` launches a **single block per rank**,
-  doing `symm_mem_barrier(sig, block_id=0, rank, ws)`; each rank's block signals every
-  peer and waits for every peer (all-to-all), and the kernel-launch boundary is the
-  global barrier. (Initially this launched `grid_sms` blocks matching the fused grid;
-  that was reduced to 1 block during Phase-4 microbench — a global barrier needs only
-  one representative per rank, and the multi-block version dominated the small-M decode
-  latency. Correctness + graph capture re-verified after the change.)
+- **Decision — leading + trailing signal-pad barriers on EVERY variant** (originally all
+  via a dedicated `symm_grid_barrier_kernel`, a **single block per rank** doing
+  `symm_mem_barrier(sig, block_id=0, …)` all-to-all, the kernel-launch boundary being the
+  global barrier; reduced from `grid_sms` blocks to 1 during Phase-4 as it dominated small-M
+  latency). **UPDATE (default now): the one-shot decode path folds both barriers IN-KERNEL**
+  (`INKERNEL_BARRIER=1`, per-block at `block_id=pid`), removing the two launches; the
+  separate 1-block kernel remains for the two-shot path and the `INKERNEL_BARRIER=0`
+  fallback. See companion doc §4/§7 (reclaim, M-dependence caveat, fixed-participant plan).
   Leading barrier = all peers' inputs visible before any pull. **Trailing barrier is
   issued for one-shot too** (not just two-shot): the persistent symmetric `input`
   buffer is reused across calls (repeated decode graphs), so peers must finish reading
@@ -349,133 +447,224 @@ pass on hardware. Nothing left to discover here — follow §5 to reproduce the 
   `triton_shmem` branch for A/B; the old branch + module are now deleted and the
   migrated backend took the `triton_shmem` name — see Phase 4.)
 
-### Phase 4 — validate & benchmark (DONE ✅ except e2e, which is HELD)
-- **DONE — Correctness:** `test_communcation.py` with `TS_ARNORM_BACKEND=triton_shmem`
-  passes (ws=4, two-shot). `test/ops/test_triton_shmem_communication.py` passes at
-  ws=1/2/4/8 (hidden=2880 → one-shot for ws≤2, two-shot for ws≥4) plus ws=2 hidden=4096
-  (whole-row) — all three kernel variants covered, fp32 reference, 2e-2 tol.
-- **DONE — Graph capture:** capture+replay cases at ws=2 (one-shot) and ws=8
-  (two-shot) pass 3 replays with changing input. Capture-safety confirmed on the
-  production two-shot path.
-- **DONE — Microbench (§6.2, §8):** `benchmark/bench_triton_shmem_ar_rmsnorm.py`
-  (self-contained, multi-process, CUDA-event timed, correctness-gated per config).
-  Swept ws=2/4/8 × M∈{1024,4096,16384} × N∈{1024,2880,4096,16384} vs. an RCCL
-  unfused baseline and the native `symm_mem` kernel. CSV: `results/triton_shmem_bench.csv`.
-  Key result in §8. iris left out of the sweep (its singleton heap can't grow across
-  the multi-config bench — an iris-shim limitation, not this backend's).
-- **DONE — Refactor/rename:** the migrated backend was renamed `symm_shmem` →
-  `triton_shmem` across the whole repo (module, kernels, test, bench, dispatch branch,
-  env value, class/factory/state-cache symbols) and the old rocSHMEM `triton_shmem.py`
-  port + its dispatch branch were **deleted**. Rationale: (a) the two are
-  correctness-identical (literally the same kernels, only the substrate differs), (b)
-  the old port is non-runnable here (rocSHMEM is not installed — the whole point of the
-  migration), and (c) all future triton-shmem ports undergo the same rocSHMEM→symm_mem
-  migration, so one unified name suffices. Tests re-run green after the rename.
-- **HELD — End-to-end server run.** No local model is available and gpt-oss-120B
-  (~240 GB) does not fit the ~57 GB free disk (host 94% full). Per instruction, held
-  pending guidance rather than downloading. NOTE: given §8, an e2e run today would show
-  the fused `triton_shmem` path **losing** to the default — worth weighing before
-  investing disk/time.
+### Phase 4 — validate & benchmark (DONE ✅, incl. MI350X e2e)
+- **Correctness:** `test_triton_shmem_communication.py` passes ws=1/2/4/8 (all three
+  kernel variants) + `test_communcation.py` via the dispatcher; fp32 ref, 2e-2 tol.
+- **Graph capture:** capture+replay pass at ws=2 (one-shot) and ws=8 (two-shot).
+- **Microbench + noise control:** §8. iris is included (heap pre-sized).
+- **e2e:** DONE on MI350X (gpt-oss-120b) — see `AR_RMSNORM_MI350X_E2E_BENCHMARKS.md`.
+
+### Phase 5 — coarse-grained substrate + hardened benchmark (DONE ✅)
+- Coarse-grained HIP-IPC data buffers (`_coarse_shmem.py`, `TS_TRITON_SHMEM_COARSE`,
+  default 1) — the perf fix (§8.1). Noise-controlled multi-backend sweep incl. iris,
+  input-range validation, and the RCCL-unfused/e2e analysis (§8.2–§8.5).
 
 ---
 
-## 8. Benchmark findings (Phase 4) — READ BEFORE SHIPPING
+## 8. Benchmark findings
 
-Full-op p50 latency (copy-in → leading barrier → fused kernel → trailing barrier →
-copy-out, at the dispatcher level), 8× MI300X, bf16, fusion=residual. `results/
-triton_shmem_bench.csv` has the full grid; representative `triton_shmem` vs. RCCL:
+Harness: `benchmark/bench_triton_shmem_ar_rmsnorm.py` (multi-process, CUDA-event p50,
+per-config correctness-gated, fp32 ref, 2e-2 tol). Full op = copy-in → leading barrier
+→ fused kernel → trailing barrier → copy-out, at the dispatcher level. Axes are
+env-overridable (`BENCH_{WORLD_SIZES,BACKENDS,M_VALUES,N_VALUES,N_WARMUP,N_REPEAT}`).
 
-| ws | M×N | RCCL (ms) | triton_shmem (ms) | vs RCCL | native symm_mem (ms) |
-|----|-----|-----------|-------------------|---------|----------------------|
-| 2 | 16384×2880 | 2.20 | 5.30 | 0.42× | 21.3 |
-| 4 | 16384×2880 | 1.21 | 12.8 | 0.09× | 43.1 |
-| 8 | 16384×2880 | 0.73 | 14.8 | 0.05× | 99.3 |
-| 8 | 1024×2880  | 0.11 | 1.07 | 0.11× | 5.82 |
-| 8 | 16384×16384| 4.00 | 99.0 | 0.04× | 165.9 |
+### 8.1 Substrate fix — coarse-grained data buffers via HIP IPC (default on)
 
-Three conclusions, all internally consistent:
+torch's ROCm symm_mem allocator (`CUDASymmetricMemory.cu`, `USE_ROCM`) allocates via
+**HIP VMM** (`hipMemCreate` + `hipMemAllocationTypePinned`) with **no coherence knob**
+(confirmed in shipped headers — only `TORCH_SYMMMEM_NBLOCKS` exists), so the mapping is
+**fine-grained**: ~107 GB/s bulk local vs ~3255 GB/s coarse-grained (measured, 30×).
+Every access paid it (copy-in/out + the kernel's local reads/writes), making the legacy
+backend 0.04–0.11× RCCL at ws=8.
 
-1. **Methodology is sound.** Our RCCL baseline matches the external `triton-shmem`
-   reference (`reverified_baseline.csv`, `dist_unfused_ar_rmsnorm … residual`) within
-   ~2% (e.g. ws=2 16384²: 12.30 vs 12.35 ms; ws=8 16384²: 3.995 vs 4.14 ms). So the
-   numbers are directly comparable to the reference.
-2. **The port is correct and well-built.** `triton_shmem` beats the already-shipping
-   native `symm_mem` kernel by **2–7×** (same fine-grained substrate; our grid-strided
-   kernel + minimal 2-barrier design vs. the native per-row kernel that launches
-   `token_num` blocks each doing a per-row barrier).
-3. **But it loses badly to RCCL (0.04–0.76×)** and to the rocSHMEM reference (which is
-   ~0.88–1.65× RCCL, kernel-only). **Root cause = memory coherence grain**, measured
-   directly:
+Fix: allocate the data buffers (`input`/`output`/`residual_out`) as ordinary
+**coarse-grained `torch.empty`** tensors and expose them peer-to-peer via **HIP IPC**
+(`hipIpcGetMemHandle`/`OpenMemHandle`, offsets via `hipMemGetAddressRange`), building the
+same `buffer_ptrs_dev` uint64 peer table the kernels already consume. Only the signal pad
+stays fine-grained symm_mem (barrier atomics need it). This is the rocSHMEM/MSCCL++/vLLM
+P2P pattern. Code: `ops/communication/_coarse_shmem.py`; wired into `triton_shmem.py`
+behind `TS_TRITON_SHMEM_COARSE` (default `1`, `0` = legacy). Kernels, barrier, dispatch,
+and graph-capture path unchanged. Coherence validated (`/home/jeremwan/coarse_probe.py`):
+in-kernel peer **read and write** are coherent across the signal-pad barrier
+(`sem=release/acquire scope=sys`); remote xGMI is fabric-bound (~0.9× either grain), so
+the win is on local access — exactly why two-shot (remote push once, rest local) is the
+right dispatch at ws≥4.
 
-   | buffer | bulk local read/write |
-   |---|---|
-   | plain `torch.empty` (coarse-grained) | ~4200 GB/s |
-   | `symm_mem.empty`, CUDA/HIP backend (fine-grained) | **~105 GB/s** |
-   | `symm_mem.empty`, NCCL backend (coarse-grained) | ~3200 GB/s |
+Constraint: HIP IPC needs the torch caching allocator **not** in expandable-segments
+(VMM) mode. If IPC export fails, `create_*` declines and the dispatcher falls back to the
+fine-grained path rather than crashing.
 
-   torch symm_mem's default CUDA/HIP backend allocates **fine-grained** memory (needed
-   for the signal-pad atomics; it bypasses L2 → ~40× slower bulk access). The upstream
-   rocSHMEM heap is coarse-grained, which is why the reference is fast. Every symm_mem
-   access pays this: copy-in, copy-out, and the kernel's own reads/writes. It hits the
-   two-shot (peer-push + copy-out) hardest, but forcing one-shot is *worse* (its higher
-   read fan-in also hits fine-grained memory) — so the rocSHMEM dispatch (two-shot at
-   ws≥4) remains the right choice.
+### 8.2 Noise control
 
-**Things tried that do NOT fix it:**
-- `symm_mem.set_backend("NCCL")` gives coarse-grained fast memory (table above) **but
-  faults** (`hipErrorIllegalAddress`) on the direct `buffer_ptrs_dev` peer load/store
-  the vendored kernels require — the NCCL backend is for NCCL window collectives, not
-  raw peer pointers. Not compatible with this kernel design.
-- Forcing one-shot everywhere (measured): slower, not faster (see above).
+This box **cannot pin GPU clocks** — sysfs perf-control is read-only in the unprivileged
+container, so `rocm-smi --setperfdeterminism` is a no-op. Substitutes (driver:
+`benchmark/run_ar_rmsnorm_noise_controlled.sh`): world-size isolation (each ws in its own
+process + 20 s cooldown, no heat-soak carry-over), high warmup/repeat (30/150), and a
+**2-pass variance floor**. Measured floor `|pass1−pass2|/min`: median 0.1–0.8%; **every
+config ≥0.5 ms is stable to <5%**; all larger deltas are sub-0.5 ms latency-bound configs
+(consistent with the reference's finding). **Trust only ≥0.5 ms configs**; small-size
+margins are within noise.
 
-**Paths forward (not attempted — would need a decision / more scope):**
-- Coarse-grained peer buffers for the *data* (input/output/residual_out) with a
-  fine-grained signal pad only — exactly what rocSHMEM does. torch's CUDA/HIP symm_mem
-  allocator is hardcoded fine-grained; getting this means either patching torch's
-  allocator or hand-rolling coarse-grained HIP allocations + `hipIpc*` peer-handle
-  exchange (≈ reimplementing a slice of rocSHMEM). Biggest potential win.
-- Accept the regression only where it doesn't matter: at tiny decode batch (M≈1–64)
-  the absolute latency is small; profile the real serving decode shape before judging.
-- Revisit on a newer torch/ROCm where symm_mem may expose a coherence knob.
+### 8.3 Results (noise-controlled, ≥0.5 ms configs, vs RCCL-unfused baseline)
 
-**Bottom line:** the migration meets its correctness / dependency-avoidance /
-graph-capture goals, but at a real large-tensor perf cost rooted in the symm_mem
-substrate. Shipping it as the default is **not** advisable until the coarse-grained
-data-buffer path (or an equivalent) lands.
+`results/ar_rmsnorm_noise_controlled/` (per-ws, 2 passes). Representative large-tensor
+p50 (ms) and speedup vs RCCL (>1 = fused wins):
 
-## 9. Risks & open items
-- **[RESOLVED] symm_mem cross-allocation offset is NOT assumed** — per-tensor
-  `buffer_ptrs_dev` (3 tables for two-shot) implemented and confirmed by the two-shot
-  correctness tests (ws=4/8 pass).
-- **[RESOLVED] Grid-level barrier semantics for persistent grids** — chose the
-  dedicated signal-pad barrier kernel (`symm_grid_barrier_kernel`, a **single block
-  per rank** doing one `symm_mem_barrier`) rather than in-kernel entry/exit. Confirmed
-  by correctness + graph capture at ws=2/4/8. Ordering for the two-shot push is
-  protected by the trailing barrier before copy-out. (Reduced from `grid_sms` blocks to
-  1 during Phase-4 microbench — see §7 Phase 2.)
-- **[KEY FINDING — see §8] Fine-grained symm_mem memory is the dominant perf cost.**
-  torch symm_mem on ROCm (CUDA/HIP backend) is fine-grained (~105 GB/s vs ~3200 GB/s
-  coarse-grained), making this backend 0.04–0.76× RCCL for large tensors. Substrate
-  property, not a port bug. A coarse-grained data-buffer path is the main open
-  optimization; do not ship as default until addressed.
-- **[RESOLVED] two-shot correctness** — output and residual_out each translated with
-  their own table + trailing barrier before copy-out; ws=4/8 correctness + ws=8 graph
-  capture pass.
-- **[OPEN] Buffer-reuse race for one-shot** — mitigated by issuing the trailing
-  barrier for one-shot too (see Phase 2 decision). If a future perf pass wants to drop
-  it, first prove no peer can still be reading the symmetric `input` when the next
-  call's `copy_` runs.
-- **[OPEN] torch/rocm version** — validated env is torch 2.11+rocm7.2 in the §5
-  container. Re-check symm_mem behavior (`enable_symm_mem_for_group`, signal-pad
-  sizing) if moving to another version.
-- **[OPEN] Tuning portability** — `ArchProfile` numbers are MI300X/MI350X-specific.
-  `detect_arch()` auto-selection is preserved; re-tune for other archs.
-- **[NOTE] Sub-group generality** — unlike the rocSHMEM shim (which required
-  `group == world`), `symm_mem` rendezvous accepts any process group, so `triton_shmem`
-  is not restricted to whole-world TP. Only whole-world TP is exercised today; validate
-  a proper sub-group before relying on it.
+| ws | M×N | RCCL | triton_shmem | iris | triton_shmem / iris |
+|----|-----|------|--------------|------|---------------------|
+| 2 | 16384×4096  | 3.11 | 2.95 (1.05×) | 2.94 (1.06×) | ~1.0× |
+| 2 | 16384×16384 | 12.30| 12.00 (1.03×)| 12.30 (1.00×)| ~1.0× |
+| 4 | 16384×2880  | 1.22 | 1.89 (0.64×) | 3.14 (0.39×) | **1.66×** |
+| 4 | 16384×16384 | 6.75 | 10.4 (0.65×) | 18.2 (0.37×) | **1.75×** |
+| 8 | 16384×2880  | 0.73 | 1.12 (0.65×) | 5.17 (0.14×) | **4.6×** |
+| 8 | 16384×16384 | 3.99 | 6.56 (0.61×) | 35.3 (0.11×) | **5.4×** |
+
+- **triton_shmem wins/parity at ws=2** (1.0–1.15×), settles at **0.6–0.7× RCCL at
+  ws=4/8** — the rocSHMEM reference envelope (ws=2 win, ws=8 RCCL wins on large tensors as
+  it keeps gaining xGMI bandwidth with PE count).
+- **triton_shmem beats iris everywhere at ws≥4 (1.7× → 5.4×)** and matches it at ws=2.
+  iris uses a one-shot full-fan-in kernel (each row reads all peers), so its cost scales
+  with ws; triton_shmem's two-shot at ws≥4 is bandwidth-optimal. triton_shmem is the AMD
+  fused default.
+
+### 8.4 Input range — no restriction for triton_shmem
+
+The triton_shmem kernels take **arbitrary M and N**: the blocked variants mask N with a
+power-of-two `BLOCK_N`; two-shot `cdiv`-shards M (guards non-divisible M); `oneshot_wholerow`
+(the only pow2-N kernel) is auto-selected **only** at ws≤2 for pow2 N, else the dispatch
+picks a blocked kernel. Verified beyond the reference grid at ws=8 (non-pow2 N ∈ {3584,
+5120}, non-divisible M ∈ {2000, 32768}): all correct, same 0.61–0.69× envelope
+(`results/ar_rmsnorm_extended_range.csv`). The prior "iris only" restriction on the sweep
+was **not** a kernel/input limit: it was the iris shim's process-global singleton heap
+(sized at first use, never grows). The bench now pre-sizes it for the whole sweep
+(`_presize_iris_heap`), so iris runs the full grid too (it also handles arbitrary M/N, just
+uncompetitively at ws≥4).
+
+### 8.5 "RCCL-unfused" baseline vs. the real TokenSpeed unfused path (e2e caveats)
+
+The bench baseline is `dist.all_reduce(bf16)` + residual-add + eager `F.rms_norm`. The
+**real** TokenSpeed unfused path (`models/base/comm_ops.py::AllReduceNormOp`, else-branch)
+is `all_reduce(x, group)` + `norm_module(x, residual)` where (a) `all_reduce` goes through
+`get_global_backend()` (auto → **custom IPC all-reduce** if registered, else triton, else
+RCCL) and (b) the norm is a **Triton fused add-RMSNorm**, not eager. Two consequences:
+- The bench baseline is a **pessimistic** proxy: real unfused AR often uses the custom IPC
+  path (faster than plain RCCL at small sizes), so fused's true e2e advantage is **smaller**
+  than the bench's RCCL ratios suggest.
+- Fusion is only taken for `num_tokens ≤ comm_fusion_max_num_tokens` (default **2048**) and
+  only when `enable_allreduce_fusion` (auto-on for single-node AMD TP). **Large prefill
+  (>2048 tokens) always runs unfused** — so the bench's large-M rows (4096/16384) map to no
+  served fused decision; they are robustness/scaling data. The e2e-relevant fused regime is
+  **M ≤ 2048** (decode + small prefill), where the bench shows fused competitive.
+
+**Microbench → e2e extrapolation is bounded, not direct:** it is a faithful *kernel-level*
+latency comparison, but (i) only M≤2048 is a served fused shape, (ii) the honest e2e
+baseline is the auto/custom AR, not the RCCL proxy, and (iii) AR+RMSNorm is a small fraction
+of per-layer time (attention + MLP GEMMs dominate), so op-level ratios do not linearly map to
+tokens/s. The e2e server run (§6.3) — **now DONE** (companion doc §5) — is the real gate.
+
+**Bottom line:** correctness, dependency-avoidance, graph-capture, and performance goals are
+met. `triton_shmem` (coarse default) is the AMD fused backend — competitive with RCCL at
+ws=2, 0.6–0.7× at ws=4/8 (rocSHMEM envelope), and 1.7–5.4× faster than iris at ws≥4.
+
+### 8.6 Model-targeted sweep — where fusion is profitable (ws=4/8 crossover)
+
+The dispatch now routes `auto → triton_shmem` (native symm_mem fallback); iris is
+demoted to explicit-only (`TS_ARNORM_BACKEND=iris`). The migrated backend carries **no
+input-size/dtype gate beyond the shared eligibility** (bf16 contract + the caller's
+`comm_fusion_max_num_tokens=2048` cap); the old iris-era routing was the only real
+activation gate and is gone. The sweep was retargeted to the **row widths actually
+encountered** by the fused AR+RMSNorm / comm+norm ops in the production models rather than
+a synthetic pow2 grid (`results/ar_rmsnorm_model_targeted/`, 2-pass, iris excluded):
+
+- **N = 512** — DeepSeek-V3/V4 & Kimi-K2 `kv_lora_rank` (compressed-KV latent norm).
+- **N = 1536** — DeepSeek/Kimi `q_lora_rank` (compressed-Q latent norm) = GLM `moe_intermediate_size`.
+- **N = 2880 / 5120 / 7168** — hidden sizes of gpt-oss-120B / GLM-4.6 / DeepSeek-V3-V4·Kimi-K2 (the residual stream).
+- **M ∈ {1…4096}** — decode/low-concurrency → chunked-prefill cap (2048) → one point past.
+
+**Fusion profitability vs the (pessimistic) RCCL baseline — speedup = RCCL ÷ triton_shmem:**
+
+| ws | profitable regime (>1.0×) | peak vs RCCL | large-M (≥0.5 ms, trustworthy) |
+|----|---------------------------|--------------|--------------------------------|
+| 2  | M ≳ 256 (N≥5120), ≳512 (2880), ≳1024 (1536); N=512 ~never | 1.05–1.14× @ M 256–1024 | ~0.97–1.01× (parity) |
+| 4  | **none** — never reaches parity | ~0.83× @ M≈512, N=5120 | 0.66–0.68× @ M=4096 |
+| 8  | **none** — never reaches parity | ~0.78× @ M≈1024, N=2880 | 0.62–0.66× @ M=4096 |
+
+**Where fusion stops being profitable at ws=4/8:** against the RCCL microbench baseline it
+is *not* profitable anywhere in the served range — the ratio **peaks at moderate M
+(≈512–1024) and then erodes monotonically** toward the large-M floor (~0.62–0.66×). So the
+marginal case for fusion is strongest around M≈512–1024 and weakens past ~1024 tokens; the
+small compressed-latent widths (N=512, 1536) are the least fusion-favorable at every ws
+(latency-bound, too few bytes to amortize the barrier/copy overhead), while the wins — where
+they exist (ws=2) — concentrate on the large residual streams (2880–7168).
+
+**Hypothesis (the fused kernel is already highly tuned, so this is algorithmic, not a tuning
+gap).** Fusion's benefit is a **fixed-overhead saving**: one kernel launch instead of three
+(AR + add + norm), no intermediate materialization, one pass over the row. That saving is a
+near-constant; it dominates only while the op is latency-bound (small/moderate M), which is
+why parity/wins appear at ws=2 and mid-M. As M and ws grow the op becomes **bandwidth-bound**,
+and there RCCL's ring/tree all-reduce is asymptotically byte-optimal and gains effective xGMI
+bandwidth as link/PE count rises with ws, whereas the one-shot/two-shot fused pattern moves
+more fabric bytes per rank. A constant overhead saving cannot outrun a growing
+byte-movement gap — hence profitability humps at moderate M and falls off with M/ws even
+for a perfectly-tuned kernel. **Caveat (see §8.5):** the RCCL baseline is pessimistic (real
+e2e unfused uses the custom IPC AR), so these are conservative crossovers; the served fused
+regime is M≤2048 and the e2e gate (§6.3) is **DONE** (companion doc §5: fusion parity/win at
+ws=4 decode with the shipped fixes).
+
+## 9. Design invariants & open items
+
+Invariants (hold today; preserve them):
+- **Per-tensor peer tables.** Offsets are not shared across allocations — two-shot uses
+  3 tables (input/output/residual_out); one-shot uses 1.
+- **Barrier.** Leading + trailing signal-pad barriers on every variant (trailing guards
+  cross-call reuse of the persistent `input`; two-shot push ordering). **Default: the
+  one-shot decode path folds them IN-KERNEL** (`INKERNEL_BARRIER=1`, per-block at
+  `block_id=pid`); the two-shot path and the legacy fallback use the separate 1-block
+  `symm_grid_barrier_kernel`. The in-kernel form is M-dependent (see open items).
+- **Substrate.** Coarse-grained `torch.empty` data buffers + HIP-IPC peer table; only
+  the signal pad is fine-grained symm_mem. Requires the caching allocator **not** in
+  expandable-segments mode; on IPC-export failure the backend declines → dispatcher
+  falls back to fine-grained (correct, slow).
+
+Open items (full plan + data: **companion doc §7**):
+- **Fused small-M loss — mostly removed; two levers remain.** SHIPPED: one-shot dispatch
+  (`ONESHOT_MAX_M=256`, no copy-out) + in-kernel barriers (default ON, no barrier launches) →
+  ws=4 decode op ~0.088→~0.048 ms, parity/win vs unfused. Remaining bounded gap: the barrier
+  *work* stays in-kernel and **copy-in (~0.012 ms) is an untouched floor**. Next levers
+  (companion §7): **(A) avoid copy-in** (producer writes into the symmetric input buffer;
+  biggest lever, ~25% of the decode op) and **(B) fixed-participant in-kernel barrier**
+  (fixes the in-kernel barrier's grid-scaling cost, the M=256 op-level dip, makes it robust
+  to M-divergence, and unlocks two-shot in-kernel — currently gated OFF as a measured loss).
+- **In-kernel barrier is M-divergence-fragile** (`block_id∈[0,grid_sms)`, M-dependent slot
+  range): deadlocks only if TP ranks replay different-M graphs at once — never in dp=1 pure
+  TP (the separate 1-block barrier is M-independent, hence robust). Set `INKERNEL_BARRIER=0`
+  under DP / overlap>1 / spec-decode until lever B lands. Repro:
+  `benchmark/probe_inkernel_barrier_graph.py PROBE_MODE=multigraph`.
+- **Fusion gate:** enable `comm_fusion_max_num_tokens>0` for ws=2 (wins broadly) and ws=4
+  decode (parity/win). Companion §3/§5/§7.
+- **Large unfused RCCL all-reduce hang is serve-specific, NOT RCCL and NOT the fused
+  kernel.** Standalone ws=4 RCCL stress (incl. rank jitter) passes; under serve 2/4 ranks
+  spin. Prime hypothesis: RCCL colliding with coexisting symm_mem/HIP-IPC collectives.
+  ws=4-safe debug plan in companion §6/§7 (do NOT run 8-GPU variants — GPU 3 contention).
+- **Serve setup skew:** image ships smg 1.4.1 but the checkout pins smg 1.7.0 → rebuild the
+  image to drop the `--policy round_robin`/socket-leak workarounds (all perf-neutral).
+  Companion §1.
+- **Decouple from caching-allocator mode** — a dedicated
+  `hipExtMallocWithFlags(hipDeviceMallocDefault)` allocator would remove the
+  expandable-segments constraint above.
+- **Kernel tuning** — `ArchProfile` is MI300X/MI350X-specific (`detect_arch()`
+  auto-selects); the remaining gap to RCCL at ws≥4 is kernel-level (grid/block, xGMI push
+  scheduling), not substrate. Re-tune for other archs.
+- **torch/rocm version** — validated on torch 2.11+rocm7.2; re-check symm_mem signal-pad
+  behavior on other versions.
+- **Sub-group TP** — symm_mem rendezvous + IPC accept any process group, but only
+  whole-world TP is exercised; validate a sub-group before relying on it.
 
 ## 10. Key file reference
+- **MI350X e2e + fusion-threshold record (companion):**
+  `ops/communication/AR_RMSNORM_MI350X_E2E_BENCHMARKS.md`. Data:
+  `benchmark/results/ar_rmsnorm_mi350x_e2e/` (crossover CSVs + e2e A/B). Helpers:
+  `benchmark/e2e_gptoss_{serve,bench,teardown}.sh`.
 - **Canonical AMD env setup (authoritative):** `test/ci_system/install_deps_rocm.sh`
 - AMD kernels source to build (§5.2): `tokenspeed-kernel-amd/` (in-tree, v0.1.1)
 - ROCm requirements pins: `tokenspeed-kernel/python/requirements/{rocm,rocm-thirdparty,common}.txt`
@@ -486,7 +675,8 @@ data-buffer path (or an equivalent) lands.
 - rocSHMEM interop (reference semantics):
   `/home/jeremwan/rocm-systems/projects/rocshmem/python/rocshmem4py/interop/torch.py`
 - **Migrated backend (this project): `ops/communication/triton_shmem.py` (shim/state) +
-  `ops/communication/_triton_shmem_kernels.py` (vendored kernels + tuning + barrier).**
+  `ops/communication/_triton_shmem_kernels.py` (vendored kernels + tuning + barrier) +
+  `ops/communication/_coarse_shmem.py` (coarse-grained HIP-IPC data buffers, §8.1).**
   (The old rocSHMEM port that previously held the `triton_shmem.py` name is deleted.)
 - Dispatch + native symm_mem kernel + reusable helpers (`_alloc_symm`,
   `_peer_ptrs_dev`, `symm_mem_barrier`, `amd_allreduce_residual_rmsnorm_kernel`):
@@ -495,7 +685,11 @@ data-buffer path (or an equivalent) lands.
 - Callers: `runtime/layers/layernorm.py`, `runtime/distributed/comm_ops.py`
 - Existing tests: `test/ops/test_communcation.py`, `test/ops/test_iris_communication.py`
 - **Migrated-backend test: `test/ops/test_triton_shmem_communication.py`**
-- **Microbench: `benchmark/bench_triton_shmem_ar_rmsnorm.py`; results:
-  `results/triton_shmem_bench.csv`. Reference: `triton-shmem/benchmark/results/
-  ar_rmsnorm_opt_sweep/reverified_baseline.csv`.**
+- **Microbench: `benchmark/bench_triton_shmem_ar_rmsnorm.py`; noise-controlled driver:
+  `benchmark/run_ar_rmsnorm_noise_controlled.sh`. Results:
+  `results/ar_rmsnorm_noise_controlled/pass{1,2}_ws{2,4,8}.csv` (2-pass variance floor),
+  `results/ar_rmsnorm_extended_range.csv` (non-pow2 N / non-divisible M). Reference:
+  `triton-shmem/benchmark/results/ar_rmsnorm_opt_sweep/reverified_baseline.csv`.**
 - Phase 0 probes: `/home/jeremwan/symm_probe.py`, `/home/jeremwan/symm_graph_probe.py`
+- Coarse-grained fix probe (§8.1: local/remote BW + peer read/write coherence):
+  `/home/jeremwan/coarse_probe.py`
