@@ -1,231 +1,277 @@
-# Fused AR+RMSNorm on MI350X — e2e benchmarks, crossover & optimization roadmap
+# Fused AR+RMSNorm on MI350X: current benchmark and fault-resolution record
 
-**Companion to `AR_RMSNORM_SYMM_MEM_MIGRATION.md`** (migration triton-shmem → torch
-symm_mem + MI300X microbench). This is the **MI350X (gfx950) benchmarking + analysis
-record**: how to run the gpt-oss-120b e2e gate, the op-level crossover, a latency
-decomposition of the *shipping* fused op, and the consolidated optimization plan. Audience:
-engineering agents. Precise + forward-looking; delete anything that stops informing a
-decision.
+This is the canonical MI350X record for the `triton_shmem` fused all-reduce +
+residual-add + RMSNorm backend. Backend design and MI300X evidence are in
+`AR_RMSNORM_SYMM_MEM_MIGRATION.md`. Container provenance and the historical
+HIP/RCCL investigation are in
+`AR_RMSNORM_ROCM_CONTAINER_AND_RCCL_HISTORY.md`.
 
-> **HEADLINE.** The migrated `triton_shmem` fused AR+RMSNorm auto-selects, is numerically
-> correct e2e on gpt-oss-120b, and — after two shipped fixes — is now **at parity-to-winning
-> vs the real unfused path for ws=4 decode**, and **wins broadly at ws=2**. The fixes:
-> (1) **M-aware one-shot dispatch** at small M (`TS_TRITON_SHMEM_ONESHOT_MAX_M=256`, drops
-> the two-shot copy-out) and (2) **in-kernel barriers**, now **DEFAULT ON**
-> (`TS_TRITON_SHMEM_INKERNEL_BARRIER=1`, drops the two separate barrier-kernel launches).
-> Together they take the ws=4 decode op from ~0.088 ms to ~0.048 ms (§4) and flip the
-> op-level crossover vs RCCL to **>1 for M≤192 at ws=4** and **≥1 almost everywhere at ws=2**
-> (§3). e2e (ws=4, same-session A/B, §5): fused decode TPOT reaches **parity at conc16 and a
-> win at conc32** vs unfused. **Recommendation: enable fusion for ws=2 and ws=4 decode
-> (`comm_fusion_max_num_tokens>0`).**
->
-> **The remaining gap is small and bounded (§4):** folding the barriers reclaimed only the
-> *launches* (~0.020 ms/op) — the barrier *work* stays inside the kernel, and **copy-in
-> (~0.012 ms) is an untouched floor**. Two levers remain (§7): **avoid copy-in** (biggest,
-> ~25% of the decode op) and a **fixed-participant in-kernel barrier** (fixes the M=256 dip,
-> makes the default robust, and unlocks two-shot in-kernel).
->
-> **Caveat (documented, narrow):** the in-kernel barrier's signal-pad slot range is
-> **M-dependent**, so it deadlocks *only if TP ranks replay different-M graphs
-> simultaneously*. Pure TP (dp=1, `overlap_schedule_depth=1`, no spec-decode) never does, so
-> the default is safe there. **Set `TS_TRITON_SHMEM_INKERNEL_BARRIER=0` under DP /
-> `overlap_schedule_depth>1` / spec-decode until the fixed-participant barrier lands (§7).**
+## Current decision
 
-Data (repo): `benchmark/results/ar_rmsnorm_mi350x_e2e/`. Probes/helpers:
-`benchmark/probe_ar_rmsnorm_decomp.py`, `benchmark/probe_inkernel_barrier_graph.py`,
-`benchmark/probe_rccl_hang.py`, `benchmark/e2e_gptoss_{serve,bench,teardown}.sh`.
+All previously failing serving configurations now complete with
+`TORCH_NCCL_BLOCKING_WAIT=0`:
 
----
+- ws=2/4/8 fused and unfused serving;
+- random input 128/output 512 at concurrency 8/16/32;
+- two seeds per point, zero failed requests;
+- ws=8 includes the physical GPU that faulted previously.
 
-## 1. Environment & serve setup
+Two independent AMD barrier defects were fixed:
 
-Container `ts-migrate-mi350x` (`diprajap-tokenspeed:serve-base`, torch 2.11+rocm7.2,
-8×gfx950). Serve = `python -m tokenspeed.cli serve …` (`e2e_gptoss_serve.sh`); confirm the
-fused path via the log line `triton_shmem AR+RMSNorm state: … substrate=coarse+ipc
-inkernel_barrier=True`. Model `gpt-oss-120b` (`/data/models/openai/gpt-oss-120b`) = mxfp4
-MoE experts + **bf16 dense/residual stream, H=2880** → AR+RMSNorm runs on the bf16 residual
-stream (representative).
+1. **Unfused Triton AR:** a scalar system-scope signal barrier did not represent
+   sibling wavefront loads/stores. Disabling the new workgroup synchronization
+   reproduces the ws=8 post-warmup memory faults; enabling it completes the full
+   campaign.
+2. **Folded fused copy-in:** phase-0 stores and peer pulls used a scalar
+   cross-rank barrier in a multi-wave program. A workgroup barrier is necessary
+   but not sufficient because the system release/acquire is wave-scoped. The
+   safe folded specialization uses one wavefront. Four warps reproduce the
+   post-readiness memory fault; one warp completes ws=4/8 serving.
 
-**GPU pinning (HIP index ≠ rocm-smi index).** rocm-smi→HIP via PCI bus: `0→1 1→3 2→2 3→0
-4→5 5→7 6→6 7→4`. **Noisy GPU (rocm-smi 3) = HIP index 0.** For ws<8 use
-`HIP_VISIBLE_DEVICES=1,2,3,5` (→ rocm-smi {0,1,2,4}). Shared box: check `rocm-smi` for other
-users before launching; tear serves down after.
+Folded copy-in is again default ON, with one warp. In-kernel barriers, coarse
+HIP-IPC buffers, and the small-M one-shot overlay remain enabled.
 
-**Serve gotchas (all image/version-skew, perf-neutral for an A/B):**
+Performance policy remains conservative:
 
-| gotcha | fix |
-|---|---|
-| `import tokenspeed` fails (baked editable points at unmounted path) | `pip install -e /home/jeremwan/tokenspeed/python --no-deps` |
-| gateway `--policy: invalid choice 'passthrough'` (image smg 1.4.1 < pinned 1.7.0) | `--policy round_robin` (or rebuild image to 1.7.0) |
-| startup pins ~1.6 TB host RAM (KV host mirror, `kvstore_ratio=2.0`) | `--kvstore-size 8` |
-| `Address already in use` / orphans survive teardown (PID 1 = `sleep infinity`, procs renamed `ts-serve`/`ts-control`) | graceful SIGINT to `ts-serve` first (`e2e_gptoss_teardown.sh`); container restart clears leaked sockets |
-| chat `harmony_parsing_failed` (gpt-oss harmony vs `--reasoning-parser base`) | bench via `/v1/completions` |
+- **ws=2:** auto-enable fusion; e2e ranges from parity to a 2.2% TPOT win.
+- **ws=4/8:** do not auto-enable fusion. The isolated fused operator wins at the
+  smallest M, but complete serving is slower over the measured workload. Users
+  can still opt in explicitly for a validated workload.
 
----
+## 1. Environment and defaults
+
+- Hardware: 8× AMD Instinct MI350X (`gfx950`), shared development host.
+- Container: `jeremwan-tokenspeed`.
+- Image: `jeremwan/tokenspeed:rocm7.2.4-torch2.11`,
+  `sha256:96f8b38d54c7da59f7888def76be81e99bf7512117bb2769609fadc7f19d230f`.
+- Runtime: torch `2.11.0+rocm7.2`, loaded HIP 7.2.53211 and RCCL 2.27.7.
+- Model: `/data/models/openai/gpt-oss-120b`; bf16 residual width N=2880.
+
+Resolved fused defaults:
+
+```text
+TS_ARNORM_BACKEND=auto
+TS_TRITON_SHMEM_COARSE=1
+TS_TRITON_SHMEM_INKERNEL_BARRIER=1
+TS_TRITON_SHMEM_FOLD_COPYIN=1
+TS_TRITON_SHMEM_FOLD_NUM_WARPS=1
+TS_TRITON_SHMEM_WORKGROUP_SYNC=1
+TS_TRITON_SHMEM_ONESHOT_MAX_M=256
+TS_TRITON_SHMEM_BARRIER_GRID=0
+TS_TRITON_AR_WORKGROUP_SYNC=1
+TORCH_NCCL_BLOCKING_WAIT=0
+```
+
+`TS_TRITON_SHMEM_WORKGROUP_SYNC=0`,
+`TS_TRITON_SHMEM_FOLD_NUM_WARPS=4`, and
+`TS_TRITON_AR_WORKGROUP_SYNC=0` are diagnostic controls only.
+
+All final runs began from an idle KFD snapshot. For ws<8 physical GPU 3/HIP
+index 0 was excluded. The final ws=8 campaigns were also checked for foreign KFD
+processes during execution.
 
 ## 2. Method
 
-- **Crossover** (`bench_triton_shmem_ar_rmsnorm.py`): full production op via the dispatcher
-  (`auto→triton_shmem`, coarse+ipc, **inkernel default**) vs `rccl_unfused`
-  (`dist.all_reduce` + residual + `F.rms_norm`). This box can't pin clocks (sysfs read-only)
-  → lean on warmup/repeat; trust <0.1 ms configs only for *relative* trends, not absolutes.
-- **Decomposition** (`probe_ar_rmsnorm_decomp.py`): times the fused op **both ways**
-  (in-kernel vs separate-barrier, toggling the live state) and splits it into copy-in / pure
-  kernel / residual in-kernel-barrier / copy-out, vs the unfused custom-AR + eager norm.
-- **e2e A/B**: identical serve except `--comm-fusion-max-num-tokens` (>0 = fusion ON, 0 =
-  pure unfused). `random`, temperature 0, ignore-eos.
+Op-level results use HIP events, per-rank medians, and the maximum rank median.
+Each row has 30 warmups, 100–150 timed repetitions, a correctness gate, and two
+passes. Tables report the mean of pass p50 values.
 
----
+The baselines answer different questions:
 
-## 3. Op-level crossover — new default (N=2880, fused ÷ RCCL; >1 ⇒ fusion wins)
+1. Section 3 retains RCCL + eager residual/`F.rms_norm` for historical crossover
+   continuity. It is deliberately pessimistic.
+2. Section 3 custom-AR rows are standalone small-message context.
+3. Section 4 uses the serving-faithful stack: Triton AR through 512 KiB, RCCL
+   above it, then TokenSpeed Triton residual-add RMSNorm. At N=2880/bf16, the
+   transport switches between M=64 and M=128.
 
-`mi350x_cross_inkernel_default.csv`. Decode M is one-shot+in-kernel; M>256 is two-shot
-(separate barriers, §4).
+End-to-end runs use random input length 128, output length 512, temperature 0,
+ignore EOS, and prompt count four times concurrency. Values are means of two
+seed medians. Curated data:
+`benchmark/results/ar_rmsnorm_mi350x_e2e/mi350x_latest_e2e_summary.csv`.
 
-| M | ws=2 | ws=4 |
-|------|------|------|
-| 8    | 1.16 | 1.05 |
-| 64   | 0.95 | **1.12** |
-| 128  | 1.00 | **1.11** |
-| 192  | —    | 1.00 |
-| 256  | 1.18 | 0.73 |
-| 384  | 1.28 | 0.68 |
-| 512  | 1.25 | 0.77 |
-| 1024 | 1.17 | 0.92 |
-| 2048 | 1.10 | 0.81 |
+## 3. Op-level crossover: RCCL + eager norm proxy
 
-- **ws=2 wins ≈everywhere** (only M=64 dips to 0.95, within noise) — vs the pre-fix envelope
-  that lost below M≈384. Enable ws=2 fusion.
-- **ws=4 decode now WINS** (M≤192: 1.0–1.12×, was 0.64× pre-fix). Two effects bound it: the
-  **M=256 dip to 0.73×** (the one-shot in-kernel barrier's cost scales with grid ≈ M — §4;
-  two-shot there is *worse*, 0.61×, so 256 is the right one-shot cap), and **M>256 two-shot**
-  never beats RCCL at ws=4 (bandwidth regime; RCCL is byte-optimal — migration doc §8.6).
-- The RCCL baseline is fair: forcing `NCCL_MIN/MAX_NCHANNELS=32` doesn't help it (auto
-  already optimal for N=2880). Note this microbench baseline (eager RCCL+`F.rms_norm`) is
-  *pessimistic* vs the real serve unfused path (custom-AR + triton fused norm) — the e2e A/B
-  (§5) is the ground truth.
+Speedup is RCCL proxy latency divided by fused latency. Above one favors fusion.
+Raw data: `mi350x_resolved_cross_pass{1,2}_ws{2,4,8}.csv`.
 
----
+| M | ws=2 | ws=4 | ws=8 |
+|---:|---:|---:|---:|
+| 8 | 1.07 | 0.77 | 0.73 |
+| 64 | 0.87 | 1.00 | 0.83 |
+| 128 | 0.86 | 1.04 | 0.67 |
+| 256 | 1.08 | 0.70 | 0.47 |
+| 384 | 1.26 | 0.61 | 0.60 |
+| 512 | 1.21 | 0.67 | 0.64 |
+| 768 | 1.13 | 0.81 | 0.76 |
+| 1024 | 1.07 | 0.86 | 0.79 |
+| 2048 | 0.99 | 0.77 | 0.89 |
 
-## 4. Decomposition — what the fixes reclaimed, and why the win is bounded (decision-critical)
+ws=2 is favorable from M=256 through M=1024. ws=4 has only narrow parity near
+M=64–128. ws=8 never beats this proxy.
 
-`probe_ar_rmsnorm_decomp.py`, ws=4, N=2880, ms, max across ranks, 2-pass. The **shipping**
-op is `copy-in → [in-kernel leading barrier → kernel → in-kernel trailing barrier]` (one
-launch); the legacy path issued the two barriers as **separate 1-block kernel launches**.
+### Custom Triton-AR extras
 
-| M | path | copy-in | kernel | in-kernel barrier | **FULL (default)** | legacy sep-barrier | **reclaim** | unfused (custom-AR+norm) | unf/FULL |
-|-----|------|---------|--------|-------------------|--------------------|--------------------|-------------|--------------------------|----------|
-| 8   | 1-shot | 0.023 | 0.013 | 0.012 | **0.048** | 0.068 | **0.020** | 0.047 | 0.98× |
-| 32  | 1-shot | 0.012 | 0.017 | 0.014 | **0.048** | 0.067 | **0.019** | 0.050 | 1.04× |
-| 64  | 1-shot | 0.012 | 0.015 | 0.015 | **0.049** | 0.067 | **0.019** | 0.064 | 1.31× |
-| 128 | 1-shot | 0.013 | 0.012 | 0.011 | **0.048** | 0.069 | **0.021** | 0.103 | 2.12× |
-| 256 | 1-shot | 0.013 | 0.019 | 0.052 | **0.084** | 0.065 | **−0.018** | 0.169 | 2.03× |
-| 512 | 2-shot | 0.013 | 0.021 | n/a (sep) | **0.083** | 0.083 | — | 0.318 | 3.8× |
+Only M=8/64 are eligible. `fused/custom >1` means fused is slower. These rows do
+not inform the crossover conclusion.
 
-(Two-shot uses separate barriers by default (~0.032 ms) + a ~0.017 ms copy-out, so its FULL
-exceeds copy-in+kernel; folding its barriers in-kernel was measured a net loss — §7.)
+| ws | M | custom unfused ms | fused/custom |
+|---:|---:|---:|---:|
+| 2 | 8 | 0.0491 | 1.16 |
+| 2 | 64 | 0.0493 | 1.10 |
+| 4 | 8 | 0.0524 | 1.11 |
+| 4 | 64 | 0.0530 | 1.06 |
+| 8 | 8 | 0.0518 | 1.14 |
+| 8 | 64 | 0.0808 | 0.79 |
 
-**What this says (answers "why the win is smaller than hoped"):**
-1. **Folding barriers reclaims the two launches, not the barrier itself.** At decode M the
-   two separate launches cost ~0.032 ms; the in-kernel barrier still costs ~0.011–0.015 ms
-   of *work* inside the kernel → net **reclaim ≈ 0.020 ms/op** (~30% of the sep-barrier op).
-   Combined with the one-shot fix (no copy-out), the decode op is ~0.048 ms — **at/under the
-   real unfused custom-AR+norm** (0.047–0.103 ms), and the advantage grows with M because the
-   custom-AR full-fan-in explodes.
-2. **Copy-in (~0.012 ms) is an untouched floor** — ~25% of the decode op and now the single
-   largest removable chunk (§7 lever A).
-3. **The in-kernel barrier cost scales with grid width (≈ M).** It is a clear win while the
-   grid is small (M≤~192) but *balloons* at M=256 (grid=256=num_cus → barrier 0.052 ms,
-   `reclaim` goes **negative**) and across the two-shot regime — which is exactly why
-   **two-shot keeps the separate barriers** (measured reclaim −0.005…−0.048 ms at M≥512) and
-   why the fixed-participant barrier (§7 lever B) is the key to going further.
-4. Context: the reference `mi350x_tuning_report.md` "~1.38× best-fused" is **kernel-only**
-   (pre-placed input, no copy-in/out, no leading barrier, pinned clocks). Production wraps
-   the ~0.014 ms kernel in copy-in + barriers; that wrapper — not the kernel — is the gap.
+## 4. Decomposition against the serving baseline
 
----
+Speedup is serving-unfused divided by fused-default latency. Above one favors
+fusion. Raw data:
+`mi350x_resolved_decomp_pass{1,2}_ws{2,4,8}.csv`.
 
-## 5. End-to-end A/B (ws=4, gpt-oss-120b) — the ground truth
+| ws | M | transport | fused ms | unfused ms | speedup |
+|---:|---:|:---|---:|---:|---:|
+| 2 | 8 | Triton AR | 0.0463 | 0.0577 | 1.25 |
+| 2 | 32 | Triton AR | 0.0449 | 0.0596 | 1.33 |
+| 2 | 64 | Triton AR | 0.0447 | 0.0598 | 1.34 |
+| 2 | 128 | RCCL | 0.0451 | 0.0610 | 1.35 |
+| 2 | 256 | RCCL | 0.0437 | 0.0650 | 1.49 |
+| 2 | 512 | RCCL | 0.0692 | 0.0786 | 1.14 |
+| 2 | 1024 | RCCL | 0.1268 | 0.1303 | 1.03 |
+| 4 | 8 | Triton AR | 0.0479 | 0.0615 | 1.29 |
+| 4 | 32 | Triton AR | 0.0465 | 0.0619 | 1.33 |
+| 4 | 64 | Triton AR | 0.0463 | 0.0629 | 1.36 |
+| 4 | 128 | RCCL | 0.0464 | 0.0651 | 1.40 |
+| 4 | 256 | RCCL | 0.0767 | 0.0663 | 0.87 |
+| 4 | 512 | RCCL | 0.0877 | 0.0683 | 0.78 |
+| 4 | 1024 | RCCL | 0.1098 | 0.0893 | 0.81 |
+| 8 | 8 | Triton AR | 0.0555 | 0.0609 | 1.10 |
+| 8 | 32 | Triton AR | 0.0576 | 0.0604 | 1.05 |
+| 8 | 64 | Triton AR | 0.0637 | 0.0760 | 1.19 |
+| 8 | 128 | RCCL | 0.0774 | 0.0627 | 0.81 |
+| 8 | 256 | RCCL | 0.1112 | 0.0659 | 0.59 |
+| 8 | 512 | RCCL | 0.0943 | 0.0656 | 0.70 |
+| 8 | 1024 | RCCL | 0.1079 | 0.0786 | 0.73 |
 
-Same-session 3-arm A/B, `random` in128/out512, temperature 0, ignore-eos; median decode
-TPOT (ms) / output tok/s. Fused = new default (one-shot + in-kernel). Data:
-`ar_rmsnorm_e2e/logs/serve_{inkernel_ON,inkernel_OFF,unfused}.log`.
+The production baseline reverses the earlier optimistic framing:
 
-| conc | unfused (cap=0) | **fused (default)** | fused, in-kernel OFF |
-|------|-----------------|---------------------|----------------------|
-| 8    | 10.28 / 766     | 11.04 (+7.4%) / 712 | 11.59 (+12.7%) / 682 |
-| 16   | 11.80 / 1337    | 12.23 (+3.6%) / 1290| 12.32 (+4.4%) / 1223 |
-| 32   | 12.86 / 2439    | **12.62 (−1.9%)** / 2421 | 13.23 (+2.9%) / 2266 |
-| 64/128 | —             | healthy, correct (11.04→15.83 as conc grows) | — |
+- ws=2 wins throughout the sampled range;
+- ws=4 wins only through M=128;
+- ws=8 wins only while the unfused transport is Triton AR (M<=64).
 
-The default (in-kernel ON) **beats the legacy separate-barrier path at every concurrency**
-and reaches **parity at conc16 / a win at conc32** vs unfused; only conc8 retains a ~7%
-penalty (the copy-in + barrier floor of §4). Validated healthy + numerically correct
-(completion "…is Paris") across conc 8/16/32/64/128 + a mixed varied-length load; correctness
-+ HIP graph capture/replay tests pass at ws=2/4 with the default
-(`test_triton_shmem_communication.py`).
+## 5. End-to-end gpt-oss-120b
 
----
+TPOT delta is `(fused/unfused)-1`; lower is better. Throughput delta is
+`(fused/unfused)-1`; higher is better.
 
-## 6. Known serve issue — RCCL large-all-reduce hang (NOT the fused kernel)
+| ws | concurrency | unfused TPOT ms | fused TPOT ms | TPOT delta | unfused tok/s | fused tok/s | throughput delta |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2 | 8 | 11.57 | 11.60 | +0.3% | 679 | 679 | -0.1% |
+| 2 | 16 | 12.89 | 12.78 | -0.9% | 1226 | 1232 | +0.5% |
+| 2 | 32 | 15.12 | 14.78 | -2.2% | 2078 | 2137 | +2.8% |
+| 4 | 8 | 10.31 | 11.18 | +8.4% | 764 | 706 | -7.6% |
+| 4 | 16 | 11.40 | 12.21 | +7.1% | 1384 | 1274 | -7.9% |
+| 4 | 32 | 12.40 | 13.06 | +5.4% | 2528 | 2168 | -14.2% |
+| 8 | 8 | 10.97 | 12.04 | +9.8% | 716 | 652 | -8.9% |
+| 8 | 16 | 12.34 | 13.06 | +5.8% | 1038 | 1208 | +16.4%* |
+| 8 | 32 | 13.41 | 13.72 | +2.3% | 2347 | 2286 | -2.6% |
 
-Under serve, a large **unfused RCCL all-reduce** (batched prefill, NumelIn≈6656×2880,
-ALLREDUCE, NCCL watchdog timeout) intermittently deadlocks — 100% spin on 2/4 ranks (rank
-desync signature). Occurs on fusion on/off (fusion routes ≤cap through triton_shmem but >cap
-still hits RCCL), so fusion-OFF is *more* exposed → a minor robustness point for fusion.
-**Isolated as serve-specific:** standalone RCCL at the suspect sizes (±rank jitter, 300
-iters, `probe_rccl_hang.py`) never hangs. Prime hypothesis: RCCL colliding with coexisting
-symm_mem / HIP-IPC collectives (custom-AR, TritonRSAG, triton_shmem). Debug steps in §7.
+`*` The ws=8 concurrency-16 unfused throughput pair has 15.9% seed spread; TPOT
+is stable and shows a regression, so no throughput win is claimed.
 
----
+All 36 final logs completed with zero request failures and no HIP/HSA fault:
 
-## 7. Consolidated plan & open items
+- `bench_final_ws2_{fused,unfused}_...`
+- `bench_final_ws4_{fused,unfused}_...`
+- `bench_resolve_ws8_{fused_clean,unfused}_...`
 
-**Shipped (this line of work):**
-- ✅ M-aware one-shot dispatch at small M (`ONESHOT_MAX_M=256`) — removes two-shot copy-out.
-- ✅ In-kernel barriers **default ON** for the one-shot decode path — removes 2 barrier
-  launches (~0.020 ms/op reclaim). Correctness + graph capture validated; e2e §5.
-- ✅ Two-shot in-kernel barriers **implemented but gated OFF** (kernel keeps the param): the
-  grid-scaling barrier makes it a net loss at two-shot grid widths (§4). Re-enable after
-  lever B.
+## 6. Exact fault causes and controls
 
-**Config recommendation (act on now, at deploy):**
-- **Enable fusion for ws=2 and ws=4 decode** (`comm_fusion_max_num_tokens>0`, e.g. 256 to
-  cover decode + short prefill). ws=2 wins ≈everywhere (§3); ws=4 decode is parity/win (§5).
-  ws=2's old "M∈[384,2048] only" note is obsolete.
-- **Keep `TS_TRITON_SHMEM_INKERNEL_BARRIER=0` under DP / `overlap_schedule_depth>1` /
-  spec-decode** until lever B lands (M-divergence caveat, headline).
+### 6.1 ws=8 unfused memory-access fault
 
-**Optimization levers (ordered by expected value; goal = beat unfused at all decode conc):**
+The serving path uses TokenSpeed Triton AR at M<=91. Its kernel used four
+wavefronts but called a scalar `symm_mem_barrier` before peer loads and before
+buffer reuse. The scalar release/acquire did not synchronize sibling wavefronts.
 
-- **A. Avoid copy-in (biggest remaining lever, ~0.012 ms ≈ 25% of the decode op).** Have the
-  producer of the AR input (the attention/MLP output projection) write **directly into the
-  state's persistent symmetric input buffer**, eliminating `self._x.copy_(input_tensor)`.
-  The in-kernel *leading* barrier (now default) already provides the entry ordering this
-  needs. Work: expose `state.symmetric_input_view(m)` from the shim; teach
-  `layernorm.forward_with_allreduce_fusion` / `comm_ops` to route the prior op's output into
-  it (fall back to copy-in when the producer can't target it); validate under graph capture
-  (buffer address is persistent, so capture-safe) + re-run §4/§5. Risk: caller-side, spans
-  model code → land behind a flag, A/B before default.
+Fix: `symm_mem_workgroup_barrier` brackets the scalar barrier with workgroup
+barriers in AMD all-reduce, native fused AR+RMSNorm, and RS/AG kernels.
 
-- **B. Fixed-participant in-kernel barrier (unlocks robustness + the M≥256 / two-shot wins).**
-  Bake a **fixed barrier participant count `G`, identical across all captured graphs/ranks**,
-  so `block_id∈[0,G)` regardless of M (the row loop already strides over M). This (i) makes
-  the barrier **M-independent → safe under M-divergence** (removes the DP/overlap/spec-decode
-  caveat), and (ii) **decouples barrier cost from grid width** → fixes the M=256 dip (§3/§4)
-  and makes two-shot in-kernel a win (re-enable it then). Constraint: **`G` ≤ a safe fraction
-  of `num_cus`** so all `G` blocks stay co-resident under serve concurrency (too-large `G`
-  risks a co-residency deadlock — the likely form of the historical fault). Validate:
-  `probe_inkernel_barrier_graph.py PROBE_MODE=multigraph PROBE_RNG_SHARED=0` must flip
-  HANG→PASS; then re-A/B (expect the M=256 dip and the two-shot loss to disappear).
+Single-variable serve control:
 
-- **C. ws=8 e2e A/B.** Microbench validated; e2e pending (needs GPU3/HIP0 — time around its
-  periodic burst). Divergence analysis is ws-agnostic; expect the ws=4 conclusions to carry.
+- `serve_resolve_ws8_unfused_nosync.log`,
+  `TS_TRITON_AR_WORKGROUP_SYNC=0`: readiness followed by memory faults on four
+  GPU nodes and fatal abort.
+- synchronized Triton AR: full ws=8 unfused campaign completed.
 
-**Separate robustness issue — RCCL hang (§6), ws=4-safe debug (do NOT run 8-GPU variants):**
-1. `NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,COLL,P2P`; trigger; find the stalled peer/transport.
-2. Force all collectives to RCCL (disable triton custom-AR + RSAG auto paths) — if the hang
-   vanishes, it's a symm_mem/IPC + RCCL resource conflict.
-3. `--enforce-eager` — if it vanishes, graph/replay-related.
-4. Env: `NCCL_P2P_DISABLE=1`, alternate `NCCL_ALGO`/`NCCL_PROTO`.
-Meanwhile keep prefill batches ≤~2048 and set a short `--distributed-timeout-seconds`.
+### 6.2 Folded copy-in fault
+
+Folded copy-in writes the coarse symmetric input in phase 0, signals peers, pulls
+peer data, and signals that the persistent buffer may be reused. With multiple
+wavefronts, a workgroup barrier does not promote every wavefront's memory effects
+into the scalar wave's system-scope release/acquire. This caused peer reads or
+reuse before all data operations were globally ordered.
+
+Fix: the folded specialization runs with
+`TS_TRITON_SHMEM_FOLD_NUM_WARPS=1`. The scalar system release/acquire then orders
+the complete program. The non-folded and two-shot paths retain their tuned
+multi-wave settings.
+
+Single-variable serve control:
+
+- `serve_resolve_ws8_fused_fold4warp.log`: four-wave fold, immediate memory
+  fault after readiness.
+- `serve_resolve_ws8_fused_clean.log`: one-wave fold, full campaign completed.
+
+### 6.3 RCCL/watchdog attribution
+
+`rccl_graph_abi_check.py` now captures RCCL itself rather than a compute-only
+graph. Eager all-reduce, captured all-reduce replay, and compute graph replay pass
+at ws=2/4/8 with blocking wait disabled. Final ws=4/8 serving also passes without
+blocking wait.
+
+Therefore the refreshed faults were not RCCL failures and do not require
+`TORCH_NCCL_BLOCKING_WAIT=1`. The old HIP 7.2.26015 event-query defect remains a
+valid historical issue, fixed by the loaded 7.2.4 runtime.
+
+### 6.4 Host fallback correctness
+
+If fused state creation or eligibility declined, `RMSNorm` previously normalized
+rank-local partials because the caller had already deferred its all-reduce.
+The fallback now explicitly executes the production `AutoBackend` all-reduce
+before residual-add RMSNorm. A spawned two-rank regression forces the decline and
+checks the full result.
+
+### 6.5 Hardware and environment exclusion
+
+The final qualification recorded no foreign KFD processes. MI350X ECC counters
+were zero on all eight GPUs, and captured RCCL passed every world size. Disabled
+barrier controls faulted on different GPU-node subsets, while the synchronized
+controls passed on the same devices. This rules against a fixed bad GPU or a
+size-dependent RCCL failure as the cause of the reproduced faults.
+
+The host still uses `amdgpu.noretry=1` and does not expose useful XGMI error
+counters through `amd-smi`; those are platform limitations, not required
+workarounds for the resolved configurations.
+
+## 7. Validation and deployment
+
+Passed:
+
+- 10 communication tests across ws=1/2/4/8, including folded ws=4 graph stress
+  and genuine ws=8 two-shot graph capture;
+- forced fused-decline fallback regression;
+- captured RCCL at ws=2/4/8 without blocking wait;
+- full final ws=2/4/8 fused and unfused e2e matrix;
+- two-pass crossover and production-baseline decomposition.
+
+Deployment defaults:
+
+- AMD TP=2: fusion auto-enables.
+- AMD TP=4/8: fusion remains explicitly available but no longer auto-enables,
+  because current e2e data show regressions.
+- DP, overlap depth greater than one, or speculative decode still require a
+  fixed `TS_TRITON_SHMEM_BARRIER_GRID` and separate validation.
+
+Next optimization work should target the M=256 barrier expansion and two-shot
+cost before broadening fusion at ws=4/8.

@@ -421,6 +421,24 @@ def symm_mem_barrier(
     wait_signal_from_peers(local_signal, block_id, world_size)
 
 
+@triton.jit
+def symm_mem_workgroup_barrier(
+    signal_pad_ptrs_dev,
+    block_id,
+    rank: tl.constexpr,
+    world_size: tl.constexpr,
+):
+    """Cross-rank barrier that represents every wavefront in the program.
+
+    ``symm_mem_barrier`` is scalar. Without the workgroup barriers, its release
+    can run before sibling wavefront stores/loads complete, and sibling
+    wavefronts can proceed before its acquire finishes.
+    """
+    tl.debug_barrier()
+    symm_mem_barrier(signal_pad_ptrs_dev, block_id, rank, world_size)
+    tl.debug_barrier()
+
+
 # ------------------------------------------------------------------------------
 # Batch-DP speculative verify helpers
 # ------------------------------------------------------------------------------
@@ -1200,7 +1218,9 @@ def amd_rsag_all_gather_kernel(
         peer_base = tl.load(buffer_ptrs + peer).to(tl.pointer_type(tl.bfloat16))
         tl.store(peer_base + GLOBAL_OFFSET + offsets, vals, mask=mask)
 
-    symm_mem_barrier(signal_pad_ptrs_dev, tl.program_id(0), RANK, WORLD_SIZE)
+    symm_mem_workgroup_barrier(
+        signal_pad_ptrs_dev, tl.program_id(0), RANK, WORLD_SIZE
+    )
 
 
 @triton.jit
@@ -1215,7 +1235,9 @@ def amd_rsag_reduce_scatter_kernel(
     BLOCK_SIZE: tl.constexpr,
 ):
     block_id = tl.program_id(0)
-    symm_mem_barrier(signal_pad_ptrs_dev, block_id, RANK, WORLD_SIZE)
+    symm_mem_workgroup_barrier(
+        signal_pad_ptrs_dev, block_id, RANK, WORLD_SIZE
+    )
 
     offsets = block_id * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
     mask = offsets < LOCAL_NUMEL
@@ -1229,7 +1251,9 @@ def amd_rsag_reduce_scatter_kernel(
         )
 
     tl.store(output_ptr + offsets, acc, mask=mask)
-    symm_mem_barrier(signal_pad_ptrs_dev, block_id, RANK, WORLD_SIZE)
+    symm_mem_workgroup_barrier(
+        signal_pad_ptrs_dev, block_id, RANK, WORLD_SIZE
+    )
 
 
 def amd_rsag_num_blocks(token_list_in_group: list[int], hidden_size: int) -> int:
@@ -1416,7 +1440,9 @@ def amd_allreduce_residual_rmsnorm_kernel(
     BLOCK_SIZE: tl.constexpr,
 ):
     row = tl.program_id(0)
-    symm_mem_barrier(signal_pad_ptrs_dev, row, RANK, WORLD_SIZE)
+    symm_mem_workgroup_barrier(
+        signal_pad_ptrs_dev, row, RANK, WORLD_SIZE
+    )
 
     offsets = tl.arange(0, BLOCK_SIZE)
     mask = offsets < HIDDEN_SIZE
@@ -1437,7 +1463,9 @@ def amd_allreduce_residual_rmsnorm_kernel(
     weight = tl.load(weight_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
     tl.store(norm_out_ptr + row_offsets, residual_out * scale * weight, mask=mask)
 
-    symm_mem_barrier(signal_pad_ptrs_dev, row, RANK, WORLD_SIZE)
+    symm_mem_workgroup_barrier(
+        signal_pad_ptrs_dev, row, RANK, WORLD_SIZE
+    )
 
 
 def create_allreduce_residual_rmsnorm_state(

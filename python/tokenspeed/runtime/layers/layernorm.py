@@ -172,6 +172,7 @@ class RMSNorm(torch.nn.Module):
         Forward method with allreduce fusion, prioritizing flashinfer fused operations
         """
 
+        needs_unfused_allreduce = False
         if residual is not None:
 
             if len(group) > 1:
@@ -198,6 +199,17 @@ class RMSNorm(torch.nn.Module):
                 )
                 if fused_result[0] is not None:
                     return fused_result
+                # The caller deferred its normal all-reduce because it selected
+                # this fused entry point. If the backend declines (eligibility,
+                # unavailable symmetric memory, or forced backend failure), the
+                # fallback must restore the full unfused AR + add-RMSNorm
+                # semantics rather than normalizing rank-local partials.
+                needs_unfused_allreduce = True
+
+        if needs_unfused_allreduce:
+            from tokenspeed.runtime.distributed.comm_ops import all_reduce
+
+            x = all_reduce(x, group)
 
         result = self.forward(x, residual)
         if isinstance(result, tuple):

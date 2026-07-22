@@ -38,6 +38,7 @@ Also includes a HIP graph capture+replay case (the capability the rocSHMEM host
 barrier could not prove; see the migration doc).
 """
 
+import os
 import socket
 import traceback
 from typing import List
@@ -198,14 +199,26 @@ def test_triton_shmem_arrms_world2_wholerow():
 # migrate off the rocSHMEM host barrier). Replays with changing input must
 # recompute the reduction correctly.
 # ---------------------------------------------------------------------------
-def _graph_worker_fn(rank, world_size, port, hidden, error_dict):
+def _graph_worker_fn(
+    rank, world_size, port, hidden, tokens, fold_copyin, replays, error_dict
+):
     try:
-        _graph_worker_main(rank, world_size, port, hidden)
+        _graph_worker_main(
+            rank, world_size, port, hidden, tokens, fold_copyin, replays
+        )
     except Exception:
         error_dict[rank] = traceback.format_exc()
 
 
-def _graph_worker_main(rank: int, world_size: int, port: int, hidden: int) -> None:
+def _graph_worker_main(
+    rank: int,
+    world_size: int,
+    port: int,
+    hidden: int,
+    tokens: int,
+    fold_copyin: bool,
+    replays: int,
+) -> None:
     device = torch.device(f"cuda:{rank}")
     torch.cuda.set_device(device)
     dist.init_process_group(
@@ -215,12 +228,14 @@ def _graph_worker_main(rank: int, world_size: int, port: int, hidden: int) -> No
         world_size=world_size,
     )
     try:
+        os.environ["TS_TRITON_SHMEM_FOLD_COPYIN"] = (
+            "1" if fold_copyin else "0"
+        )
         from tokenspeed_kernel.ops.communication.triton_shmem import (
             create_triton_shmem_ar_rmsnorm_state,
             triton_shmem_allreduce_residual_rmsnorm,
         )
 
-        tokens = 256
         state = create_triton_shmem_ar_rmsnorm_state(
             group=dist.group.WORLD,
             rank_in_group=rank,
@@ -267,36 +282,48 @@ def _graph_worker_main(rank: int, world_size: int, port: int, hidden: int) -> No
         dist.barrier()
 
         # Replay with changing input; the captured graph must recompute the AR.
-        for it in range(1, 4):
+        for it in range(1, replays + 1):
             x.fill_((rank + 1) * it)
             g.replay()
-            torch.cuda.synchronize()
-            reduced = torch.full(
-                (tokens, hidden),
-                world_size * (world_size + 1) // 2 * it,
-                dtype=torch.float32,
-                device=device,
-            )
-            ref_residual = reduced + residual.float()
-            ref_norm = ref_residual * torch.rsqrt(
-                ref_residual.pow(2).mean(dim=-1, keepdim=True) + _EPS
-            )
-            ref_norm = ref_norm * weight.float()
-            torch.testing.assert_close(
-                residual_out.float(), ref_residual, atol=2e-2, rtol=2e-2
-            )
-            torch.testing.assert_close(
-                norm_out.float(), ref_norm, atol=2e-2, rtol=2e-2
-            )
-            dist.barrier()
+            if it % 10 == 0 or it == replays:
+                torch.cuda.synchronize()
+                reduced = torch.full(
+                    (tokens, hidden),
+                    world_size * (world_size + 1) // 2 * it,
+                    dtype=torch.float32,
+                    device=device,
+                )
+                ref_residual = reduced + residual.float()
+                ref_norm = ref_residual * torch.rsqrt(
+                    ref_residual.pow(2).mean(dim=-1, keepdim=True) + _EPS
+                )
+                ref_norm = ref_norm * weight.float()
+                torch.testing.assert_close(
+                    residual_out.float(), ref_residual, atol=2e-2, rtol=2e-2
+                )
+                torch.testing.assert_close(
+                    norm_out.float(), ref_norm, atol=2e-2, rtol=2e-2
+                )
+                dist.barrier()
     finally:
         dist.destroy_process_group()
 
 
-def _run_graph(world_size: int, hidden: int) -> None:
+def _run_graph(
+    world_size: int,
+    hidden: int,
+    *,
+    tokens: int = 256,
+    fold_copyin: bool = False,
+    replays: int = 3,
+) -> None:
     _skip_if_unsupported(world_size)
     port = _get_open_port()
-    _spawn_and_collect(_graph_worker_fn, (world_size, port, hidden), world_size)
+    _spawn_and_collect(
+        _graph_worker_fn,
+        (world_size, port, hidden, tokens, fold_copyin, replays),
+        world_size,
+    )
 
 
 def test_triton_shmem_arrms_graph_capture_world2():
@@ -305,5 +332,21 @@ def test_triton_shmem_arrms_graph_capture_world2():
 
 
 def test_triton_shmem_arrms_graph_capture_world8():
-    # twoshot_blocked under graph capture/replay -- the production path.
+    # M=256 uses the small-M one-shot overlay at ws=8.
     _run_graph(world_size=8, hidden=2880)
+
+
+def test_triton_shmem_arrms_folded_copyin_graph_world4():
+    # Serving regression: repeated captured one-shot blocked calls with folded
+    # phase-0 copy-in and no host synchronization between every replay.
+    _run_graph(
+        world_size=4,
+        hidden=2880,
+        tokens=64,
+        fold_copyin=True,
+        replays=100,
+    )
+
+
+def test_triton_shmem_arrms_twoshot_graph_world8():
+    _run_graph(world_size=8, hidden=2880, tokens=512)

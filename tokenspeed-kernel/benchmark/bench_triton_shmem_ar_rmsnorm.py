@@ -30,6 +30,9 @@ barrier -> copy-out) for each backend selectable through the
 * ``rccl_unfused`` -- ``dist.all_reduce`` (native bf16 transport) + residual add
   + eager ``F.rms_norm``. The baseline (the reference bench's
   ``dist_unfused_ar_rmsnorm``).
+* ``triton_ar_unfused`` -- TokenSpeed's 512-KiB-gated Triton all-reduce +
+  the same eager residual/norm. Unsupported rows are reported as NaN. This is a
+  standalone small-message reference, not the crossover baseline.
 * ``triton_shmem``   -- the migrated PyTorch symmetric-memory backend (this project).
 * ``symm_mem``     -- the native TokenSpeed symm_mem fused kernel.
 * ``iris``         -- the Iris backend.
@@ -67,6 +70,7 @@ import torch.multiprocessing as mp
 import torch.nn.functional as F
 
 _EPS = 1e-6
+_TRITON_AR_MAX_BYTES = 512 * 1024
 
 
 def _env_list(name: str, default: List) -> List:
@@ -150,13 +154,37 @@ def _make_inputs(tokens, hidden, rank, device):
     return x, residual
 
 
-def _run_backend(backend, x, residual, weight, rank, group, max_token_num):
+def _prepare_backend(backend, x, scratch):
+    """Reset an in-place unfused transport outside the timed region."""
+    if backend in ("rccl_unfused", "triton_ar_unfused"):
+        scratch.copy_(x)
+
+
+def _run_backend(
+    backend,
+    x,
+    residual,
+    weight,
+    rank,
+    group,
+    max_token_num,
+    scratch,
+    triton_ar_state,
+):
     """Run one fused op for ``backend``; return (norm_out, residual_out)."""
     hidden = x.shape[1]
     if backend == "rccl_unfused":
-        acc = x.detach().clone()
-        dist.all_reduce(acc, group=group)
-        residual_out = acc + residual
+        dist.all_reduce(scratch, group=group)
+        residual_out = scratch + residual
+        norm_out = F.rms_norm(residual_out, [hidden], weight, _EPS)
+        return norm_out, residual_out
+    if backend == "triton_ar_unfused":
+        if x.numel() * x.element_size() > _TRITON_AR_MAX_BYTES:
+            return None, None
+        from tokenspeed_kernel.ops.communication.triton import all_reduce
+
+        all_reduce(triton_ar_state, scratch)
+        residual_out = scratch + residual
         norm_out = F.rms_norm(residual_out, [hidden], weight, _EPS)
         return norm_out, residual_out
 
@@ -178,18 +206,50 @@ def _run_backend(backend, x, residual, weight, rank, group, max_token_num):
     return norm_out, residual_out
 
 
-def _time_backend(backend, x, residual, weight, rank, group, max_token_num) -> float:
+def _time_backend(
+    backend,
+    x,
+    residual,
+    weight,
+    rank,
+    group,
+    max_token_num,
+    scratch,
+    triton_ar_state,
+) -> float:
     """Return this rank's p50 latency (ms) for ``backend`` on the given inputs."""
     for _ in range(_N_WARMUP):
-        _run_backend(backend, x, residual, weight, rank, group, max_token_num)
+        _prepare_backend(backend, x, scratch)
+        _run_backend(
+            backend,
+            x,
+            residual,
+            weight,
+            rank,
+            group,
+            max_token_num,
+            scratch,
+            triton_ar_state,
+        )
     torch.cuda.synchronize()
     dist.barrier(group=group)
 
     starts = [torch.cuda.Event(enable_timing=True) for _ in range(_N_REPEAT)]
     ends = [torch.cuda.Event(enable_timing=True) for _ in range(_N_REPEAT)]
     for i in range(_N_REPEAT):
+        _prepare_backend(backend, x, scratch)
         starts[i].record()
-        _run_backend(backend, x, residual, weight, rank, group, max_token_num)
+        _run_backend(
+            backend,
+            x,
+            residual,
+            weight,
+            rank,
+            group,
+            max_token_num,
+            scratch,
+            triton_ar_state,
+        )
         ends[i].record()
     torch.cuda.synchronize()
     times = [s.elapsed_time(e) for s, e in zip(starts, ends)]
@@ -234,21 +294,42 @@ def _worker_main(rank, world_size, port, backends, result_dict):
     try:
         group = dist.group.WORLD
         max_token_num = max(_M_VALUES)
+        triton_ar_state = None
+        if "triton_ar_unfused" in backends:
+            from tokenspeed_kernel.ops.communication.triton import create_state
+
+            triton_ar_state = create_state(
+                group=group,
+                rank_in_group=rank,
+                device=device,
+                max_numel=_TRITON_AR_MAX_BYTES
+                // torch.empty((), dtype=torch.bfloat16).element_size(),
+            )
         if "iris" in backends:
             _presize_iris_heap(max_token_num)
         for n in _N_VALUES:
             weight = torch.linspace(0.5, 1.5, n, dtype=torch.bfloat16, device=device)
             for m in _M_VALUES:
                 x, residual = _make_inputs(m, n, rank, device)
+                scratch = torch.empty_like(x)
                 ref_residual, ref_norm = _reference(
                     x, residual, weight, world_size, n, device
                 )
                 for backend in backends:
-                    if backend != "rccl_unfused":
+                    if backend not in ("rccl_unfused", "triton_ar_unfused"):
                         os.environ["TS_ARNORM_BACKEND"] = backend
+                    _prepare_backend(backend, x, scratch)
                     # Correctness gate before timing.
                     norm_out, residual_out = _run_backend(
-                        backend, x, residual, weight, rank, group, max_token_num
+                        backend,
+                        x,
+                        residual,
+                        weight,
+                        rank,
+                        group,
+                        max_token_num,
+                        scratch,
+                        triton_ar_state,
                     )
                     if norm_out is None:
                         result_dict[(rank, backend, m, n)] = float("nan")
@@ -260,7 +341,15 @@ def _worker_main(rank, world_size, port, backends, result_dict):
                         norm_out.float(), ref_norm, atol=2e-2, rtol=2e-2
                     )
                     p50 = _time_backend(
-                        backend, x, residual, weight, rank, group, max_token_num
+                        backend,
+                        x,
+                        residual,
+                        weight,
+                        rank,
+                        group,
+                        max_token_num,
+                        scratch,
+                        triton_ar_state,
                     )
                     result_dict[(rank, backend, m, n)] = p50
     finally:

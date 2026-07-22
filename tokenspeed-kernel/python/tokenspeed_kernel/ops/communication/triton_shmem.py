@@ -105,18 +105,83 @@ def _inkernel_barrier_enabled() -> bool:
     companion §6). Set ``TS_TRITON_SHMEM_INKERNEL_BARRIER=0`` to force the legacy
     separate-barrier path.
 
-    CAVEAT — set to 0 under configs that can diverge M across TP ranks (DP,
-    ``overlap_schedule_depth>1``, speculative decode) until the M-independent
-    barrier lands: the in-kernel barrier is issued by all ``grid_sms`` blocks at
-    ``block_id=pid`` (M-dependent slot range), so it DEADLOCKS if two ranks run the
-    barrier over different M simultaneously (the separate 1-block barrier is
-    grid=(1,), block_id=0 -> M-independent -> robust). Pure TP (dp=1,
-    overlap_schedule_depth=1) never diverges M, so the default is safe there. Repro:
-    ``benchmark/probe_inkernel_barrier_graph.py`` (PROBE_MODE=multigraph). Fix plan:
-    companion doc §6 plan."""
+    CAVEAT — under configs that can diverge M across TP ranks (DP,
+    ``overlap_schedule_depth>1``, speculative decode) the M-dependent in-kernel
+    barrier DEADLOCKS if two ranks run it over different M simultaneously (its slot
+    range is M-dependent). Pure TP (dp=1, overlap_schedule_depth=1) never diverges
+    M, so the default is safe there. For divergent configs, set the fixed-grid
+    barrier (``TS_TRITON_SHMEM_BARRIER_GRID>0``, lever B) -- divergence-safe and
+    still faster than falling back to ``INKERNEL_BARRIER=0``. Repro:
+    ``benchmark/probe_inkernel_barrier_graph.py`` (PROBE_MODE=multigraph)."""
     return os.environ.get("TS_TRITON_SHMEM_INKERNEL_BARRIER", "1") not in (
         "0", "false", "False"
     )
+
+
+def _fold_copyin_enabled() -> bool:
+    """Fold the input copy-in into the one-shot fused kernel: each rank writes its
+    local input into its symmetric buffer in a phase-0 pass, ordered before the
+    pull by the in-kernel leading barrier, instead of a separate ``copy_`` launch
+    (companion doc §7 lever A). Removes the ~0.012 ms/op copy-in launch that is an
+    untouched floor at decode M. Requires the in-kernel barrier (the phase-0 write
+    must precede the leading barrier); no-op on the two-shot / separate-barrier
+    path. Default ON after adding workgroup synchronization around the scalar
+    cross-rank barriers; set ``TS_TRITON_SHMEM_FOLD_COPYIN=0`` to isolate the
+    separate-copy path."""
+    return os.environ.get("TS_TRITON_SHMEM_FOLD_COPYIN", "1") not in (
+        "0", "false", "False"
+    )
+
+
+def _workgroup_sync_enabled() -> bool:
+    """Bracket each scalar cross-rank signal barrier with a workgroup barrier.
+
+    Required whenever a Triton program uses multiple wavefronts: the scalar
+    system-scope release/acquire must represent all wavefronts' preceding stores
+    or reads. The opt-out exists only to reproduce the pre-fix race."""
+    return os.environ.get("TS_TRITON_SHMEM_WORKGROUP_SYNC", "1") not in (
+        "0",
+        "false",
+        "False",
+    )
+
+
+def _fold_num_warps() -> int:
+    """Wavefront count for the folded copy-in specialization.
+
+    A single wavefront makes the scalar system-scope signal barrier order the
+    entire program's phase-0 stores and peer reads. Multi-wave folded kernels
+    remain available for diagnostics while their system-fence semantics are
+    qualified."""
+    value = int(os.environ.get("TS_TRITON_SHMEM_FOLD_NUM_WARPS", "1"))
+    if value not in (1, 2, 4, 8):
+        raise ValueError("TS_TRITON_SHMEM_FOLD_NUM_WARPS must be 1, 2, 4, or 8")
+    return value
+
+
+def _barrier_grid() -> int:
+    """Fixed in-kernel-barrier participant/grid width `G` (companion doc §7 lever
+    B). `0` (DEFAULT) = M-dependent grid (`min(cap, M, num_cus)`); `>0` = launch
+    exactly `min(G, num_cus)` blocks for EVERY call regardless of M, striding rows
+    over G.
+
+    A fixed `G` makes the barrier participant set **M-independent** (block index
+    i in [0,G) present on all ranks, zero-row blocks still barrier), which is
+    **divergence-safe** under cross-rank M-divergence (DP / overlap>1 /
+    spec-decode) -- validated: it flips the multigraph-divergent probe HANG->PASS.
+    Correctness relies on the one-shot pull's disjoint row partition (block i owns
+    rows {i, i+G, ...}; no cross-block data dep → only a per-block cross-rank
+    barrier is needed, never a within-GPU grid sync). `G` MUST be <= num_cus with
+    headroom so all G blocks stay co-resident (the spin barrier deadlocks else).
+
+    **DEFAULT OFF (measured):** a fixed `G` is a net PERFORMANCE LOSS vs the
+    M-dependent grid -- the barrier cost scales with participant count, so no fixed
+    `G` is perf-neutral (small `G` starves large-M parallelism; large `G` makes the
+    small-M barrier expensive; the M=256 "dip" is NOT fixed and is not a real serve
+    problem -- fused is ~2x faster than unfused there regardless). Use `>0` **only**
+    for M-diverging configs, where it beats the alternative (INKERNEL_BARRIER=0,
+    separate-barrier path). Tune `G` to the config's decode-M range."""
+    return int(os.environ.get("TS_TRITON_SHMEM_BARRIER_GRID", "0"))
 
 
 def _oneshot_max_m() -> int:
@@ -290,6 +355,10 @@ class TritonShmemAllReduceResidualRMSNorm:
         # its barriers in-kernel -- both dominate small-M latency. Reuses the
         # (already symmetric) input buffer; needs its own fp32 scratch.
         self._inkernel = _inkernel_barrier_enabled()
+        self._fold_copyin = _fold_copyin_enabled()
+        self._workgroup_sync = _workgroup_sync_enabled()
+        self._fold_num_warps = _fold_num_warps()
+        self._barrier_grid = _barrier_grid()
         self._oneshot_max_m = _oneshot_max_m()
         if self._is_twoshot:
             self._oneshot_kernel = (
@@ -306,7 +375,9 @@ class TritonShmemAllReduceResidualRMSNorm:
 
         logger.info(
             "triton_shmem AR+RMSNorm state: kernel=%s ws=%d max_tokens=%d hidden=%d "
-            "substrate=%s data=%.1f MiB/rank inkernel_barrier=%s small_m_oneshot=%s(<=%d)",
+            "substrate=%s data=%.1f MiB/rank inkernel_barrier=%s fold_copyin=%s "
+            "workgroup_sync=%s fold_num_warps=%d "
+            "small_m_oneshot=%s(<=%d)",
             self.kernel,
             self.world_size,
             max_token_num,
@@ -314,6 +385,9 @@ class TritonShmemAllReduceResidualRMSNorm:
             "coarse+ipc" if self._coarse else "symm_mem(fine)",
             n_symm * buf_bytes / 1024**2,
             self._inkernel,
+            self._fold_copyin and self._inkernel,
+            self._workgroup_sync,
+            self._fold_num_warps,
             self._oneshot_kernel if self._is_twoshot else "n/a",
             self._oneshot_max_m if self._is_twoshot else 0,
         )
@@ -346,16 +420,31 @@ class TritonShmemAllReduceResidualRMSNorm:
             num_warps=1,
         )
 
-    def _run_oneshot(self, x, residual, weight, eps, m, n, ws, norm_out, residual_out):
+    def _grid_width(self, kern, ws, work_rows, inkernel):
+        """Persistent-grid width. Lever B (companion doc §7): when the in-kernel
+        barrier is active and ``_barrier_grid>0``, use a FIXED ``min(G, num_cus)``
+        blocks for every call (M-independent → the barrier participant set matches
+        across ranks regardless of M, and its cost is decoupled from M). Otherwise
+        the legacy M-dependent ``min(cap, work_rows, num_cus)``."""
+        if inkernel and self._barrier_grid > 0:
+            return max(1, min(self._barrier_grid, self._num_cus))
+        return _k.recommended_grid(kern, ws, work_rows, self._num_cus)
+
+    def _run_oneshot(self, x, local_src, residual, weight, eps, m, n, ws,
+                     norm_out, residual_out, fold):
         """One-shot pull into the caller's *local* output (no copy-out). Barriers
         are folded into the kernel when ``self._inkernel`` (default), else issued
         as the legacy separate launches. Reads the symmetric input ``x``; writes
-        ``norm_out``/``residual_out`` directly."""
+        ``norm_out``/``residual_out`` directly. When ``fold`` (lever A), the kernel
+        also writes ``local_src`` into ``x`` (symmetric) in a phase-0 pass before
+        the leading barrier, so the caller skipped the separate ``copy_``."""
         kern = self._oneshot_kernel
-        grid_sms = _k.recommended_grid(kern, ws, m, self._num_cus)
+        inkernel = self._inkernel
+        grid_sms = self._grid_width(kern, ws, m, inkernel)
         grid = (grid_sms,)
         num_warps = _k.recommended_num_warps(kern)
-        inkernel = self._inkernel
+        if fold:
+            num_warps = self._fold_num_warps
         if not inkernel:
             self._barrier()  # leading (legacy separate-barrier path)
         if kern == "oneshot_wholerow":
@@ -371,6 +460,7 @@ class TritonShmemAllReduceResidualRMSNorm:
                 norm_out,  # add_in placeholder (HAS_ADD=False)
                 m,
                 self._signal_pad,
+                local_src,
                 N=n,
                 ws=ws,
                 NUM_SMS=grid_sms,
@@ -378,6 +468,8 @@ class TritonShmemAllReduceResidualRMSNorm:
                 HAS_ADD=False,
                 RANK=self.my_pe,
                 INKERNEL_BARRIER=inkernel,
+                FOLD_COPYIN=fold,
+                WORKGROUP_SYNC=self._workgroup_sync,
                 num_warps=num_warps,
             )
         else:  # oneshot_blocked
@@ -395,6 +487,7 @@ class TritonShmemAllReduceResidualRMSNorm:
                 m,
                 n,
                 self._signal_pad,
+                local_src,
                 BLOCK_N=_k.recommended_block_n(self.dtype, n),
                 ws=ws,
                 NUM_SMS=grid_sms,
@@ -402,6 +495,8 @@ class TritonShmemAllReduceResidualRMSNorm:
                 HAS_ADD=False,
                 RANK=self.my_pe,
                 INKERNEL_BARRIER=inkernel,
+                FOLD_COPYIN=fold,
+                WORKGROUP_SYNC=self._workgroup_sync,
                 num_warps=num_warps,
             )
         if not inkernel:
@@ -432,9 +527,6 @@ class TritonShmemAllReduceResidualRMSNorm:
         if residual_out is None:
             residual_out = torch.empty_like(residual)
 
-        x = self._x[:m]
-        x.copy_(input_tensor)
-
         # Dispatch: one-shot pull for ws<=2 (always) and small-M/decode at ws>=4
         # (companion doc §6). One-shot writes output locally (no two-shot copy-out)
         # and folds its barriers in-kernel; two-shot stays bandwidth-optimal for
@@ -443,27 +535,36 @@ class TritonShmemAllReduceResidualRMSNorm:
             self._oneshot_max_m > 0 and m <= self._oneshot_max_m
         )
 
+        # Lever A (companion doc §7): fold the input copy-in into the one-shot
+        # kernel (phase-0 write ordered by the in-kernel leading barrier). Requires
+        # the in-kernel barrier; two-shot keeps the explicit copy_.
+        fold = self._fold_copyin and self._inkernel and use_oneshot
+
+        x = self._x[:m]
+        if not fold:
+            x.copy_(input_tensor)
+
         if use_oneshot:
-            self._run_oneshot(x, residual, weight, eps, m, n, ws, norm_out, residual_out)
+            self._run_oneshot(x, input_tensor, residual, weight, eps, m, n, ws,
+                              norm_out, residual_out, fold)
             return norm_out, residual_out
 
-        # Two-shot push (ws>=4, large M).
+        # Two-shot push (ws>=4, large M). In-kernel barriers are re-enabled here
+        # ONLY under lever B (fixed grid): the in-kernel barrier's cost scales with
+        # grid width, and two-shot's legacy grid is large (up to num_cus), so with
+        # the M-dependent grid folding it in was a net loss (measured reclaim
+        # -0.005..-0.048 ms at M=512..1024). The fixed grid (`_barrier_grid`) caps
+        # the participant count so the barrier is cheap + constant → two-shot in-
+        # kernel becomes viable. Falls back to separate barriers when barrier_grid=0.
         work_rows = triton.cdiv(m, ws)
-        grid_sms = _k.recommended_grid("twoshot_blocked", ws, work_rows, self._num_cus)
+        inkernel = self._inkernel and self._barrier_grid > 0
+        grid_sms = self._grid_width("twoshot_blocked", ws, work_rows, inkernel)
         num_warps = _k.recommended_num_warps("twoshot_blocked")
         grid = (grid_sms,)
         y = self._y[:m]
         res_out = self._residual_out[:m]
-        # Two-shot uses SEPARATE barriers even when in-kernel is enabled globally.
-        # The in-kernel barrier's cost scales with grid width (all NUM_SMS blocks
-        # spin-sync); two-shot's grid is large (up to num_cus), so folding it in
-        # costs MORE than the two 1-block launches it removes (measured: reclaim
-        # -0.005..-0.048 ms at M=512..1024, decomp probe). It is a win only for the
-        # small-grid one-shot decode path. The kernel keeps the INKERNEL_BARRIER
-        # param so the planned fixed-participant barrier (companion doc §6 plan) can
-        # re-enable it once the barrier cost is decoupled from grid width.
-        inkernel = False
-        self._barrier()  # leading: peers' copy-in visible before any pull
+        if not inkernel:
+            self._barrier()  # leading: peers' copy-in visible before any pull
         _k.fused_ar_rmsnorm_twoshot_blocked_kernel[grid](
             x,
             y,
@@ -487,9 +588,11 @@ class TritonShmemAllReduceResidualRMSNorm:
             HAS_ADD=False,
             RANK=self.my_pe,
             INKERNEL_BARRIER=inkernel,
+            WORKGROUP_SYNC=self._workgroup_sync,
             num_warps=num_warps,
         )
-        self._barrier()  # trailing: peers' pushes into our output/residual_out visible
+        if not inkernel:
+            self._barrier()  # trailing: peers' pushes into our output/residual_out visible
         norm_out.copy_(y)
         residual_out.copy_(res_out)
         return norm_out, residual_out

@@ -210,6 +210,7 @@ def fused_ar_rmsnorm_oneshot_wholerow_kernel(
     add_in,
     M,
     signal_pad,
+    local_src,
     N: tl.constexpr,
     ws: tl.constexpr,
     NUM_SMS: tl.constexpr,
@@ -217,6 +218,8 @@ def fused_ar_rmsnorm_oneshot_wholerow_kernel(
     HAS_ADD: tl.constexpr,
     RANK: tl.constexpr = 0,
     INKERNEL_BARRIER: tl.constexpr = False,
+    FOLD_COPYIN: tl.constexpr = False,
+    WORKGROUP_SYNC: tl.constexpr = True,
 ):
     """One-shot pull, whole-row. Every PE reduces all rows by pulling each peer's
     ``input`` and writes only its own local ``output`` / ``residual_out`` (no
@@ -229,17 +232,36 @@ def fused_ar_rmsnorm_oneshot_wholerow_kernel(
     because this kernel is pull-only (reads peers, writes local): entry acquire
     makes peers' copy-in visible before the pull; exit release lets peers know we
     finished reading our symmetric input before the next call overwrites it. Same
-    pattern as the native ``amd_allreduce_residual_rmsnorm_kernel``."""
+    pattern as the native ``amd_allreduce_residual_rmsnorm_kernel``.
+
+    ``FOLD_COPYIN`` (requires ``INKERNEL_BARRIER``) writes this rank's local input
+    (``local_src``) into its symmetric ``input`` buffer in a phase-0 pass *before*
+    the leading barrier, replacing the separate ``copy_`` launch (companion doc §7
+    lever A). The leading barrier then orders the write before any peer pull, so
+    the same barrier that already existed does double duty."""
     tl.static_assert(
         (N & (N - 1)) == 0,
         "fused_ar_rmsnorm_oneshot_wholerow_kernel requires N to be a power of two; "
         "use fused_ar_rmsnorm_oneshot_blocked_kernel for arbitrary N",
     )
     pid = tl.program_id(0)
-    if INKERNEL_BARRIER:
-        symm_mem_barrier(signal_pad, pid, RANK, ws)
-
     offsets_n = tl.max_contiguous(tl.multiple_of(tl.arange(0, N), N), N)
+
+    if FOLD_COPYIN:
+        for row_id in range(pid, M, NUM_SMS):
+            offsets_io = offsets_n + (N * row_id)
+            tl.store(input + offsets_io, tl.load(local_src + offsets_io))
+
+    if INKERNEL_BARRIER:
+        # The signal CAS is issued by a scalar lane. Synchronize all wavefronts
+        # before its system-scope release so every phase-0 store is ordered, and
+        # after its acquire before any wavefront starts pulling peer data.
+        if WORKGROUP_SYNC:
+            tl.debug_barrier()
+        symm_mem_barrier(signal_pad, pid, RANK, ws)
+        if WORKGROUP_SYNC:
+            tl.debug_barrier()
+
     gamma_row = tl.load(gamma + offsets_n).to(tl.float32)
 
     for row_id in range(pid, M, NUM_SMS):
@@ -261,7 +283,13 @@ def fused_ar_rmsnorm_oneshot_wholerow_kernel(
         tl.store(output + offsets_io, rms_norm)
 
     if INKERNEL_BARRIER:
+        # No peer may reuse its persistent input until every wavefront in this
+        # workgroup has finished the pull.
+        if WORKGROUP_SYNC:
+            tl.debug_barrier()
         symm_mem_barrier(signal_pad, pid, RANK, ws)
+        if WORKGROUP_SYNC:
+            tl.debug_barrier()
 
 
 @triton.jit
@@ -288,6 +316,7 @@ def fused_ar_rmsnorm_twoshot_blocked_kernel(
     HAS_ADD: tl.constexpr,
     RANK: tl.constexpr = 0,
     INKERNEL_BARRIER: tl.constexpr = False,
+    WORKGROUP_SYNC: tl.constexpr = True,
 ):
     """Two-pass, N-blocked. Contiguous row ownership: PE ``my_pe`` owns rows
     ``[my_pe*M_shard, (my_pe+1)*M_shard)``, reduces them by pulling every peer's
@@ -310,7 +339,11 @@ def fused_ar_rmsnorm_twoshot_blocked_kernel(
     )
     pid = tl.program_id(0)
     if INKERNEL_BARRIER:
+        if WORKGROUP_SYNC:
+            tl.debug_barrier()
         symm_mem_barrier(signal_pad, pid, RANK, ws)
+        if WORKGROUP_SYNC:
+            tl.debug_barrier()
     M_shard = tl.cdiv(M, ws)
     shard_row_offset = M_shard * my_pe
     n_blocks = tl.cdiv(N, BLOCK_N)
@@ -360,7 +393,11 @@ def fused_ar_rmsnorm_twoshot_blocked_kernel(
                         tl.store(peer_ptr + offs, rms_norm, mask=mask)
 
     if INKERNEL_BARRIER:
+        if WORKGROUP_SYNC:
+            tl.debug_barrier()
         symm_mem_barrier(signal_pad, pid, RANK, ws)
+        if WORKGROUP_SYNC:
+            tl.debug_barrier()
 
 
 @triton.jit
@@ -378,6 +415,7 @@ def fused_ar_rmsnorm_oneshot_blocked_kernel(
     M,
     N,
     signal_pad,
+    local_src,
     BLOCK_N: tl.constexpr,
     ws: tl.constexpr,
     NUM_SMS: tl.constexpr,
@@ -385,6 +423,8 @@ def fused_ar_rmsnorm_oneshot_blocked_kernel(
     HAS_ADD: tl.constexpr,
     RANK: tl.constexpr = 0,
     INKERNEL_BARRIER: tl.constexpr = False,
+    FOLD_COPYIN: tl.constexpr = False,
+    WORKGROUP_SYNC: tl.constexpr = True,
 ):
     """One-shot pull, two-pass, N-blocked (arbitrary ``N``). No row ownership, no
     peer push. Every PE reduces all rows by pulling each peer's ``input`` and
@@ -395,17 +435,39 @@ def fused_ar_rmsnorm_oneshot_blocked_kernel(
     ``INKERNEL_BARRIER`` folds the leading + trailing signal-pad barriers into the
     kernel (per-block at ``pid``), removing two separate barrier-kernel launches
     (companion doc §6). Pull-only ⇒ same proven pattern as the native
-    ``amd_allreduce_residual_rmsnorm_kernel`` (no cross-thread push to order)."""
+    ``amd_allreduce_residual_rmsnorm_kernel`` (no cross-thread push to order).
+
+    ``FOLD_COPYIN`` (requires ``INKERNEL_BARRIER``) writes this rank's local input
+    (``local_src``) into its symmetric ``input`` buffer in a phase-0 pass *before*
+    the leading barrier, replacing the separate ``copy_`` launch (companion doc §7
+    lever A)."""
     tl.static_assert(
         (BLOCK_N & (BLOCK_N - 1)) == 0,
         "fused_ar_rmsnorm_oneshot_blocked_kernel requires BLOCK_N to be a power of two",
     )
     pid = tl.program_id(0)
-    if INKERNEL_BARRIER:
-        symm_mem_barrier(signal_pad, pid, RANK, ws)
     n_blocks = tl.cdiv(N, BLOCK_N)
     col = tl.arange(0, BLOCK_N)
     scratch_off = pid * N
+
+    if FOLD_COPYIN:
+        for row_id in range(pid, M, NUM_SMS):
+            row_io_off = row_id * N
+            for blk in range(0, n_blocks):
+                cols = blk * BLOCK_N + col
+                mask = cols < N
+                offs = row_io_off + cols
+                tl.store(input + offs, tl.load(local_src + offs, mask=mask, other=0.0), mask=mask)
+
+    if INKERNEL_BARRIER:
+        # See the whole-row variant: the scalar system release/acquire must be
+        # bracketed by workgroup barriers so it represents every wavefront's
+        # global stores/loads rather than only the issuing lane's operations.
+        if WORKGROUP_SYNC:
+            tl.debug_barrier()
+        symm_mem_barrier(signal_pad, pid, RANK, ws)
+        if WORKGROUP_SYNC:
+            tl.debug_barrier()
 
     for row_id in range(pid, M, NUM_SMS):
         row_io_off = row_id * N
@@ -439,4 +501,8 @@ def fused_ar_rmsnorm_oneshot_blocked_kernel(
             tl.store(output + offs, rms_norm, mask=mask)
 
     if INKERNEL_BARRIER:
+        if WORKGROUP_SYNC:
+            tl.debug_barrier()
         symm_mem_barrier(signal_pad, pid, RANK, ws)
+        if WORKGROUP_SYNC:
+            tl.debug_barrier()
