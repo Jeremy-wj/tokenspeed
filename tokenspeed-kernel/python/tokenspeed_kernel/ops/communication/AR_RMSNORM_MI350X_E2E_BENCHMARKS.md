@@ -30,6 +30,9 @@ Two independent AMD barrier defects were fixed:
 
 Folded copy-in is again default ON, with one warp. In-kernel barriers, coarse
 HIP-IPC buffers, and the small-M one-shot overlay remain enabled.
+For ws=4 blocked one-shot calls, the integration now caps the grid at 128 CTAs
+from M>=256; this removes the M=256 barrier-participant expansion without
+changing smaller-M launches.
 
 Performance policy remains conservative:
 
@@ -56,6 +59,8 @@ TS_TRITON_SHMEM_INKERNEL_BARRIER=1
 TS_TRITON_SHMEM_FOLD_COPYIN=1
 TS_TRITON_SHMEM_FOLD_NUM_WARPS=1
 TS_TRITON_SHMEM_WORKGROUP_SYNC=1
+TS_TRITON_SHMEM_GRID_CAP=-1             # auto: ws4 cap=128, other ws uncapped
+TS_TRITON_SHMEM_GRID_CAP_MIN_M=-1       # auto: activate at M=256
 TS_TRITON_SHMEM_ONESHOT_MAX_M=256
 TS_TRITON_SHMEM_BARRIER_GRID=0
 TS_TRITON_AR_WORKGROUP_SYNC=1
@@ -94,13 +99,14 @@ seed medians. Curated data:
 
 Speedup is RCCL proxy latency divided by fused latency. Above one favors fusion.
 Raw data: `mi350x_resolved_cross_pass{1,2}_ws{2,4,8}.csv`.
+The ws4 M=256 cell incorporates the later `ar_rmsnorm_opt2` selective-cap result.
 
 | M | ws=2 | ws=4 | ws=8 |
 |---:|---:|---:|---:|
 | 8 | 1.07 | 0.77 | 0.73 |
 | 64 | 0.87 | 1.00 | 0.83 |
 | 128 | 0.86 | 1.04 | 0.67 |
-| 256 | 1.08 | 0.70 | 0.47 |
+| 256 | 1.08 | 0.88 | 0.47 |
 | 384 | 1.26 | 0.61 | 0.60 |
 | 512 | 1.21 | 0.67 | 0.64 |
 | 768 | 1.13 | 0.81 | 0.76 |
@@ -129,6 +135,7 @@ not inform the crossover conclusion.
 Speedup is serving-unfused divided by fused-default latency. Above one favors
 fusion. Raw data:
 `mi350x_resolved_decomp_pass{1,2}_ws{2,4,8}.csv`.
+The ws4 M=256 fused value incorporates the direct two-pass selective-cap result.
 
 | ws | M | transport | fused ms | unfused ms | speedup |
 |---:|---:|:---|---:|---:|---:|
@@ -143,7 +150,7 @@ fusion. Raw data:
 | 4 | 32 | Triton AR | 0.0465 | 0.0619 | 1.33 |
 | 4 | 64 | Triton AR | 0.0463 | 0.0629 | 1.36 |
 | 4 | 128 | RCCL | 0.0464 | 0.0651 | 1.40 |
-| 4 | 256 | RCCL | 0.0767 | 0.0663 | 0.87 |
+| 4 | 256 | RCCL | 0.0612 | 0.0663 | 1.08 |
 | 4 | 512 | RCCL | 0.0877 | 0.0683 | 0.78 |
 | 4 | 1024 | RCCL | 0.1098 | 0.0893 | 0.81 |
 | 8 | 8 | Triton AR | 0.0555 | 0.0609 | 1.10 |
@@ -157,8 +164,64 @@ fusion. Raw data:
 The production baseline reverses the earlier optimistic framing:
 
 - ws=2 wins throughout the sampled range;
-- ws=4 wins only through M=128;
+- ws=4 wins through M=256 after the selective grid cap;
 - ws=8 wins only while the unfused transport is Triton AR (M<=64).
+
+### 4.1 M=256 integration optimization
+
+The M=256 cliff was not reduction math. On gfx950 ws=4 the blocked one-shot grid
+grew from 128 to 256 CTAs, and every CTA executed two system-scope cross-rank
+barriers. Two-pass focused results:
+
+| ws4 width N | uncapped M=256 ms | cap=128 ms | change |
+|---:|---:|---:|---:|
+| 1536 | 0.0591 | 0.0547 | -7.5% |
+| 2880 | 0.0760 | 0.0612 | **-19.5%** |
+| 5120 | 0.0965 | 0.0868 | -10.0% |
+| 7168 | 0.1232 | 0.1147 | -6.9% |
+
+The shipping cap activates only at M>=256. A blanket cap regressed M=192 and
+larger widths below M=256, while prior fixed-grid attempts charged every small-M
+call for idle barrier participants. This selective dynamic cap preserves
+M-dependent participation and pure-TP graph semantics. N=512 already uses the
+whole-row kernel's 64-CTA cap and is unchanged.
+
+Raw data: `benchmark/results/ar_rmsnorm_opt2/pass{1,2}_ws4_{prod,cap128}.csv`.
+
+The final ws8 sweep covered N={512,1536,2880,5120,7168}. No common cap was safe:
+cap=128 strongly helped N=1536 at M=224–256, was only a borderline ~3% win for
+N=2880 at M=256, and regressed N=5120/7168. N=512 cap results were order-sensitive.
+Therefore ws8 remains uncapped rather than adding width-specific defaults without
+model-level serving gates.
+
+### 4.2 Two-shot integration follow-up
+
+The current two-shot wrapper pays copy-in, two one-block barriers, the tuned
+kernel, and two copy-outs. Several integration-only alternatives were measured:
+
+- a custom paired copy-out kernel was slower than two `copy_` calls;
+- `torch._foreach_copy_` saved about 3 µs at M=512 but regressed M=1024 by
+  roughly 10 µs;
+- returning ping-pong symmetric outputs removed about 13 µs in microbenchmarks
+  but faulted under captured serving because the borrowed residual lifetime
+  crossed later fused calls;
+- in-kernel/fixed-grid two-shot barriers remain slower, as in the prior sweep.
+
+Forced-path data found large isolated width-specific crossovers:
+
+| ws | N=512 | N=1536 | N=2880 | N=5120 | N=7168 |
+|---:|---:|---:|---:|---:|---:|
+| 4 | >=2048 | 896 | 384 | 256 | 192 |
+| 8 | >=2048 | 384 | 192 | 160 | 160 |
+
+These are operator bounds, not shipping settings. Raising gpt-oss N=2880 to
+M=384 again completed the early loads but faulted during the concurrency-32
+serving arm. The conservative global threshold therefore remains 256. No unsafe
+or shape-regressing two-shot change was enabled.
+
+The remaining safe opportunities require an explicit runtime buffer-lifetime
+contract (producer-direct symmetric input or caller-owned symmetric outputs),
+not another barrier/grid retry.
 
 ## 5. End-to-end gpt-oss-120b
 
@@ -185,6 +248,15 @@ All 36 final logs completed with zero request failures and no HIP/HSA fault:
 - `bench_final_ws2_{fused,unfused}_...`
 - `bench_final_ws4_{fused,unfused}_...`
 - `bench_resolve_ws8_{fused_clean,unfused}_...`
+
+The final conservative ws4 cap was rechecked at concurrency 32:
+
+- fused TPOT: 12.60 ms mean (12.81/12.39);
+- fused output: 2482 tok/s mean (2444/2520);
+- 3.5% lower TPOT and 14.5% higher output throughput than the prior fused arm;
+- still 1.7% higher TPOT than unfused, so ws4 remains opt-in.
+
+Sources: `bench_last_ws4_conservative_c32_seed{0,1}.log`.
 
 ## 6. Exact fault causes and controls
 
@@ -264,6 +336,17 @@ Passed:
 - captured RCCL at ws=2/4/8 without blocking wait;
 - full final ws=2/4/8 fused and unfused e2e matrix;
 - two-pass crossover and production-baseline decomposition.
+- disjoint and interleaved TP subgroups on world size 4;
+- width/grid/path sweeps across N={512,1536,2880,5120,7168}.
+
+Allocator independence was also probed. Torch 2.11 reports expandable segments
+unsupported on this ROCm platform, so a dedicated pluggable allocator would add
+packaging and correctness risk without changing current steady-state behavior.
+It remains a future portability item rather than a performance optimization.
+
+Fixed-grid DP/speculative work was not promoted: fixed participants avoid one
+deadlock mode but cannot make mismatched TP collective sequences semantically
+correct, and every measured fixed grid regressed latency.
 
 Deployment defaults:
 
@@ -273,5 +356,117 @@ Deployment defaults:
 - DP, overlap depth greater than one, or speculative decode still require a
   fixed `TS_TRITON_SHMEM_BARRIER_GRID` and separate validation.
 
-Next optimization work should target the M=256 barrier expansion and two-shot
-cost before broadening fusion at ws=4/8.
+This completes the pre-profiling optimization sweep. Further work should start
+from traces: measure real `(M,N,path)` frequency and producer/consumer lifetimes
+before introducing a caller-owned symmetric-buffer contract. Barrier folding,
+generic paired-copy retries, mutable borrowed outputs, and isolated
+width-specific thresholds should not be revisited without new trace evidence.
+
+## 8. July 2026 end-to-end profiling follow-up
+
+Initial profiling attempts failed because torch loaded its bundled ROCm 7.2.0
+`libroctracer64.so` beside system ROCm 7.2.4 HIP/HSA/ROCTX. Relocating that last
+bundled tracing library fixes torch/Kineto and eager Proton. The profiler-qualified
+artifact and exact linkage are documented in the environment history:
+
+```text
+jeremwan/tokenspeed:rocm7.2.4-torch2.11-profiler
+sha256:ad3ea3f8cae8ca38cf12824b15c606d0630118c6e04b4087e191b04619a6c135
+```
+
+The usable evidence now includes:
+
+- matched eager Proton controls retained from the first pass;
+- normal graph-serving torch CPU+GPU Chrome traces at TP=2 and TP=4;
+- Proton rocprofiler graph tree/Hatchet output with explicit replay scopes.
+
+Physical GPU 3 remained excluded. The torch traces are the primary production
+timeline. Proton graph support is complementary: tree/Hatchet works, while
+trace/Chrome graph output remains unsupported or incomplete in the installed
+Proton build.
+
+### 8.1 Matched eager results
+
+At concurrency 32:
+
+- TP=2, input 128/output 64: fused TPOT 96.03 ms versus unfused 166.13 ms
+  (-42.2%); output throughput 304.22 versus 183.57 tok/s.
+- TP=4, input 128/output 32: fused TPOT 156.18 ms versus unfused 118.78 ms
+  (+31.5%); output throughput 180.10 versus 225.63 tok/s.
+
+The direction matches the production policy: TP=2 benefits, while TP=4 remains
+slower end to end. The eager magnitudes must not be projected onto graph serving.
+
+### 8.2 Shape, path, and launch frequency
+
+A narrow communication Proton scope now records `M`, `N`, world size, folded
+copy-in, and the selected one-shot/two-shot path. Per rank:
+
+- TP=2: 1,080 calls at `M=32,N=2880` (93.8%) and 72 at
+  `M=64,N=2880` (6.2%);
+- TP=4: 1,080 calls at `M=32,N=2880` (93.8%) and 72 at
+  `M=128,N=2880` (6.2%);
+- every observed fused call used `oneshot_blocked` with folded copy-in;
+- no observed call used two-shot.
+
+The longer TP=2 window contained 2,304 fused AR+RMSNorm launches per rank. Its
+matched unfused window contained about 2,263 custom Triton AR launches and 2,409
+separate RMSNorm launches. TP=4 similarly reduced roughly 2,336 separate AR/norm
+launches to 1,152 fused launches in the scoped window.
+
+GPU kernel residency is rank-skewed because the scalar/system barriers wait for
+peers. In the TP=4 fused trace, median one-shot kernel duration was 32.6 us on
+rank 0 and 836-874 us on ranks 1-3. The unfused custom AR showed the same class
+of skew (23.8 us to 1,206 us across ranks). Therefore the TP=4 e2e regression is
+not evidence that reduction arithmetic or a particular fused barrier retry is
+the next optimization. These eager residency values are superseded for production
+graph diagnosis by §8.3.
+
+### 8.3 Production graph-serving traces
+
+The corrected torch/Kineto environment produced complete traces on every rank:
+
+- TP=2 fused: 1,152 fused kernels per rank; median duration 20.3-21.3 us and
+  p95 43.5-45.7 us.
+- TP=4 fused: 1,080 fused kernels per rank; median duration 34.2-44.3 us and
+  p95 49.0-78.7 us.
+- TP=4 unfused: 1,095 custom AR kernels and 1,241 RMSNorm kernels per rank.
+  Median custom AR was 24.8-31.9 us and RMSNorm 5.8-6.2 us.
+
+At TP=4, the max-rank fused median (44.3 us) is about 16% above the max-rank
+sum of unfused AR plus RMSNorm medians (about 38.1 us). The max-rank accumulated
+window is similarly 55.9 ms fused versus about 47.3 ms unfused. This directly
+supports the small production e2e regression in §5 and corrects the eager-only
+interpretation: production graph replay does not show the extreme multi-rank
+residency skew seen in eager profiling.
+
+The next kernel optimization target is therefore narrow: TP=4, `N=2880`,
+decode `M=32`, blocked one-shot under graph replay. Changes must beat the
+serving-faithful unfused AR+RMSNorm sum without regressing TP=2 or M=64/128.
+The trace still provides no reason to alter two-shot behavior.
+
+### 8.4 Decision
+
+No kernel policy changes are promoted from this profiling pass:
+
+- keep TP=2 auto-enable and TP=4/8 opt-in;
+- keep the M<=256 one-shot overlay, single-wave folded copy-in, and selective
+  TP=4 grid cap;
+- do not raise the two-shot threshold or build a caller-owned two-shot output
+  contract for this workload: two-shot did not occur in the measured windows;
+- do not revisit multi-wave folding, generic paired copies, or broad fixed-grid
+  policy; any new experiment should target the traced TP=4 M=32 graph path.
+
+Additional Proton eager runs are not needed for the current decision. The
+corrected torch environment now preserves production graph and overlap behavior.
+A producer-direct symmetric-input contract remains a future option only after a
+separate lifetime trace establishes caller-owned input/output lifetimes.
+
+Artifacts:
+
+- `/home/jeremwan/ar_rmsnorm_profiles/ws2_{fused,unfused}_proton_eager/`
+- `/home/jeremwan/ar_rmsnorm_profiles/ws2_fused_scoped/`
+- `/home/jeremwan/ar_rmsnorm_profiles/ws4_{fused,unfused}_proton_eager/`
+- `/home/jeremwan/ar_rmsnorm_profiles/final_profiler_image/ws4_{fused,unfused}_torch/`
+- `/home/jeremwan/ar_rmsnorm_profiles/env_rocprofiler/proton-graph-*.hatchet`
+- `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_profile_ws{2,4}_*_proton_eager_seed0.log`

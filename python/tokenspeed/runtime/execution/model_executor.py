@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 import torch
 from tokenspeed_kernel.ops.tuning import freeze_autotuning
 from tokenspeed_kernel.platform import current_platform
+from tokenspeed_kernel.profiling import start_profiling_before_graphs_from_env
 
 from tokenspeed.runtime.configs.model_config import ModelConfig
 from tokenspeed.runtime.configs.paged_cache_spec import (
@@ -551,6 +552,7 @@ class ModelExecutor:
         self._active_multimodal_context = None
         self._active_positions_override = None
 
+        start_profiling_before_graphs_from_env()
         self.forward_step = CudaGraphWrapper(
             forward_func=self._forward_step,
             attn_backend=attn_backend,

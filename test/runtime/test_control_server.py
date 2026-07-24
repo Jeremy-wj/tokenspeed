@@ -70,6 +70,10 @@ def _build_mock_smg() -> FastAPI:
     async def start_profile():
         return JSONResponse({"status": "profiling"})
 
+    @mock.api_route("/stop_profile", methods=["GET", "POST"])
+    async def stop_profile():
+        return JSONResponse({"status": "stopped"})
+
     return mock
 
 
@@ -96,6 +100,7 @@ class TestProxyPassthrough(unittest.TestCase):
 
         cls.hs = hs
         hs._gateway_url = f"http://127.0.0.1:{cls.MOCK_PORT}"
+        hs._rl_control_url = f"http://127.0.0.1:{cls.MOCK_PORT}"
         hs._engine_grpc_addr = "127.0.0.1:1"  # dead — only gRPC tests touch it
 
         cls._mock_server = uvicorn.Server(
@@ -215,6 +220,11 @@ class TestProxyPassthrough(unittest.TestCase):
         r = requests.post(self._url("/start_profile"), timeout=10)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json()["status"], "profiling")
+
+    def test_stop_profile_passthrough(self):
+        r = requests.post(self._url("/stop_profile"), timeout=10)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["status"], "stopped")
 
     def test_status_code_relayed(self):
         """A non-200 from smg must be relayed, not masked as 200."""

@@ -45,11 +45,13 @@ finished with the model's eager logits tail.
 from __future__ import annotations
 
 import bisect
+import os
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, NamedTuple
 
 import torch
 
+from tokenspeed_kernel.profiling import profiling_scope
 from tokenspeed.runtime.execution.breakable_cuda_graph import (
     BreakableCapture,
     active_forward,
@@ -64,6 +66,10 @@ from tokenspeed.runtime.utils import get_colorful_logger
 from tokenspeed.runtime.utils.common import maybe_inference_mode
 
 logger = get_colorful_logger(__name__)
+
+_PROFILE_GRAPH_SCOPES = os.environ.get(
+    "TOKENSPEED_KERNEL_PROFILE_GRAPH_SCOPES", ""
+).lower() in {"1", "true", "yes", "on"}
 
 if TYPE_CHECKING:
     from tokenspeed.runtime.execution.cuda_graph_wrapper import CudaGraphWrapper
@@ -375,7 +381,15 @@ class PrefillGraph:
             self._outputs[bucket] = CapturedForward(*self._run_inner(bucket))
         if self._pool is None:
             self._pool = cap.pool  # share the pool across all subsequent buckets
-        cap.replay()  # capture records kernels without executing; smoke-test replay
+        if _PROFILE_GRAPH_SCOPES:
+            with profiling_scope(
+                "runtime.prefill_graph_replay",
+                bucket=bucket,
+                capture_smoke_test=1,
+            ):
+                cap.replay()
+        else:
+            cap.replay()  # capture records kernels without executing; smoke-test replay
         self._captures[bucket] = cap
 
     def _run_inner(self, num_tokens: int):
@@ -586,7 +600,15 @@ class PrefillGraph:
             else:
                 ib.positions_buf[num_tokens:bucket].zero_()
         with self._padded_to(ctx, bucket):
-            self._captures[bucket].replay(valid_rows=num_tokens)
+            if _PROFILE_GRAPH_SCOPES:
+                with profiling_scope(
+                    "runtime.prefill_graph_replay",
+                    num_tokens=num_tokens,
+                    bucket=bucket,
+                ):
+                    self._captures[bucket].replay(valid_rows=num_tokens)
+            else:
+                self._captures[bucket].replay(valid_rows=num_tokens)
         hidden_states, aux_hidden_states = self._outputs[bucket].sliced(num_tokens)
         # The eager logits tail of BaseCausalLM.forward, on the replayed hidden states.
         logits_metadata = LogitsMetadata.from_forward_context(ctx)

@@ -354,10 +354,18 @@ class SchedulerControlClient:
         return await self._execute_profile(req)
 
     async def _execute_profile(self: AsyncLLM, req: ProfileReq):
-        result = (await self.profile_communicator(req))[0]
-        if not result.success:
-            raise RuntimeError(result.message)
-        return result
+        results = await self.profile_communicator(req)
+        failures = [
+            (rank, result.message)
+            for rank, result in enumerate(results)
+            if not result.success
+        ]
+        if failures:
+            details = "; ".join(
+                f"rank {rank}: {message}" for rank, message in failures
+            )
+            raise RuntimeError(f"Profiling failed on {len(failures)} rank(s): {details}")
+        return results[0]
 
     async def start_expert_distribution_record(self: AsyncLLM):
         self.auto_create_handle_loop()

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import bisect
 import gc
+import os
 import queue
 from collections.abc import Callable
 from contextlib import contextmanager
@@ -31,6 +32,7 @@ import torch
 import torch.distributed as dist
 import tqdm
 
+from tokenspeed_kernel.profiling import profiling_scope
 from tokenspeed.runtime.configs.paged_cache_spec import (
     compute_max_logical_pages_for_capture,
 )
@@ -61,6 +63,9 @@ if TYPE_CHECKING:
 
 logger = get_colorful_logger(__name__)
 
+_PROFILE_GRAPH_SCOPES = os.environ.get(
+    "TOKENSPEED_KERNEL_PROFILE_GRAPH_SCOPES", ""
+).lower() in {"1", "true", "yes", "on"}
 
 _is_capture_mode = False
 _is_cuda_graph_phase = False
@@ -1200,8 +1205,17 @@ class CudaGraphWrapper:
             self.deepep_adapter.replay()
 
             graph_key = self._cuda_graph_key(padded_bs)
-            with nvtx_range("graph_replay", color="red"):
-                self.graphs[graph_key].replay()
+            if _PROFILE_GRAPH_SCOPES:
+                with profiling_scope(
+                    "runtime.decode_graph_replay",
+                    batch_size=bs,
+                    padded_batch_size=padded_bs,
+                ):
+                    with nvtx_range("graph_replay", color="red"):
+                        self.graphs[graph_key].replay()
+            else:
+                with nvtx_range("graph_replay", color="red"):
+                    self.graphs[graph_key].replay()
 
             (
                 output_tokens,

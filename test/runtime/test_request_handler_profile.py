@@ -156,6 +156,33 @@ class TestRequestHandlerProtonProfile(unittest.TestCase):
         self.assertIn("Failed to start Proton profiling", result.message)
         self.assertFalse(self.handler.profile_in_progress)
 
+    def test_stop_finalizes_env_bootstrap_session(self):
+        state = profiling.ProfilingState.get()
+        state.enabled = True
+        state._session = 1
+
+        with mock.patch.object(request_handler_mod, "stop_profiling") as stop_profiling:
+            result = self.handler.profile(ProfileReq(type=ProfileReqType.STOP_PROFILE))
+
+        self.assertTrue(result.success)
+        self.assertIn("import-time", result.message)
+        stop_profiling.assert_called_once()
+
+    def test_bootstrap_finalize_failure_does_not_escape_scheduler(self):
+        state = profiling.ProfilingState.get()
+        state.enabled = True
+        state._session = 1
+
+        with mock.patch.object(
+            request_handler_mod,
+            "stop_profiling",
+            side_effect=RuntimeError("bad graph correlation"),
+        ):
+            result = self.handler.profile(ProfileReq(type=ProfileReqType.STOP_PROFILE))
+
+        self.assertFalse(result.success)
+        self.assertIn("bad graph correlation", result.message)
+
     def test_start_and_stop_drive_proton_session_per_rank(self):
         self.handler = _make_handler(_attn_mapping(tp_rank=3))
         with mock.patch.object(

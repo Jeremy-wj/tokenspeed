@@ -1,0 +1,15 @@
+world_size,backend,M,N,lat_ms,skew_pct
+8,rccl_unfused,8,2880,0.050160,1.833
+8,triton_shmem,8,2880,0.081301,0.393
+8,rccl_unfused,64,2880,0.051560,1.588
+8,triton_shmem,64,2880,0.080881,0.742
+8,rccl_unfused,128,2880,0.055060,0.762
+8,triton_shmem,128,2880,0.081921,0.513
+8,rccl_unfused,256,2880,0.057841,0.622
+8,triton_shmem,256,2880,0.076961,0.597
+8,rccl_unfused,512,2880,0.070981,0.422
+8,triton_shmem,512,2880,0.094821,0.380
+8,rccl_unfused,1024,2880,0.091401,0.394
+8,triton_shmem,1024,2880,0.107281,0.224
+8,rccl_unfused,2048,2880,0.125981,0.175
+8,triton_shmem,2048,2880,0.131921,0.349

@@ -43,12 +43,14 @@ __all__ = [
     "ShapeCapture",
     "bootstrap_profiling_from_env",
     "kernel_scope",
+    "profiling_scope",
     "profile_config_from_env",
     "profiling",
     "proton_available",
     "shape_capture",
     "start_shape_capture",
     "start_profiling",
+    "start_profiling_before_graphs_from_env",
     "stop_shape_capture",
     "stop_profiling",
 ]
@@ -56,6 +58,8 @@ __all__ = [
 # Enable profiling bootstrap at import time.
 # Truthy values: 1/true/yes/on (case-insensitive).
 _ENV_PROFILE = "TOKENSPEED_KERNEL_PROFILE"
+# Start after model/runtime initialization but before CUDA/HIP graph capture.
+_ENV_PROFILE_BEFORE_GRAPHS = "TOKENSPEED_KERNEL_PROFILE_BEFORE_GRAPHS"
 # Proton output prefix/path.
 # Default: "profile".
 _ENV_PROFILE_OUTPUT = "TOKENSPEED_KERNEL_PROFILE_OUTPUT"
@@ -63,7 +67,7 @@ _ENV_PROFILE_OUTPUT = "TOKENSPEED_KERNEL_PROFILE_OUTPUT"
 # Supported: "tree" or "trace". Default: "tree".
 _ENV_PROFILE_DATA = "TOKENSPEED_KERNEL_PROFILE_DATA"
 # Activity backend override.
-# Supported: "cupti" or "roctracer".
+# Supported: "cupti", "roctracer", or "rocprofiler".
 _ENV_PROFILE_BACKEND = "TOKENSPEED_KERNEL_PROFILE_BACKEND"
 # Profiling mode override.
 # Supported: "pcsampling" or "periodic_flushing".
@@ -274,12 +278,19 @@ def profile_config_from_env(output: str | None = None) -> ProfilingConfig:
         A :class:`ProfilingConfig` with ``data``/``backend``/``mode``/``hook``/
         ``output_format`` sourced from the environment.
     """
+    output_path = output or os.environ.get(_ENV_PROFILE_OUTPUT, "profile")
+    output_path = output_path.replace("{pid}", str(os.getpid()))
+    backend = os.environ.get(_ENV_PROFILE_BACKEND) or None
+    mode = os.environ.get(_ENV_PROFILE_MODE) or None
+    hook = os.environ.get(_ENV_PROFILE_HOOK, "triton")
+    if hook.strip().lower() in {"", "none", "off"}:
+        hook = None
     return ProfilingConfig(
-        output=output or os.environ.get(_ENV_PROFILE_OUTPUT, "profile"),
+        output=output_path,
         data=os.environ.get(_ENV_PROFILE_DATA, "tree"),
-        backend=os.environ.get(_ENV_PROFILE_BACKEND),
-        mode=os.environ.get(_ENV_PROFILE_MODE),
-        hook=os.environ.get(_ENV_PROFILE_HOOK, "triton"),
+        backend=backend,
+        mode=mode,
+        hook=hook,
         output_format=os.environ.get(_ENV_PROFILE_OUTPUT_FORMAT, ""),
     )
 
@@ -388,6 +399,15 @@ def kernel_scope(
     return _VizTracerProtonScope(proton.scope(name, metrics=scope_metrics))
 
 
+def profiling_scope(name: str, **metrics: object):
+    state = ProfilingState.get()
+    if not state.active:
+        return _NOOP_SCOPE
+
+    scope_metrics = _proton_metrics(metrics)
+    return _VizTracerProtonScope(proton.scope(name, metrics=scope_metrics))
+
+
 def _atexit_stop_profiling() -> None:
     try:
         stop_profiling()
@@ -419,3 +439,13 @@ def bootstrap_profiling_from_env() -> None:
 
     atexit.register(_atexit_stop_profiling)
     atexit.register(_atexit_stop_shape_capture)
+
+
+def start_profiling_before_graphs_from_env() -> int | None:
+    """Start an env-configured session at the model-to-graph lifecycle boundary."""
+    if not _is_truthy(os.environ.get(_ENV_PROFILE_BEFORE_GRAPHS)):
+        return None
+    state = ProfilingState.get()
+    if state.active:
+        return state._session
+    return start_profiling(profile_config_from_env())

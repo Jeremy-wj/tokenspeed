@@ -68,9 +68,15 @@ class BenchmarkConfig:
         if self.proton_config.data not in {"tree", "trace"}:
             raise ValueError("proton_config.data must be one of: tree, trace")
 
-        if self.proton_config.backend not in {None, "cupti", "roctracer"}:
+        if self.proton_config.backend not in {
+            None,
+            "cupti",
+            "roctracer",
+            "rocprofiler",
+        }:
             raise ValueError(
-                "proton_config.backend must be one of: None, cupti, roctracer"
+                "proton_config.backend must be one of: "
+                "None, cupti, roctracer, rocprofiler"
             )
 
         if self.proton_config.mode not in {None, "pcsampling", "periodic_flushing"}:

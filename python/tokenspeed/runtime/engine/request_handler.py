@@ -367,7 +367,7 @@ class RequestHandler:
                 return ProfileReqOutput(
                     success=False,
                     message="PROTON cannot be combined with "
-                    f"{', '.join(conflicting)}: CUPTI/roctracer supports only "
+                    f"{', '.join(conflicting)}: GPU profiling backends support only "
                     "one GPU profiling client per process.",
                 )
             if not proton_available():
@@ -499,6 +499,18 @@ class RequestHandler:
 
     def stop_profile(self, stage: ForwardMode | None = None) -> ProfileReqOutput | None:
         if not self.profile_in_progress:
+            if ProfilingState.get().active:
+                try:
+                    stop_profiling()
+                except Exception as exc:  # noqa: BLE001
+                    return ProfileReqOutput(
+                        success=False,
+                        message=f"Failed to finalize import-time Proton profiling: {exc}",
+                    )
+                return ProfileReqOutput(
+                    success=True,
+                    message="Stopped the import-time Proton profiling session.",
+                )
             return ProfileReqOutput(
                 success=False,
                 message="Profiling is not in progress. Call /start_profile first.",

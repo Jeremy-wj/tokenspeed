@@ -28,6 +28,8 @@ TS_TRITON_SHMEM_INKERNEL_BARRIER=1      # one-shot barriers in the fused kernel
 TS_TRITON_SHMEM_FOLD_COPYIN=1           # fold one-shot copy-in
 TS_TRITON_SHMEM_FOLD_NUM_WARPS=1        # system barrier covers the whole program
 TS_TRITON_SHMEM_WORKGROUP_SYNC=1        # bracket scalar cross-rank barriers
+TS_TRITON_SHMEM_GRID_CAP=-1             # auto: gfx950 ws4 cap 128 at M>=256
+TS_TRITON_SHMEM_GRID_CAP_MIN_M=-1       # use validated auto crossover
 TS_TRITON_SHMEM_ONESHOT_MAX_M=256       # one-shot overlay at ws>=4
 TS_TRITON_SHMEM_BARRIER_GRID=0           # M-dependent grid; fixed grid is opt-in
 TS_TRITON_AR_WORKGROUP_SYNC=1           # safe unfused Triton AR barriers
@@ -173,17 +175,20 @@ falls back rather than running a partially configured backend.
 Use the verified local image and container:
 
 ```text
-image:     jeremwan/tokenspeed:rocm7.2.4-torch2.11
-container: jeremwan-tokenspeed
-model:     /data/models/openai/gpt-oss-120b
+serving image:   jeremwan/tokenspeed:rocm7.2.4-torch2.11
+profiling image: jeremwan/tokenspeed:rocm7.2.4-torch2.11-profiler
+profiler ID:     sha256:ad3ea3f8cae8ca38cf12824b15c606d0630118c6e04b4087e191b04619a6c135
+container:       jeremwan-tokenspeed-profiler
+model:           /data/models/openai/gpt-oss-120b
 ```
 
 The container uses torch `2.11.0+rocm7.2` with system ROCm 7.2.4 libraries after
 relocating torch's bundled ROCm runtime. Re-run
-`benchmark/fix_torch_hip_bundling.sh` after any torch reinstall. The deterministic
-HIP probe, eager and captured RCCL, and final ws=2/4/8 serving pass without
-blocking wait. See the historical environment document for exact recreation,
-verification, and evidence boundaries.
+`benchmark/fix_torch_hip_bundling.sh` after any torch reinstall; it must relocate
+the bundled roctracer as well as HIP/HSA/ROCTX/RCCL. The deterministic HIP probe,
+eager and captured RCCL, final ws=2/4/8 serving, and TP=2/4 torch graph profiling
+pass without blocking wait. See the historical environment document for exact
+recreation, verification, and evidence boundaries.
 
 The host is shared. Before every GPU run, inspect KFD processes and utilization.
 For ws<8 avoid physical GPU 3/HIP index 0; use all eight only from an idle snapshot.
@@ -267,12 +272,20 @@ Preserve:
 
 Next work should be driven by current MI350X data:
 
-- tune one-shot/two-shot thresholds by architecture, N, and world size;
-- reduce barrier work or copy bytes only when end-to-end data justifies the added
-  integration surface;
-- validate subgroup TP;
-- validate fixed-grid behavior under DP, overlap, and speculative decode;
-- decouple coarse allocation from caching-allocator mode;
+- scoped traces found 93.8% `M=32`, 6.2% `M=64/128`, and 100% one-shot blocked
+  calls at TP=2/4; graph-serving traces further show the TP=4 M=32 fused kernel
+  about 16% above the max-rank unfused AR+RMSNorm median sum, so target that
+  narrow graph path before changing the conservative one-shot threshold;
+- remove two-shot copies only after tracing proves an explicit caller-owned
+  symmetric-buffer lifetime contract; two-shot did not occur in the profiled
+  decode windows, and paired-copy, borrowed-output, and barrier-folding
+  shortcuts were slower or unsafe;
+- extend subgroup TP graph coverage beyond the validated disjoint/interleaved
+  eager cases when a subgroup deployment is planned;
+- validate scheduler collective-order invariants under DP/speculative decode
+  before using a fixed grid;
+- revisit allocator independence only on a ROCm build that supports expandable
+  segments or requires a pluggable allocator;
 - re-run runtime, correctness, and capture gates after torch/ROCm changes.
 
 The current crossover, serving baseline, e2e A/B results, and future measurement

@@ -28,8 +28,10 @@ Architecture::
     Client  ──►  control_server  :8001
                     ├─ /health, /get_server_info, /get_model_info,
                     │  /health_check, /abort  ──►  gRPC engine  (direct)
-                    └─ /generate, /v1/*, /flush_cache
-                         ──►  smg gateway  :8000  ──►  gRPC engine
+                    ├─ /generate, /v1/*, /flush_cache
+                    │    ──►  smg gateway  :8000  ──►  gRPC engine
+                    └─ /start_profile, /stop_profile
+                         ──►  in-engine control plane
 """
 
 from __future__ import annotations
@@ -368,12 +370,12 @@ async def flush_cache(request: Request):
 
 @app.api_route("/start_profile", methods=["GET", "POST"])
 async def start_profile(request: Request):
-    return await _proxy_request(request)
+    return await _proxy_to_rl_control(request)
 
 
 @app.api_route("/stop_profile", methods=["GET", "POST"])
 async def stop_profile(request: Request):
-    return await _proxy_request(request)
+    return await _proxy_to_rl_control(request)
 
 
 # ---------------------------------------------------------------------------

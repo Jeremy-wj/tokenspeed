@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
 import tokenspeed_kernel.profiling as profiling
@@ -174,6 +175,27 @@ def test_kernel_scope_noop_when_inactive():
         pass
 
 
+def test_profiling_scope_noop_when_inactive():
+    assert profiling.profiling_scope("runtime.graph_replay") is profiling._NOOP_SCOPE
+
+
+def test_profiling_scope_filters_non_numeric_metrics(monkeypatch):
+    fake = _FakeProton()
+    monkeypatch.setattr(profiling, "_HAS_PROTON", True)
+    monkeypatch.setattr(profiling, "proton", fake)
+    profiling.start_profiling()
+
+    with profiling.profiling_scope(
+        "runtime.graph_replay",
+        batch_size=32,
+        graph_key="decode",
+        optional=None,
+    ):
+        pass
+
+    assert fake.scope_calls == [("runtime.graph_replay", {"batch_size": 32})]
+
+
 def test_kernel_scope_uses_proton_scope_when_active(monkeypatch):
     fake = _FakeProton()
     monkeypatch.setattr(profiling, "_HAS_PROTON", True)
@@ -188,12 +210,14 @@ def test_kernel_scope_uses_proton_scope_when_active(monkeypatch):
         M=32,
         N=64,
         K=128,
+        layout="row_major",
+        optional=None,
     ):
         pass
 
     assert fake.scope_calls == [
         (
-            "gemm.mm[triton_mm_fp8_scaled]",
+            "gemm.mm[triton_mm_fp8_scaled]{dtype=torch.float16}",
             {
                 "M": 32,
                 "N": 64,
@@ -296,6 +320,22 @@ def test_bootstrap_reads_env_and_only_runs_once(monkeypatch):
     assert len(registrations) == 2
 
 
+def test_start_profiling_before_graphs_from_env(monkeypatch):
+    fake = _FakeProton()
+    monkeypatch.setattr(profiling, "_HAS_PROTON", True)
+    monkeypatch.setattr(profiling, "proton", fake)
+    monkeypatch.setenv("TOKENSPEED_KERNEL_PROFILE_BEFORE_GRAPHS", "1")
+    monkeypatch.setenv("TOKENSPEED_KERNEL_PROFILE_OUTPUT", "before-graphs-{pid}")
+
+    session = profiling.start_profiling_before_graphs_from_env()
+    repeated = profiling.start_profiling_before_graphs_from_env()
+
+    assert session == 123
+    assert repeated == 123
+    assert len(fake.start_calls) == 1
+    assert fake.start_calls[0][0][0] == f"before-graphs-{os.getpid()}"
+
+
 def test_proton_available_reflects_import(monkeypatch):
     monkeypatch.setattr(profiling, "_HAS_PROTON", True)
     assert profiling.proton_available()
@@ -334,6 +374,34 @@ def test_profile_config_from_env_output_override_wins(monkeypatch):
     assert cfg.mode == "periodic_flushing"
     assert cfg.hook == "triton"
     assert cfg.output_format == "chrome_trace"
+
+
+def test_profile_config_from_env_expands_pid(monkeypatch):
+    monkeypatch.setenv(
+        "TOKENSPEED_KERNEL_PROFILE_OUTPUT", "profiles/bootstrap-{pid}.proton"
+    )
+
+    cfg = profiling.profile_config_from_env()
+
+    assert cfg.output == f"profiles/bootstrap-{os.getpid()}.proton"
+
+
+def test_profile_config_from_env_disables_hook(monkeypatch):
+    monkeypatch.setenv("TOKENSPEED_KERNEL_PROFILE_HOOK", "none")
+
+    cfg = profiling.profile_config_from_env()
+
+    assert cfg.hook is None
+
+
+def test_profile_config_from_env_normalizes_blank_backend_and_mode(monkeypatch):
+    monkeypatch.setenv("TOKENSPEED_KERNEL_PROFILE_BACKEND", "")
+    monkeypatch.setenv("TOKENSPEED_KERNEL_PROFILE_MODE", "")
+
+    cfg = profiling.profile_config_from_env()
+
+    assert cfg.backend is None
+    assert cfg.mode is None
 
 
 def test_shape_capture_records_dump_and_clear(tmp_path):

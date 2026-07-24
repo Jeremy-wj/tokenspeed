@@ -16,10 +16,12 @@
 set -euo pipefail
 
 ROCM_LIB="${ROCM_LIB:-/opt/rocm/lib}"
-# Core ROCm *runtime* libs that carry the HIP/RCCL behavior. Compute libs
+# Core ROCm *runtime* and tracing libs that must come from one system release.
+# Keeping the wheel's ROCm 7.2.0 libroctracer beside system HIP/HSA 7.2.4 causes
+# native Kineto/Proton activity-buffer faults. Compute libs
 # (rocblas/hipblaslt/etc.) are intentionally left bundled.
 LIBS=(libamdhip64 librccl libhsa-runtime64 libamd_comgr librocm-core \
-      librocprofiler-register libroctx64)
+      librocprofiler-register libroctx64 libroctracer64)
 
 TL="$(python3 -c 'import torch,os;print(os.path.join(os.path.dirname(torch.__file__),"lib"))')"
 BK="${TL}/_bundled_rocm_backup"

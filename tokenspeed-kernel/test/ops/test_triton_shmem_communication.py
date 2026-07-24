@@ -195,6 +195,96 @@ def test_triton_shmem_arrms_world2_wholerow():
 
 
 # ---------------------------------------------------------------------------
+# Suite 1b: subgroup TP pointer/rank semantics.
+# ---------------------------------------------------------------------------
+def _subgroup_worker(rank, world_size, port, interleaved, error_dict):
+    try:
+        torch.cuda.set_device(rank)
+        dist.init_process_group(
+            backend="nccl",
+            init_method=f"tcp://localhost:{port}",
+            rank=rank,
+            world_size=world_size,
+        )
+        rank_sets = (
+            [(0, 2), (1, 3)] if interleaved else [(0, 1), (2, 3)]
+        )
+        groups = [dist.new_group(ranks) for ranks in rank_sets]
+        group_idx = next(i for i, ranks in enumerate(rank_sets) if rank in ranks)
+        ranks = rank_sets[group_idx]
+        group = groups[group_idx]
+
+        from tokenspeed_kernel.ops.communication.triton_shmem import (
+            create_triton_shmem_ar_rmsnorm_state,
+            triton_shmem_allreduce_residual_rmsnorm,
+        )
+
+        hidden = 2880
+        device = torch.device(f"cuda:{rank}")
+        state = create_triton_shmem_ar_rmsnorm_state(
+            group=group,
+            rank_in_group=ranks.index(rank),
+            max_token_num=512,
+            hidden_dim=hidden,
+            dtype=torch.bfloat16,
+        )
+        assert state is not None
+        weight = torch.linspace(
+            0.5, 1.5, hidden, dtype=torch.bfloat16, device=device
+        )
+        expected_reduced = float(sum(r + 1 for r in ranks))
+        for tokens in (64, 256, 512):
+            x, residual = _make_inputs(tokens, hidden, rank, device)
+            norm_out, residual_out = (
+                triton_shmem_allreduce_residual_rmsnorm(
+                    state, x, residual, weight, _EPS
+                )
+            )
+            ref_residual = (
+                torch.full_like(x, expected_reduced, dtype=torch.float32)
+                + residual.float()
+            )
+            ref_norm = ref_residual * torch.rsqrt(
+                ref_residual.square().mean(-1, keepdim=True) + _EPS
+            )
+            ref_norm *= weight.float()
+            torch.testing.assert_close(
+                residual_out.float(), ref_residual, atol=2e-2, rtol=2e-2
+            )
+            torch.testing.assert_close(
+                norm_out.float(), ref_norm, atol=2e-2, rtol=2e-2
+            )
+    except Exception:
+        error_dict[rank] = traceback.format_exc()
+    finally:
+        if dist.is_initialized():
+            dist.destroy_process_group()
+
+
+def _run_subgroup(interleaved: bool) -> None:
+    _skip_if_unsupported(4)
+    error_dict = mp.Manager().dict()
+    mp.spawn(
+        _subgroup_worker,
+        args=(4, _get_open_port(), interleaved, error_dict),
+        nprocs=4,
+        join=True,
+    )
+    if error_dict:
+        raise RuntimeError(
+            "\n".join(f"Rank {r}: {e}" for r, e in error_dict.items())
+        )
+
+
+def test_triton_shmem_arrms_disjoint_subgroups():
+    _run_subgroup(interleaved=False)
+
+
+def test_triton_shmem_arrms_interleaved_subgroups():
+    _run_subgroup(interleaved=True)
+
+
+# ---------------------------------------------------------------------------
 # Suite 2: HIP graph capture + replay (capture-safety is the decisive reason to
 # migrate off the rocSHMEM host barrier). Replays with changing input must
 # recompute the reduction correctly.
@@ -343,6 +433,17 @@ def test_triton_shmem_arrms_folded_copyin_graph_world4():
         world_size=4,
         hidden=2880,
         tokens=64,
+        fold_copyin=True,
+        replays=100,
+    )
+
+
+def test_triton_shmem_arrms_gridcap_graph_world4():
+    # Exercises the gfx950 ws4 M>=256 integration cap (256 -> 128 CTAs).
+    _run_graph(
+        world_size=4,
+        hidden=2880,
+        tokens=256,
         fold_copyin=True,
         replays=100,
     )

@@ -1395,6 +1395,7 @@ async def benchmark(
     backend: str,
     api_url: str,
     base_url: str,
+    profile_base_url: str | None,
     model_id: str,
     model_name: str | None,
     tokenizer: PreTrainedTokenizerBase | None,
@@ -1407,6 +1408,10 @@ async def benchmark(
     profile: bool,
     profile_num_steps: int | None,
     profile_activities: list[str] | None,
+    profile_output_dir: str | None,
+    profile_id: str | None,
+    profile_with_stack: bool | None,
+    profile_record_shapes: bool | None,
     selected_percentile_metrics: list[str],
     selected_percentiles: list[float],
     ignore_eos: bool,
@@ -1486,28 +1491,35 @@ async def benchmark(
             print("Starting profiler...")
         else:
             print(f"Starting profiler for {profile_num_steps} steps...")
-        # Use a dedicated body for the /start_profile request so profiler
-        # fields don't leak into the generation request payloads below.
-        profile_body = dict(extra_body or {})
+        profile_body = {}
         if profile_num_steps is not None:
             profile_body["num_steps"] = profile_num_steps
         if profile_activities is not None:
             profile_body["activities"] = profile_activities
-        profile_input = RequestFuncInput(
-            model=model_id,
-            model_name=model_name,
-            prompt=test_request.prompt,
-            api_url=base_url + "/start_profile",
-            prompt_len=test_request.prompt_len,
-            output_len=test_request.expected_output_len,
-            logprobs=logprobs,
-            ignore_eos=ignore_eos,
-            extra_headers=extra_headers,
-            extra_body=profile_body,
-        )
-        profile_output = await request_func(profile_input, session=session)
-        if profile_output.success:
-            print("Profiler started")
+        if profile_output_dir is not None:
+            profile_body["output_dir"] = profile_output_dir
+        if profile_id is not None:
+            profile_body["profile_id"] = profile_id
+        if profile_with_stack is not None:
+            profile_body["with_stack"] = profile_with_stack
+        if profile_record_shapes is not None:
+            profile_body["record_shapes"] = profile_record_shapes
+        control_base_url = (profile_base_url or base_url).rstrip("/")
+        try:
+            async with session.post(
+                control_base_url + "/start_profile",
+                json=profile_body,
+                headers=extra_headers,
+            ) as response:
+                profile_response = await response.text()
+                if response.status < 200 or response.status >= 300:
+                    raise RuntimeError(
+                        f"Profiler start failed ({response.status}): {profile_response}"
+                    )
+        except Exception:
+            await session.close()
+            raise
+        print("Profiler started")
 
     distribution = "Poisson process" if burstiness == 1.0 else "Gamma distribution"
     if ramp_up_strategy:
@@ -1687,19 +1699,18 @@ async def benchmark(
 
     if profile and profile_num_steps is None:
         print("Stopping profiler...")
-        profile_input = RequestFuncInput(
-            model=model_id,
-            model_name=model_name,
-            prompt=test_request.prompt,
-            api_url=base_url + "/stop_profile",
-            prompt_len=test_request.prompt_len,
-            output_len=test_request.expected_output_len,
-            logprobs=logprobs,
-            ignore_eos=ignore_eos,
-        )
-        profile_output = await request_func(profile_input, session=session)
-        if profile_output.success:
-            print("Profiler stopped")
+        control_base_url = (profile_base_url or base_url).rstrip("/")
+        async with session.post(
+            control_base_url + "/stop_profile",
+            json={},
+            headers=extra_headers,
+        ) as response:
+            profile_response = await response.text()
+            if response.status < 200 or response.status >= 300:
+                raise RuntimeError(
+                    f"Profiler stop failed ({response.status}): {profile_response}"
+                )
+        print("Profiler stopped")
 
     await session.close()
     return result
@@ -1802,6 +1813,25 @@ def add_serving_cli_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--profile", action="store_true")
     parser.add_argument("--profile-num-steps", type=int, default=None)
     parser.add_argument(
+        "--profile-base-url",
+        type=str,
+        default=None,
+        help="Base URL for /start_profile and /stop_profile. Use the TokenSpeed "
+        "control sidecar URL when the serving gateway does not expose profiling.",
+    )
+    parser.add_argument("--profile-output-dir", type=str, default=None)
+    parser.add_argument("--profile-id", type=str, default=None)
+    parser.add_argument(
+        "--profile-with-stack",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+    )
+    parser.add_argument(
+        "--profile-record-shapes",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+    )
+    parser.add_argument(
         "--profile-activities",
         nargs="+",
         choices=["CPU", "GPU", "MEM", "CUDA_PROFILER", "VIZTRACER", "PROTON"],
@@ -1810,7 +1840,7 @@ def add_serving_cli_args(parser: argparse.ArgumentParser) -> None:
         "default, CPU and GPU via the torch profiler). PROTON drives the "
         "Triton Proton profiler inside each scheduler process; it cannot be "
         "combined with GPU or CUDA_PROFILER, which need the same "
-        "CUPTI/roctracer interface.",
+        "GPU activity interface.",
     )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--ignore-eos", action="store_true")
@@ -1927,6 +1957,7 @@ async def main_async(args: argparse.Namespace) -> dict[str, Any]:
         backend=args.backend,
         api_url=api_url,
         base_url=base_url,
+        profile_base_url=args.profile_base_url,
         model_id=model_id,
         model_name=model_name,
         tokenizer=tokenizer,
@@ -1939,6 +1970,10 @@ async def main_async(args: argparse.Namespace) -> dict[str, Any]:
         profile=args.profile,
         profile_num_steps=args.profile_num_steps,
         profile_activities=args.profile_activities,
+        profile_output_dir=args.profile_output_dir,
+        profile_id=args.profile_id,
+        profile_with_stack=args.profile_with_stack,
+        profile_record_shapes=args.profile_record_shapes,
         selected_percentile_metrics=percentile_metrics.split(","),
         selected_percentiles=[float(p) for p in args.metric_percentiles.split(",")],
         ignore_eos=args.ignore_eos,

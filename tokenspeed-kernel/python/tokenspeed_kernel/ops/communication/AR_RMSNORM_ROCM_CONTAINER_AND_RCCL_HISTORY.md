@@ -246,3 +246,108 @@ Exact results and deployment policy are in
 The image's historical commit message says “RCCL graph-capture hang fixed.” That
 string remains provenance; current evidence additionally requires the kernel
 barrier fixes above.
+
+## 7. Profiling compatibility boundary
+
+The original profiler failure was an environment mismatch, not a fundamental
+torch 2.11 / ROCm 7.2 incompatibility. `fix_torch_hip_bundling.sh` moved the
+wheel's HIP/HSA/ROCTX/RCCL libraries but omitted `libroctracer64.so`.
+Consequently `libtorch_hip.so` loaded:
+
+- system ROCm 7.2.4 `libamdhip64`, `libhsa-runtime64`, `libroctx64`, and RCCL;
+- the torch wheel's bundled ROCm 7.2.0 `libroctracer64`.
+
+That mixed activity stack segfaulted in
+`roctracer::MemoryPool::Write` from `THCPEvent_wait`. Relocating the bundled
+`libroctracer64.so` so the loader selects `/opt/rocm/lib/libroctracer64.so`
+fixes both torch/Kineto and eager Proton roctracer. The fix script now includes
+`libroctracer64` in the required system-runtime family.
+
+### 7.1 Profiler-qualified artifact
+
+```text
+image:     jeremwan/tokenspeed:rocm7.2.4-torch2.11-profiler
+image ID:  sha256:ad3ea3f8cae8ca38cf12824b15c606d0630118c6e04b4087e191b04619a6c135
+container: jeremwan-tokenspeed-profiler
+torch:     2.11.0+rocm7.2 (compiled HIP label 7.2.26015)
+runtime:   system HIP 7.2.53211 / ROCm 7.2.4
+tracing:   system roctracer 4.1.70204 / rocprofiler-sdk 1.1.0
+```
+
+The image differs from `jeremwan/tokenspeed:rocm7.2.4-torch2.11` only by
+relocating torch's bundled roctracer. Compute libraries remain wheel-bundled.
+`ldd libtorch_hip.so` resolves HIP, HSA, ROCTX, RCCL, and roctracer from
+`/opt/rocm/lib`.
+
+Passed in the committed image:
+
+- standalone torch CPU+GPU eager and graph Chrome traces;
+- TP=2 normal graph-serving torch CPU+GPU profile, both rank files complete;
+- deterministic HIP event-query/capture probe with runtime 70253211;
+- ws=2 eager and captured RCCL plus compute-graph replay with blocking wait off;
+- standalone eager Proton roctracer Chrome trace;
+- standalone graph Proton tree/Hatchet with both roctracer and rocprofiler.
+
+The TP=2 torch serving capture produced 1.7/1.8 MiB rank traces, about 92,000
+events and 29,139 GPU kernels per rank, including 1,152
+`fused_ar_rmsnorm_oneshot_blocked_kernel` events.
+
+Recreation from the serving image:
+
+```bash
+cd /home/jeremwan/tokenspeed/tokenspeed-kernel
+bash benchmark/fix_torch_hip_bundling.sh
+ldd /opt/venv/lib/python3.10/site-packages/torch/lib/libtorch_hip.so \
+  | grep -E 'libamdhip64|libhsa-runtime|libroctx|libroctracer|librccl'
+```
+
+All five libraries in that check must resolve under `/opt/rocm/lib`.
+
+### 7.2 Why the all-bundled alternative was rejected
+
+A separate container restored all torch-wheel ROCm 7.2.0 runtime libraries.
+That coherent stack also passed the standalone torch graph-profiler probe, but
+reproduced the deterministic HIP 70226015 defect:
+
+```text
+hipEventQuery -> hipErrorStreamCaptureUnsupported
+capture       -> hipErrorStreamCaptureInvalidated
+```
+
+It could be used only with watchdog avoidance such as
+`TORCH_NCCL_BLOCKING_WAIT=1`. The all-system 7.2.4 runtime/tracing family works
+without that workaround and is the promoted configuration.
+
+### 7.3 Proton graph support
+
+Proton's AMD graph behavior depends on backend, lifecycle, and data format:
+
+- `data=trace` / `chrome_trace` works for eager kernels, but graph replay
+  finalization fails with missing CPU-scope correlations or emits incomplete
+  metric-only output.
+- `data=tree` / `hatchet` is the supported graph path in the installed
+  tokenspeed-proton 3.8.10.post20260709 build.
+- roctracer must start after HIP/model initialization but before graph capture.
+  The new `TOKENSPEED_KERNEL_PROFILE_BEFORE_GRAPHS=1` lifecycle hook starts at
+  that boundary.
+- rocprofiler must configure before HIP/HSA registration. Use
+  `TOKENSPEED_KERNEL_PROFILE=1` plus
+  `TOKENSPEED_KERNEL_PROFILE_EARLY=1`.
+- both graph modes require the session to remain active through graph capture
+  and replay. `TOKENSPEED_KERNEL_PROFILE_EARLY_KEEP_ACTIVE=1` prevents the
+  early session from being used only as a backend-prime.
+- `TOKENSPEED_KERNEL_PROFILE_GRAPH_SCOPES=1` adds explicit decode and prefill
+  replay scopes so Hatchet attributes replayed kernels.
+
+The rocprofiler TokenSpeed run finalized two valid per-rank Hatchet files. Each
+contained decode and prefill replay scopes, 353 timed nodes, and timed fused
+AR+RMSNorm kernels. It still emitted many `Cannot find graph` warnings for graph
+objects outside the attributed paths, so this mode is usable but noisy.
+
+Legacy roctracer is the cleaner torch/Kineto path and is stable for eager Proton.
+Its full multi-rank TokenSpeed graph/Hatchet path remains shaky: one experiment
+produced a complete rank file and a zero-byte peer file. Profiler control now
+checks every rank result instead of accepting rank zero alone.
+
+Do not use ROCm 7.14/TheRock preview packages for this setup. All conclusions
+above use torch 2.11 with released ROCm 7.2.4 userspace.

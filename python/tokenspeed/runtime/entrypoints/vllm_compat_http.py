@@ -53,6 +53,7 @@ from tokenspeed.runtime.engine.weight_transfer.manager import PAUSE_MODES
 from tokenspeed.runtime.utils import get_colorful_logger
 
 if TYPE_CHECKING:
+    from tokenspeed.runtime.engine.async_llm import AsyncLLM
     from tokenspeed.runtime.engine.weight_transfer.manager import WeightTransferManager
 
 logger = get_colorful_logger(__name__)
@@ -75,6 +76,16 @@ def _manager(request: Request) -> "WeightTransferManager":
     return manager
 
 
+def _async_llm(request: Request) -> "AsyncLLM":
+    async_llm = getattr(request.app.state, "async_llm", None)
+    if async_llm is None:
+        raise HTTPException(
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR.value,
+            detail="AsyncLLM is not configured on this server.",
+        )
+    return async_llm
+
+
 async def _read_json(request: Request) -> dict[str, Any]:
     """Parse a JSON object body, 400 on invalid JSON."""
     try:
@@ -86,6 +97,55 @@ async def _read_json(request: Request) -> dict[str, Any]:
             status_code=400, detail="Request body must be a JSON object"
         )
     return body
+
+
+# --------------------------------------------------------------------------- #
+# Profiling
+# --------------------------------------------------------------------------- #
+
+
+@router.post("/start_profile")
+async def start_profile(raw_request: Request) -> JSONResponse:
+    body = await _read_json(raw_request)
+    try:
+        result = await _async_llm(raw_request).start_profile(
+            output_dir=body.get("output_dir"),
+            start_step=body.get("start_step"),
+            num_steps=body.get("num_steps"),
+            activities=body.get("activities"),
+            with_stack=body.get("with_stack"),
+            record_shapes=body.get("record_shapes"),
+            profile_by_stage=body.get("profile_by_stage", False),
+            profile_id=body.get("profile_id"),
+        )
+    except (TypeError, ValueError, RuntimeError) as err:
+        return JSONResponse(
+            content={"success": False, "message": str(err)},
+            status_code=HTTPStatus.BAD_REQUEST.value,
+        )
+    return JSONResponse(
+        content={
+            "success": bool(getattr(result, "success", True)),
+            "message": getattr(result, "message", "Succeeded"),
+        }
+    )
+
+
+@router.post("/stop_profile")
+async def stop_profile(raw_request: Request) -> JSONResponse:
+    try:
+        result = await _async_llm(raw_request).stop_profile()
+    except RuntimeError as err:
+        return JSONResponse(
+            content={"success": False, "message": str(err)},
+            status_code=HTTPStatus.BAD_REQUEST.value,
+        )
+    return JSONResponse(
+        content={
+            "success": bool(getattr(result, "success", True)),
+            "message": getattr(result, "message", "Succeeded"),
+        }
+    )
 
 
 # --------------------------------------------------------------------------- #

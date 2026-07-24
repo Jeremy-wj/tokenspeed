@@ -1,0 +1,54 @@
+===== [ON_c4_s0] in=128 out=512 n=40 conc=4 seed=0 =====
+Benchmark duration (s):                  62.66     
+Request throughput (req/s):              0.64      
+Output token throughput (tok/s):         326.82    
+Total token throughput (tok/s):          408.53    
+Mean TTFT (ms):                          78.79     
+Median TTFT (ms):                        78.57     
+Mean TPOT (ms):                          12.11     
+Median TPOT (ms):                        11.99     
+===== [ON_c4_s1] in=128 out=512 n=40 conc=4 seed=1 =====
+Benchmark duration (s):                  63.76     
+Request throughput (req/s):              0.63      
+Output token throughput (tok/s):         321.22    
+Total token throughput (tok/s):          401.53    
+Mean TTFT (ms):                          75.77     
+Median TTFT (ms):                        78.33     
+Mean TPOT (ms):                          12.33     
+Median TPOT (ms):                        12.32     
+===== [ON_c8_s0] in=128 out=512 n=48 conc=8 seed=0 =====
+Benchmark duration (s):                  39.19     
+Request throughput (req/s):              1.22      
+Output token throughput (tok/s):         627.14    
+Total token throughput (tok/s):          783.93    
+Mean TTFT (ms):                          78.74     
+Median TTFT (ms):                        81.24     
+Mean TPOT (ms):                          12.62     
+Median TPOT (ms):                        12.65     
+===== [ON_c8_s1] in=128 out=512 n=48 conc=8 seed=1 =====
+Benchmark duration (s):                  38.15     
+Request throughput (req/s):              1.26      
+Output token throughput (tok/s):         644.20    
+Total token throughput (tok/s):          805.25    
+Mean TTFT (ms):                          81.19     
+Median TTFT (ms):                        81.00     
+Mean TPOT (ms):                          12.28     
+Median TPOT (ms):                        12.26     
+===== [ON_c16_s0] in=128 out=512 n=64 conc=16 seed=0 =====
+Benchmark duration (s):                  27.95     
+Request throughput (req/s):              2.29      
+Output token throughput (tok/s):         1172.24   
+Total token throughput (tok/s):          1465.30   
+Mean TTFT (ms):                          98.47     
+Median TTFT (ms):                        105.28    
+Mean TPOT (ms):                          13.47     
+Median TPOT (ms):                        13.51     
+===== [ON_c16_s1] in=128 out=512 n=64 conc=16 seed=1 =====
+Benchmark duration (s):                  27.63     
+Request throughput (req/s):              2.32      
+Output token throughput (tok/s):         1185.75   
+Total token throughput (tok/s):          1482.19   
+Mean TTFT (ms):                          95.64     
+Median TTFT (ms):                        104.94    
+Mean TPOT (ms):                          13.32     
+Median TPOT (ms):                        13.30     

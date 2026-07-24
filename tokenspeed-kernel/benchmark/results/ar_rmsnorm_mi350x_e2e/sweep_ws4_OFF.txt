@@ -1,0 +1,38 @@
+===== [OFF_c4_s0] in=128 out=512 n=40 conc=4 seed=0 =====
+Benchmark duration (s):                  54.22     
+Request throughput (req/s):              0.74      
+Output token throughput (tok/s):         377.69    
+Total token throughput (tok/s):          472.11    
+Mean TTFT (ms):                          85.63     
+Median TTFT (ms):                        90.30     
+Mean TPOT (ms):                          10.44     
+Median TPOT (ms):                        10.45     
+===== [OFF_c4_s1] in=128 out=512 n=40 conc=4 seed=1 =====
+Benchmark duration (s):                  54.57     
+Request throughput (req/s):              0.73      
+Output token throughput (tok/s):         375.30    
+Total token throughput (tok/s):          469.13    
+Mean TTFT (ms):                          80.80     
+Median TTFT (ms):                        77.16     
+Mean TPOT (ms):                          10.52     
+Median TPOT (ms):                        10.50     
+===== [OFF_c8_s0] in=128 out=512 n=48 conc=8 seed=0 =====
+Benchmark duration (s):                  33.79     
+Request throughput (req/s):              1.42      
+Output token throughput (tok/s):         727.29    
+Total token throughput (tok/s):          909.12    
+Mean TTFT (ms):                          84.05     
+Median TTFT (ms):                        82.14     
+Mean TPOT (ms):                          10.85     
+Median TPOT (ms):                        10.85     
+===== [OFF_c8_s1] in=128 out=512 n=48 conc=8 seed=1 =====
+Benchmark duration (s):                  33.27     
+Request throughput (req/s):              1.44      
+Output token throughput (tok/s):         738.75    
+Total token throughput (tok/s):          923.44    
+Mean TTFT (ms):                          84.20     
+Median TTFT (ms):                        91.45     
+Mean TPOT (ms):                          10.68     
+Median TPOT (ms):                        10.68     
+===== [OFF_c16_s0] in=128 out=512 n=64 conc=16 seed=0 =====
+===== [OFF_c16_s1] in=128 out=512 n=64 conc=16 seed=1 =====

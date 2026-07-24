@@ -1,0 +1,19 @@
+===== [OFF_dec256] in=256 out=512 n=32 conc=8 seed=0 =====
+Benchmark duration (s):                  21.40     
+Request throughput (req/s):              1.50      
+Output token throughput (tok/s):         765.63    
+Total token throughput (tok/s):          1148.45   
+Mean TTFT (ms):                          104.98    
+Median TTFT (ms):                        108.91    
+Mean TPOT (ms):                          10.26     
+Median TPOT (ms):                        10.28     
+===== [OFF_dec256_s1] in=256 out=512 n=32 conc=8 seed=1 =====
+Benchmark duration (s):                  21.53     
+Request throughput (req/s):              1.49      
+Output token throughput (tok/s):         761.12    
+Total token throughput (tok/s):          1141.68   
+Mean TTFT (ms):                          97.61     
+Median TTFT (ms):                        109.46    
+Mean TPOT (ms):                          10.33     
+Median TPOT (ms):                        10.34     
+===== [OFF_mix1024] in=1024 out=256 n=48 conc=16 seed=0 =====

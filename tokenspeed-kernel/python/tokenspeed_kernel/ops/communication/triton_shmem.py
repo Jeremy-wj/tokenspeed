@@ -78,6 +78,7 @@ import torch.distributed._symmetric_memory as symm_mem
 
 from tokenspeed_kernel._triton import triton
 from tokenspeed_kernel.platform import current_platform
+from tokenspeed_kernel.profiling import kernel_scope
 
 from . import _triton_shmem_kernels as _k
 from ._coarse_shmem import alloc_coarse_symm
@@ -159,6 +160,19 @@ def _fold_num_warps() -> int:
     return value
 
 
+def _dynamic_grid_cap() -> int:
+    """Optional cap on the normal M-dependent compute grid.
+
+    Unlike ``BARRIER_GRID``, this does not add zero-row participants or change
+    divergence semantics; it only limits compute/barrier parallelism. ``-1``
+    selects the validated architecture/world-size policy."""
+    return int(os.environ.get("TS_TRITON_SHMEM_GRID_CAP", "-1"))
+
+
+def _dynamic_grid_cap_min_m() -> int:
+    return int(os.environ.get("TS_TRITON_SHMEM_GRID_CAP_MIN_M", "-1"))
+
+
 def _barrier_grid() -> int:
     """Fixed in-kernel-barrier participant/grid width `G` (companion doc §7 lever
     B). `0` (DEFAULT) = M-dependent grid (`min(cap, M, num_cus)`); `>0` = launch
@@ -177,8 +191,7 @@ def _barrier_grid() -> int:
     **DEFAULT OFF (measured):** a fixed `G` is a net PERFORMANCE LOSS vs the
     M-dependent grid -- the barrier cost scales with participant count, so no fixed
     `G` is perf-neutral (small `G` starves large-M parallelism; large `G` makes the
-    small-M barrier expensive; the M=256 "dip" is NOT fixed and is not a real serve
-    problem -- fused is ~2x faster than unfused there regardless). Use `>0` **only**
+    small-M barrier expensive; the M=256 dip is not fixed). Use `>0` **only**
     for M-diverging configs, where it beats the alternative (INKERNEL_BARRIER=0,
     separate-barrier path). Tune `G` to the config's decode-M range."""
     return int(os.environ.get("TS_TRITON_SHMEM_BARRIER_GRID", "0"))
@@ -190,11 +203,8 @@ def _oneshot_max_m() -> int:
     so it skips the two-shot symmetric copy-out, and with in-kernel barriers has
     minimal fixed overhead -- decisive in the small-M/decode regime where
     two-shot's bandwidth advantage does not apply (companion doc §6). Two-shot's
-    bandwidth-optimality still wins at large M. Default 256 (measured one-shot vs
-    two-shot crossover on MI350X gfx950 ws=4: one-shot wins M<=256, two-shot wins
-    M>=512); override with ``TS_TRITON_SHMEM_ONESHOT_MAX_M`` (0 disables). NOTE:
-    the crossover is lower at ws=8 (one-shot pulls ws x bytes) -- validate/retune
-    for ws=8."""
+    bandwidth-optimality still wins at large M. The conservative default remains
+    256; isolated width-specific crossovers require model-level serving gates."""
     return int(os.environ.get("TS_TRITON_SHMEM_ONESHOT_MAX_M", "256"))
 
 __all__ = [
@@ -358,8 +368,21 @@ class TritonShmemAllReduceResidualRMSNorm:
         self._fold_copyin = _fold_copyin_enabled()
         self._workgroup_sync = _workgroup_sync_enabled()
         self._fold_num_warps = _fold_num_warps()
+        configured_grid_cap = _dynamic_grid_cap()
+        configured_grid_min_m = _dynamic_grid_cap_min_m()
+        arch = _k.detect_arch(self.device.index)
+        if configured_grid_cap < 0:
+            if arch == "gfx950" and self.world_size == 4:
+                self._dynamic_grid_cap = 128
+                self._dynamic_grid_cap_min_m = 256
+            else:
+                self._dynamic_grid_cap = 0
+                self._dynamic_grid_cap_min_m = 0
+        else:
+            self._dynamic_grid_cap = configured_grid_cap
+            self._dynamic_grid_cap_min_m = max(0, configured_grid_min_m)
         self._barrier_grid = _barrier_grid()
-        self._oneshot_max_m = _oneshot_max_m()
+        self._oneshot_max_m = max(0, _oneshot_max_m())
         if self._is_twoshot:
             self._oneshot_kernel = (
                 "oneshot_wholerow"
@@ -377,6 +400,7 @@ class TritonShmemAllReduceResidualRMSNorm:
             "triton_shmem AR+RMSNorm state: kernel=%s ws=%d max_tokens=%d hidden=%d "
             "substrate=%s data=%.1f MiB/rank inkernel_barrier=%s fold_copyin=%s "
             "workgroup_sync=%s fold_num_warps=%d "
+            "grid_cap=%d grid_cap_min_m=%d "
             "small_m_oneshot=%s(<=%d)",
             self.kernel,
             self.world_size,
@@ -388,6 +412,8 @@ class TritonShmemAllReduceResidualRMSNorm:
             self._fold_copyin and self._inkernel,
             self._workgroup_sync,
             self._fold_num_warps,
+            self._dynamic_grid_cap,
+            self._dynamic_grid_cap_min_m,
             self._oneshot_kernel if self._is_twoshot else "n/a",
             self._oneshot_max_m if self._is_twoshot else 0,
         )
@@ -428,7 +454,14 @@ class TritonShmemAllReduceResidualRMSNorm:
         the legacy M-dependent ``min(cap, work_rows, num_cus)``."""
         if inkernel and self._barrier_grid > 0:
             return max(1, min(self._barrier_grid, self._num_cus))
-        return _k.recommended_grid(kern, ws, work_rows, self._num_cus)
+        grid = _k.recommended_grid(kern, ws, work_rows, self._num_cus)
+        if (
+            self._dynamic_grid_cap > 0
+            and kern.startswith("oneshot")
+            and work_rows >= self._dynamic_grid_cap_min_m
+        ):
+            grid = min(grid, self._dynamic_grid_cap)
+        return max(1, grid)
 
     def _run_oneshot(self, x, local_src, residual, weight, eps, m, n, ws,
                      norm_out, residual_out, fold):
@@ -636,11 +669,28 @@ def triton_shmem_allreduce_residual_rmsnorm(
     norm_out: torch.Tensor | None = None,
     residual_out: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    return state.fused(
-        input_tensor=input_tensor,
-        residual=residual,
-        weight=weight,
-        eps=eps,
-        norm_out=norm_out,
-        residual_out=residual_out,
+    m, n = input_tensor.shape
+    use_oneshot = (not state._is_twoshot) or (
+        state._oneshot_max_m > 0 and m <= state._oneshot_max_m
     )
+    path = state._oneshot_kernel if use_oneshot else "twoshot_blocked"
+    with kernel_scope(
+        "communication",
+        "allreduce_residual_rmsnorm",
+        input_tensor.dtype,
+        kernel_name=path,
+        M=m,
+        N=n,
+        world_size=state.world_size,
+        fold_copyin=int(
+            state._fold_copyin and state._inkernel and use_oneshot
+        ),
+    ):
+        return state.fused(
+            input_tensor=input_tensor,
+            residual=residual,
+            weight=weight,
+            eps=eps,
+            norm_out=norm_out,
+            residual_out=residual_out,
+        )

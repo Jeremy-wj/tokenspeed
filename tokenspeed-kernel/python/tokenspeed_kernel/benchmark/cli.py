@@ -145,7 +145,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--proton-backend",
-        choices=["cupti", "roctracer"],
+        choices=["cupti", "roctracer", "rocprofiler"],
         help="Proton activity backend",
     )
     parser.add_argument(

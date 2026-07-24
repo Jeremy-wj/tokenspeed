@@ -19,6 +19,7 @@
 # SOFTWARE.
 
 import faulthandler
+import os
 import signal
 import threading
 import time
@@ -2023,6 +2024,24 @@ def run_event_loop(
     event_loop = None
     shutdown_event = threading.Event()
     previous_sigterm_handler = None
+    early_profile = os.environ.get("TOKENSPEED_KERNEL_PROFILE_EARLY", "").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    keep_early_profile = os.environ.get(
+        "TOKENSPEED_KERNEL_PROFILE_EARLY_KEEP_ACTIVE", ""
+    ).lower() in {"1", "true", "yes", "on"}
+    if early_profile and not keep_early_profile:
+        from tokenspeed_kernel.profiling import ProfilingState, stop_profiling
+
+        if ProfilingState.get().active:
+            try:
+                stop_profiling()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to finalize early Proton bootstrap: %s", exc)
+
     try:
         if server_args.disaggregation_mode == "encode":
             # The encode role is LM-free; run the lightweight vision-tower loop

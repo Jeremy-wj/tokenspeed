@@ -1,0 +1,4 @@
+world_size,backend,M,N,lat_ms,skew_pct
+4,triton_shmem,192,2880,0.069961,0.172
+4,triton_shmem,224,2880,0.072061,0.139
+4,triton_shmem,256,2880,0.072561,0.303

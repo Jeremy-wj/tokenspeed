@@ -131,6 +131,12 @@ iteration.
   (`TOKENSPEED_KERNEL_PROFILE_DATA=trace`,
   `TOKENSPEED_KERNEL_PROFILE_OUTPUT_FORMAT=chrome_trace`), then merge the
   traces with `tokenspeed merge-traces`.
+- AMD graph profiling must start before graph capture. Use
+  `benchmark/e2e_gptoss_profile_serve.sh` with
+  `proton-roctracer-graph` or `proton-rocprofiler-graph`, run the workload
+  without issuing a second start request, then POST `/stop_profile`.
+  The installed Proton build uses `tree`/Hatchet for graph replay; reserve
+  `trace`/Chrome output for eager sessions.
 
 ### Plugins
 

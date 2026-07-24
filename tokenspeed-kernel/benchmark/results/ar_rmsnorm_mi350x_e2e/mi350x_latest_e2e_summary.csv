@@ -1,0 +1,19 @@
+world_size,arm,blocking_wait,fold_copyin,fold_num_warps,triton_ar_workgroup_sync,concurrency,input_len,output_len,seeds,median_tpot_ms_mean,output_tok_s_mean,status
+2,unfused,0,n/a,n/a,1,8,128,512,"0,1",11.565,679.420,pass
+2,fused,0,1,1,1,8,128,512,"0,1",11.595,678.910,pass
+2,unfused,0,n/a,n/a,1,16,128,512,"0,1",12.890,1225.720,pass
+2,fused,0,1,1,1,16,128,512,"0,1",12.775,1232.080,pass
+2,unfused,0,n/a,n/a,1,32,128,512,"0,1",15.115,2078.140,pass
+2,fused,0,1,1,1,32,128,512,"0,1",14.780,2137.140,pass
+4,unfused,0,n/a,n/a,1,8,128,512,"0,1",10.310,763.730,pass
+4,fused,0,1,1,1,8,128,512,"0,1",11.175,705.560,pass
+4,unfused,0,n/a,n/a,1,16,128,512,"0,1",11.400,1383.570,pass
+4,fused,0,1,1,1,16,128,512,"0,1",12.210,1274.410,pass
+4,unfused,0,n/a,n/a,1,32,128,512,"0,1",12.395,2527.590,pass
+4,fused,0,1,1,1,32,128,512,"0,1",12.600,2481.765,"pass; ws4 selective cap"
+8,unfused,0,n/a,n/a,1,8,128,512,"0,1",10.965,716.160,pass
+8,fused,0,1,1,1,8,128,512,"0,1",12.035,652.210,pass
+8,unfused,0,n/a,n/a,1,16,128,512,"0,1",12.335,1037.500,pass
+8,fused,0,1,1,1,16,128,512,"0,1",13.055,1207.920,pass
+8,unfused,0,n/a,n/a,1,32,128,512,"0,1",13.405,2347.420,pass
+8,fused,0,1,1,1,32,128,512,"0,1",13.715,2285.720,pass

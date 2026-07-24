@@ -1,0 +1,36 @@
+===== [FIX_c4_s0] in=128 out=512 n=40 conc=4 seed=0 =====
+Benchmark duration (s):                  57.89     
+Request throughput (req/s):              0.69      
+Output token throughput (tok/s):         353.78    
+Total token throughput (tok/s):          442.22    
+Mean TTFT (ms):                          79.49     
+Median TTFT (ms):                        78.04     
+Mean TPOT (ms):                          11.17     
+Median TPOT (ms):                        11.23     
+===== [FIX_c4_s1] in=128 out=512 n=40 conc=4 seed=1 =====
+Benchmark duration (s):                  58.25     
+Request throughput (req/s):              0.69      
+Output token throughput (tok/s):         351.61    
+Total token throughput (tok/s):          439.51    
+Mean TTFT (ms):                          78.94     
+Median TTFT (ms):                        78.27     
+Mean TPOT (ms):                          11.24     
+Median TPOT (ms):                        11.27     
+===== [FIX_c8_s0] in=128 out=512 n=48 conc=8 seed=0 =====
+Benchmark duration (s):                  35.12     
+Request throughput (req/s):              1.37      
+Output token throughput (tok/s):         699.78    
+Total token throughput (tok/s):          874.73    
+Mean TTFT (ms):                          82.89     
+Median TTFT (ms):                        84.17     
+Mean TPOT (ms):                          11.29     
+Median TPOT (ms):                        11.27     
+===== [FIX_c8_s1] in=128 out=512 n=48 conc=8 seed=1 =====
+Benchmark duration (s):                  35.33     
+Request throughput (req/s):              1.36      
+Output token throughput (tok/s):         695.68    
+Total token throughput (tok/s):          869.60    
+Mean TTFT (ms):                          85.25     
+Median TTFT (ms):                        86.49     
+Mean TPOT (ms):                          11.35     
+Median TPOT (ms):                        11.32     
