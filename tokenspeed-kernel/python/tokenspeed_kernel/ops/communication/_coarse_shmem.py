@@ -24,8 +24,8 @@ torch symm_mem on ROCm hands back **fine-grained** memory (HIP VMM,
 ``hipMemCreate`` with ``hipMemAllocationTypePinned``, no coherence knob), which
 bypasses L2 and delivers only ~105 GB/s for bulk local access vs. ~3200 GB/s for
 coarse-grained HBM. That is the dominant cost in the ``triton_shmem`` fused
-AR+RMSNorm backend (migration doc §8): copy-in, copy-out, and the kernel's local
-reads/writes all pay the ~30x penalty.
+AR+RMSNorm backend: copy-in, copy-out, and the kernel's local reads/writes all
+pay the ~30x penalty.
 
 This module provides the rocSHMEM-style alternative used by every high-perf AMD
 P2P library (rocSHMEM, MSCCL++, vLLM custom all-reduce): allocate the *data*

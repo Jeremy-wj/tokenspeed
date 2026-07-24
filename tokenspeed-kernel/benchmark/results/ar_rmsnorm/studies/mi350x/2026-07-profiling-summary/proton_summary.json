@@ -27,7 +27,7 @@
       "communication_scopes": [],
       "kernel_count": 52831,
       "total_kernel_us": 558145.446,
-      "trace": "/home/jeremwan/ar_rmsnorm_profiles/ws2_fused_proton_eager/ws2-fused-proton-eager-TP0.proton.chrome_trace"
+      "trace": "raw/history/mi350x/2026-07-23/proton/ws2_fused_proton_eager/ws2-fused-proton-eager-TP0.proton.chrome_trace"
     },
     {
       "communication_kernels": {
@@ -56,7 +56,7 @@
       "communication_scopes": [],
       "kernel_count": 52831,
       "total_kernel_us": 2102944.24,
-      "trace": "/home/jeremwan/ar_rmsnorm_profiles/ws2_fused_proton_eager/ws2-fused-proton-eager-TP1.proton.chrome_trace"
+      "trace": "raw/history/mi350x/2026-07-23/proton/ws2_fused_proton_eager/ws2-fused-proton-eager-TP1.proton.chrome_trace"
     },
     {
       "communication_kernels": {
@@ -78,7 +78,7 @@
       "communication_scopes": [],
       "kernel_count": 55208,
       "total_kernel_us": 1226158.616,
-      "trace": "/home/jeremwan/ar_rmsnorm_profiles/ws2_unfused_proton_eager/ws2-unfused-proton-eager-TP0.proton.chrome_trace"
+      "trace": "raw/history/mi350x/2026-07-23/proton/ws2_unfused_proton_eager/ws2-unfused-proton-eager-TP0.proton.chrome_trace"
     },
     {
       "communication_kernels": {
@@ -100,7 +100,7 @@
       "communication_scopes": [],
       "kernel_count": 55036,
       "total_kernel_us": 2550022.548,
-      "trace": "/home/jeremwan/ar_rmsnorm_profiles/ws2_unfused_proton_eager/ws2-unfused-proton-eager-TP1.proton.chrome_trace"
+      "trace": "raw/history/mi350x/2026-07-23/proton/ws2_unfused_proton_eager/ws2-unfused-proton-eager-TP1.proton.chrome_trace"
     },
     {
       "communication_kernels": {
@@ -156,7 +156,7 @@
       ],
       "kernel_count": 27359,
       "total_kernel_us": 318130.785,
-      "trace": "/home/jeremwan/ar_rmsnorm_profiles/ws2_fused_scoped/ws2-fused-scoped-TP0.proton.chrome_trace"
+      "trace": "raw/history/mi350x/2026-07-23/proton/ws2_fused_scoped/ws2-fused-scoped-TP0.proton.chrome_trace"
     },
     {
       "communication_kernels": {
@@ -212,7 +212,7 @@
       ],
       "kernel_count": 27359,
       "total_kernel_us": 812645.735,
-      "trace": "/home/jeremwan/ar_rmsnorm_profiles/ws2_fused_scoped/ws2-fused-scoped-TP1.proton.chrome_trace"
+      "trace": "raw/history/mi350x/2026-07-23/proton/ws2_fused_scoped/ws2-fused-scoped-TP1.proton.chrome_trace"
     },
     {
       "communication_kernels": {
@@ -268,7 +268,7 @@
       ],
       "kernel_count": 27359,
       "total_kernel_us": 570226.075,
-      "trace": "/home/jeremwan/ar_rmsnorm_profiles/ws4_fused_proton_eager/ws4-fused-proton-eager-TP0.proton.chrome_trace"
+      "trace": "raw/history/mi350x/2026-07-23/proton/ws4_fused_proton_eager/ws4-fused-proton-eager-TP0.proton.chrome_trace"
     },
     {
       "communication_kernels": {
@@ -324,7 +324,7 @@
       ],
       "kernel_count": 27359,
       "total_kernel_us": 1399001.1,
-      "trace": "/home/jeremwan/ar_rmsnorm_profiles/ws4_fused_proton_eager/ws4-fused-proton-eager-TP1.proton.chrome_trace"
+      "trace": "raw/history/mi350x/2026-07-23/proton/ws4_fused_proton_eager/ws4-fused-proton-eager-TP1.proton.chrome_trace"
     },
     {
       "communication_kernels": {
@@ -380,7 +380,7 @@
       ],
       "kernel_count": 27359,
       "total_kernel_us": 1412593.556,
-      "trace": "/home/jeremwan/ar_rmsnorm_profiles/ws4_fused_proton_eager/ws4-fused-proton-eager-TP2.proton.chrome_trace"
+      "trace": "raw/history/mi350x/2026-07-23/proton/ws4_fused_proton_eager/ws4-fused-proton-eager-TP2.proton.chrome_trace"
     },
     {
       "communication_kernels": {
@@ -436,7 +436,7 @@
       ],
       "kernel_count": 27359,
       "total_kernel_us": 1447318.804,
-      "trace": "/home/jeremwan/ar_rmsnorm_profiles/ws4_fused_proton_eager/ws4-fused-proton-eager-TP3.proton.chrome_trace"
+      "trace": "raw/history/mi350x/2026-07-23/proton/ws4_fused_proton_eager/ws4-fused-proton-eager-TP3.proton.chrome_trace"
     },
     {
       "communication_kernels": {
@@ -458,7 +458,7 @@
       "communication_scopes": [],
       "kernel_count": 28511,
       "total_kernel_us": 1695843.003,
-      "trace": "/home/jeremwan/ar_rmsnorm_profiles/ws4_unfused_proton_eager/ws4-unfused-proton-eager-TP0.proton.chrome_trace"
+      "trace": "raw/history/mi350x/2026-07-23/proton/ws4_unfused_proton_eager/ws4-unfused-proton-eager-TP0.proton.chrome_trace"
     },
     {
       "communication_kernels": {
@@ -480,7 +480,7 @@
       "communication_scopes": [],
       "kernel_count": 28511,
       "total_kernel_us": 1610684.765,
-      "trace": "/home/jeremwan/ar_rmsnorm_profiles/ws4_unfused_proton_eager/ws4-unfused-proton-eager-TP1.proton.chrome_trace"
+      "trace": "raw/history/mi350x/2026-07-23/proton/ws4_unfused_proton_eager/ws4-unfused-proton-eager-TP1.proton.chrome_trace"
     },
     {
       "communication_kernels": {
@@ -502,7 +502,7 @@
       "communication_scopes": [],
       "kernel_count": 28511,
       "total_kernel_us": 506592.699,
-      "trace": "/home/jeremwan/ar_rmsnorm_profiles/ws4_unfused_proton_eager/ws4-unfused-proton-eager-TP2.proton.chrome_trace"
+      "trace": "raw/history/mi350x/2026-07-23/proton/ws4_unfused_proton_eager/ws4-unfused-proton-eager-TP2.proton.chrome_trace"
     },
     {
       "communication_kernels": {
@@ -524,7 +524,7 @@
       "communication_scopes": [],
       "kernel_count": 28511,
       "total_kernel_us": 1742403.53,
-      "trace": "/home/jeremwan/ar_rmsnorm_profiles/ws4_unfused_proton_eager/ws4-unfused-proton-eager-TP3.proton.chrome_trace"
+      "trace": "raw/history/mi350x/2026-07-23/proton/ws4_unfused_proton_eager/ws4-unfused-proton-eager-TP3.proton.chrome_trace"
     }
   ]
 }

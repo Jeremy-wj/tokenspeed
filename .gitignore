@@ -196,3 +196,6 @@ Testing/
 .serena/*
 
 AGENTS.local.md
+
+# Local AR+RMSNorm traces and serving logs. Curated manifests/summaries remain tracked.
+/tokenspeed-kernel/benchmark/results/ar_rmsnorm/raw/**

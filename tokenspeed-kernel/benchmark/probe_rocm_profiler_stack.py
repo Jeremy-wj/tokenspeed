@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from benchmark.shape_axes import default_hidden_size
+
 
 def _torch_probe(args: argparse.Namespace) -> None:
     import torch
@@ -72,8 +74,10 @@ def _proton_probe(args: argparse.Namespace) -> None:
     if args.profile_before_runtime:
         session = start_profiling(config)
 
-    x = torch.randn(args.size, 2880, device="cuda", dtype=torch.bfloat16)
-    weight = torch.ones(2880, device="cuda", dtype=torch.bfloat16)
+    x = torch.randn(
+        args.size, args.hidden_size, device="cuda", dtype=torch.bfloat16
+    )
+    weight = torch.ones(args.hidden_size, device="cuda", dtype=torch.bfloat16)
 
     if not args.profile_before_runtime:
         rmsnorm(x, weight, 1e-5)
@@ -135,6 +139,7 @@ def main() -> None:
     parser.add_argument("--record-shapes", action="store_true")
     parser.add_argument("--repeats", type=int, default=8)
     parser.add_argument("--size", type=int, default=256)
+    parser.add_argument("--hidden-size", type=int, default=default_hidden_size())
     parser.add_argument(
         "--proton-backend",
         choices=["roctracer", "rocprofiler", "instrumentation"],

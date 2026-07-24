@@ -132,11 +132,16 @@ iteration.
   `TOKENSPEED_KERNEL_PROFILE_OUTPUT_FORMAT=chrome_trace`), then merge the
   traces with `tokenspeed merge-traces`.
 - AMD graph profiling must start before graph capture. Use
-  `benchmark/e2e_gptoss_profile_serve.sh` with
+  `benchmark/e2e_arnorm_profile_serve.sh` with an explicit model profile and
   `proton-roctracer-graph` or `proton-rocprofiler-graph`, run the workload
   without issuing a second start request, then POST `/stop_profile`.
   The installed Proton build uses `tree`/Hatchet for graph replay; reserve
-  `trace`/Chrome output for eager sessions.
+  `trace`/Chrome output for eager sessions. The validated gpt-oss wrapper and
+  profile are `benchmark/e2e_gptoss_profile_serve.sh` and
+  `benchmark/profiles/ar_rmsnorm/gpt_oss_120b_mi350x.env`.
+- Fused AR+RMSNorm project status, backend invariants, profiling commands, and
+  curated MI300X/MI350X evidence are indexed at
+  [`benchmark/results/ar_rmsnorm/README.md`](benchmark/results/ar_rmsnorm/README.md).
 
 ### Plugins
 

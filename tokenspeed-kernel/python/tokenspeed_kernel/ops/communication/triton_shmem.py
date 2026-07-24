@@ -27,13 +27,15 @@ rather than the rocSHMEM heap they used upstream. That rocSHMEM->symm_mem
 re-backing IS the migration: zero new runtime deps (symm_mem ships in ``torch``;
 rocSHMEM is not pip-installable) and a graph-capture-safe in-kernel signal-pad
 barrier (rocSHMEM's host ``barrier_all_on_stream`` under HIP graph capture was
-unproven). See the migration doc for the full rationale.
+unproven). See
+``benchmark/results/ar_rmsnorm/docs/backend-design-and-safety.md`` for the
+current rationale and invariants.
 
 It exposes the same shim contract as ``communication.iris``
 (``create_*_state`` + ``*_allreduce_residual_rmsnorm`` + a ``*_STATES`` cache) so
 it drops into the ``TS_ARNORM_BACKEND`` switch as the ``triton_shmem`` backend.
 
-Substrate mapping (migration doc §4):
+Substrate mapping (canonical backend design):
 
 * Allocation: ``symm_mem.empty`` + ``rendezvous`` (via :func:`._alloc_symm`).
 * Pointer translation: a **per-tensor** ``buffer_ptrs_dev`` table (via
@@ -51,7 +53,7 @@ Substrate mapping (migration doc §4):
   the native ``amd_allreduce_residual_rmsnorm_kernel`` (entry + exit barrier) and
   Iris (``device_barrier`` before + after).
 
-PERFORMANCE (migration doc §8/§8.1): torch symm_mem on ROCm allocates
+PERFORMANCE: torch symm_mem on ROCm allocates
 **fine-grained** memory (HIP VMM, no coherence knob) which bypasses L2 and
 delivers only ~105 GB/s for bulk local access vs. ~3200 GB/s coarse-grained --
 a ~30x penalty on copy-in/out and the kernel's local reads/writes. This is fixed
@@ -91,7 +93,7 @@ _platform = current_platform()
 
 def _coarse_enabled() -> bool:
     """Whether to back the *data* buffers with coarse-grained HBM + HIP IPC
-    instead of fine-grained symm_mem (migration doc §8). Default ON: the
+    instead of fine-grained symm_mem. Default ON: the
     fine-grained substrate is ~30x slower for all local access. Set
     ``TS_TRITON_SHMEM_COARSE=0`` to force the legacy symm_mem-only path."""
     return os.environ.get("TS_TRITON_SHMEM_COARSE", "1") not in ("0", "false", "False")
@@ -100,7 +102,7 @@ def _coarse_enabled() -> bool:
 def _inkernel_barrier_enabled() -> bool:
     """Fold the leading+trailing signal-pad barriers into the fused kernels
     instead of launching two separate barrier kernels — removes the barrier-launch
-    staging overhead that dominates small-M/decode latency (companion doc §6).
+    staging overhead that dominates small-M/decode latency.
     **Default ON (Jul 2026):** validated correct + graph-safe + faster than the
     separate-barrier path e2e (ws=4 pure-TP gpt-oss-120b serve, conc 8–128 + mixed;
     companion §6). Set ``TS_TRITON_SHMEM_INKERNEL_BARRIER=0`` to force the legacy
@@ -123,7 +125,7 @@ def _fold_copyin_enabled() -> bool:
     """Fold the input copy-in into the one-shot fused kernel: each rank writes its
     local input into its symmetric buffer in a phase-0 pass, ordered before the
     pull by the in-kernel leading barrier, instead of a separate ``copy_`` launch
-    (companion doc §7 lever A). Removes the ~0.012 ms/op copy-in launch that is an
+    Removes the ~0.012 ms/op copy-in launch that is an
     untouched floor at decode M. Requires the in-kernel barrier (the phase-0 write
     must precede the leading barrier); no-op on the two-shot / separate-barrier
     path. Default ON after adding workgroup synchronization around the scalar
@@ -160,6 +162,20 @@ def _fold_num_warps() -> int:
     return value
 
 
+def _oneshot_block_n() -> int:
+    """Optional diagnostic override for the blocked one-shot tile width.
+
+    ``0`` keeps the architecture recommendation. A narrow override lets the
+    profiled small-M path be tuned without perturbing the two-shot kernel.
+    """
+    value = int(os.environ.get("TS_TRITON_SHMEM_ONESHOT_BLOCK_N", "0"))
+    if value < 0 or (value and value & (value - 1)):
+        raise ValueError(
+            "TS_TRITON_SHMEM_ONESHOT_BLOCK_N must be 0 or a positive power of two"
+        )
+    return value
+
+
 def _dynamic_grid_cap() -> int:
     """Optional cap on the normal M-dependent compute grid.
 
@@ -174,8 +190,8 @@ def _dynamic_grid_cap_min_m() -> int:
 
 
 def _barrier_grid() -> int:
-    """Fixed in-kernel-barrier participant/grid width `G` (companion doc §7 lever
-    B). `0` (DEFAULT) = M-dependent grid (`min(cap, M, num_cus)`); `>0` = launch
+    """Fixed in-kernel-barrier participant/grid width `G`.
+    `0` (DEFAULT) = M-dependent grid (`min(cap, M, num_cus)`); `>0` = launch
     exactly `min(G, num_cus)` blocks for EVERY call regardless of M, striding rows
     over G.
 
@@ -202,7 +218,7 @@ def _oneshot_max_m() -> int:
     one-shot pull kernel instead of two-shot. One-shot writes the output locally,
     so it skips the two-shot symmetric copy-out, and with in-kernel barriers has
     minimal fixed overhead -- decisive in the small-M/decode regime where
-    two-shot's bandwidth advantage does not apply (companion doc §6). Two-shot's
+    two-shot's bandwidth advantage does not apply. Two-shot's
     bandwidth-optimality still wins at large M. The conservative default remains
     256; isolated width-specific crossovers require model-level serving gates."""
     return int(os.environ.get("TS_TRITON_SHMEM_ONESHOT_MAX_M", "256"))
@@ -286,7 +302,7 @@ class TritonShmemAllReduceResidualRMSNorm:
         buf_bytes = max_token_num * hidden_dim * itemsize
 
         # Data buffers can be coarse-grained HBM (full bandwidth) shared via HIP
-        # IPC, with only the signal pad left fine-grained (migration doc §8).
+        # IPC, with only the signal pad left fine-grained.
         # This recovers the ~30x local-bandwidth penalty of fine-grained symm_mem.
         self._coarse = _coarse_enabled()
         self._coarse_buffers: list = []
@@ -359,7 +375,7 @@ class TritonShmemAllReduceResidualRMSNorm:
         else:  # oneshot_wholerow
             self._scratch = None
 
-        # Small-M one-shot path (companion doc §6): at ws>=4 the dispatched kernel
+        # Small-M one-shot path: at ws>=4 the dispatched kernel
         # is two-shot, but small-M/decode calls route through one-shot pull, which
         # writes output locally (skips the two-shot symmetric copy-out) and folds
         # its barriers in-kernel -- both dominate small-M latency. Reuses the
@@ -368,6 +384,10 @@ class TritonShmemAllReduceResidualRMSNorm:
         self._fold_copyin = _fold_copyin_enabled()
         self._workgroup_sync = _workgroup_sync_enabled()
         self._fold_num_warps = _fold_num_warps()
+        configured_oneshot_block_n = _oneshot_block_n()
+        self._oneshot_block_n = configured_oneshot_block_n or _k.recommended_block_n(
+            self.dtype, hidden_dim
+        )
         configured_grid_cap = _dynamic_grid_cap()
         configured_grid_min_m = _dynamic_grid_cap_min_m()
         arch = _k.detect_arch(self.device.index)
@@ -399,7 +419,7 @@ class TritonShmemAllReduceResidualRMSNorm:
         logger.info(
             "triton_shmem AR+RMSNorm state: kernel=%s ws=%d max_tokens=%d hidden=%d "
             "substrate=%s data=%.1f MiB/rank inkernel_barrier=%s fold_copyin=%s "
-            "workgroup_sync=%s fold_num_warps=%d "
+            "workgroup_sync=%s fold_num_warps=%d oneshot_block_n=%d "
             "grid_cap=%d grid_cap_min_m=%d "
             "small_m_oneshot=%s(<=%d)",
             self.kernel,
@@ -412,6 +432,7 @@ class TritonShmemAllReduceResidualRMSNorm:
             self._fold_copyin and self._inkernel,
             self._workgroup_sync,
             self._fold_num_warps,
+            self._oneshot_block_n,
             self._dynamic_grid_cap,
             self._dynamic_grid_cap_min_m,
             self._oneshot_kernel if self._is_twoshot else "n/a",
@@ -447,7 +468,7 @@ class TritonShmemAllReduceResidualRMSNorm:
         )
 
     def _grid_width(self, kern, ws, work_rows, inkernel):
-        """Persistent-grid width. Lever B (companion doc §7): when the in-kernel
+        """Persistent-grid width. When the in-kernel
         barrier is active and ``_barrier_grid>0``, use a FIXED ``min(G, num_cus)``
         blocks for every call (M-independent → the barrier participant set matches
         across ranks regardless of M, and its cost is decoupled from M). Otherwise
@@ -521,7 +542,7 @@ class TritonShmemAllReduceResidualRMSNorm:
                 n,
                 self._signal_pad,
                 local_src,
-                BLOCK_N=_k.recommended_block_n(self.dtype, n),
+                BLOCK_N=self._oneshot_block_n,
                 ws=ws,
                 NUM_SMS=grid_sms,
                 HAS_RESIDUAL=True,
@@ -561,14 +582,14 @@ class TritonShmemAllReduceResidualRMSNorm:
             residual_out = torch.empty_like(residual)
 
         # Dispatch: one-shot pull for ws<=2 (always) and small-M/decode at ws>=4
-        # (companion doc §6). One-shot writes output locally (no two-shot copy-out)
+        # One-shot writes output locally (no two-shot copy-out)
         # and folds its barriers in-kernel; two-shot stays bandwidth-optimal for
         # large M at ws>=4 (separate barriers + copy-out, unchanged).
         use_oneshot = (not self._is_twoshot) or (
             self._oneshot_max_m > 0 and m <= self._oneshot_max_m
         )
 
-        # Lever A (companion doc §7): fold the input copy-in into the one-shot
+        # Fold the input copy-in into the one-shot
         # kernel (phase-0 write ordered by the in-kernel leading barrier). Requires
         # the in-kernel barrier; two-shot keeps the explicit copy_.
         fold = self._fold_copyin and self._inkernel and use_oneshot

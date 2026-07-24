@@ -1,0 +1,72 @@
+{
+  "traces": [
+    {
+      "kernels": {
+        "_rmsnorm_kernel": {
+          "count": 1241,
+          "median_us": 5.279,
+          "p95_us": 16.759,
+          "total_us": 7603.065
+        },
+        "amd_all_reduce_kernel": {
+          "count": 1095,
+          "median_us": 31.64,
+          "p95_us": 63.2,
+          "total_us": 53185.574
+        }
+      },
+      "trace": "raw/current/gpt-oss-120b/mi350x/2026-07-24/traces/torch/tp4-unfused/tp4-unfused-rank0.trace.json.gz"
+    },
+    {
+      "kernels": {
+        "_rmsnorm_kernel": {
+          "count": 1241,
+          "median_us": 5.759,
+          "p95_us": 16.599,
+          "total_us": 7783.789
+        },
+        "amd_all_reduce_kernel": {
+          "count": 1095,
+          "median_us": 30.279,
+          "p95_us": 65.039,
+          "total_us": 54515.583
+        }
+      },
+      "trace": "raw/current/gpt-oss-120b/mi350x/2026-07-24/traces/torch/tp4-unfused/tp4-unfused-rank1.trace.json.gz"
+    },
+    {
+      "kernels": {
+        "_rmsnorm_kernel": {
+          "count": 1241,
+          "median_us": 5.279,
+          "p95_us": 16.319,
+          "total_us": 7596.422
+        },
+        "amd_all_reduce_kernel": {
+          "count": 1095,
+          "median_us": 31.159,
+          "p95_us": 64.2,
+          "total_us": 56397.908
+        }
+      },
+      "trace": "raw/current/gpt-oss-120b/mi350x/2026-07-24/traces/torch/tp4-unfused/tp4-unfused-rank2.trace.json.gz"
+    },
+    {
+      "kernels": {
+        "_rmsnorm_kernel": {
+          "count": 1241,
+          "median_us": 5.719,
+          "p95_us": 16.6,
+          "total_us": 8175.381
+        },
+        "amd_all_reduce_kernel": {
+          "count": 1095,
+          "median_us": 24.8,
+          "p95_us": 32.959,
+          "total_us": 43546.718
+        }
+      },
+      "trace": "raw/current/gpt-oss-120b/mi350x/2026-07-24/traces/torch/tp4-unfused/tp4-unfused-rank3.trace.json.gz"
+    }
+  ]
+}

@@ -1,0 +1,232 @@
+{
+  "traces": [
+    {
+      "graphs": {
+        "fused_oneshot": {
+          "comm_sum_us": {
+            "max_us": 3033.674,
+            "median_us": 80.1985,
+            "min_us": 69.479,
+            "p95_us": 2737.548
+          },
+          "count": 50,
+          "gpu_span_us": {
+            "max_us": 15357.893798828125,
+            "median_us": 434.4830322265625,
+            "min_us": 353.601806640625,
+            "p95_us": 15111.231201171875
+          },
+          "kernel_sum_us": {
+            "max_us": 15346.369,
+            "median_us": 434.44,
+            "min_us": 353.559,
+            "p95_us": 15100.727
+          },
+          "median_all_reduce_count": 0.0,
+          "median_kernel_count": 44.0,
+          "median_oneshot_count": 2.0,
+          "median_rmsnorm_count": 0.0,
+          "median_twoshot_count": 0.0
+        },
+        "fused_twoshot": {
+          "comm_sum_us": {
+            "max_us": 436.717,
+            "median_us": 358.6975,
+            "min_us": 328.158,
+            "p95_us": 384.637
+          },
+          "count": 72,
+          "gpu_span_us": {
+            "max_us": 1197.849853515625,
+            "median_us": 1117.5889892578125,
+            "min_us": 1012.088134765625,
+            "p95_us": 1155.888916015625
+          },
+          "kernel_sum_us": {
+            "max_us": 1197.794,
+            "median_us": 1117.5125,
+            "min_us": 1012.035,
+            "p95_us": 1155.833
+          },
+          "median_all_reduce_count": 0.0,
+          "median_kernel_count": 57.0,
+          "median_oneshot_count": 0.0,
+          "median_rmsnorm_count": 0.0,
+          "median_twoshot_count": 2.0
+        }
+      },
+      "trace": "raw/current/gpt-oss-120b/mi350x/2026-07-24/traces/torch/tp4-fused-generic-block512/tp4-fused-generic-block512-rank0.trace.json.gz"
+    },
+    {
+      "graphs": {
+        "fused_oneshot": {
+          "comm_sum_us": {
+            "max_us": 3207.715,
+            "median_us": 85.64,
+            "min_us": 68.679,
+            "p95_us": 3144.9139999999998
+          },
+          "count": 50,
+          "gpu_span_us": {
+            "max_us": 15365.774169921875,
+            "median_us": 432.52294921875,
+            "min_us": 356.1220703125,
+            "p95_us": 15114.51220703125
+          },
+          "kernel_sum_us": {
+            "max_us": 15354.849,
+            "median_us": 432.48,
+            "min_us": 356.079,
+            "p95_us": 15102.928
+          },
+          "median_all_reduce_count": 0.0,
+          "median_kernel_count": 44.0,
+          "median_oneshot_count": 2.0,
+          "median_rmsnorm_count": 0.0,
+          "median_twoshot_count": 0.0
+        },
+        "fused_twoshot": {
+          "comm_sum_us": {
+            "max_us": 410.67699999999996,
+            "median_us": 360.857,
+            "min_us": 337.83799999999997,
+            "p95_us": 396.878
+          },
+          "count": 72,
+          "gpu_span_us": {
+            "max_us": 1177.72998046875,
+            "median_us": 1118.509033203125,
+            "min_us": 1007.72802734375,
+            "p95_us": 1156.88916015625
+          },
+          "kernel_sum_us": {
+            "max_us": 1177.674,
+            "median_us": 1118.453,
+            "min_us": 1007.675,
+            "p95_us": 1156.833
+          },
+          "median_all_reduce_count": 0.0,
+          "median_kernel_count": 57.0,
+          "median_oneshot_count": 0.0,
+          "median_rmsnorm_count": 0.0,
+          "median_twoshot_count": 2.0
+        }
+      },
+      "trace": "raw/current/gpt-oss-120b/mi350x/2026-07-24/traces/torch/tp4-fused-generic-block512/tp4-fused-generic-block512-rank1.trace.json.gz"
+    },
+    {
+      "graphs": {
+        "fused_oneshot": {
+          "comm_sum_us": {
+            "max_us": 3395.637,
+            "median_us": 88.939,
+            "min_us": 69.598,
+            "p95_us": 3066.752
+          },
+          "count": 50,
+          "gpu_span_us": {
+            "max_us": 15355.2939453125,
+            "median_us": 434.68310546875,
+            "min_us": 355.001953125,
+            "p95_us": 15112.531005859375
+          },
+          "kernel_sum_us": {
+            "max_us": 15344.049,
+            "median_us": 434.64,
+            "min_us": 354.959,
+            "p95_us": 15099.487000000001
+          },
+          "median_all_reduce_count": 0.0,
+          "median_kernel_count": 44.0,
+          "median_oneshot_count": 2.0,
+          "median_rmsnorm_count": 0.0,
+          "median_twoshot_count": 0.0
+        },
+        "fused_twoshot": {
+          "comm_sum_us": {
+            "max_us": 515.998,
+            "median_us": 359.5175,
+            "min_us": 331.196,
+            "p95_us": 386.957
+          },
+          "count": 72,
+          "gpu_span_us": {
+            "max_us": 1268.3701171875,
+            "median_us": 1117.0491943359375,
+            "min_us": 1006.568115234375,
+            "p95_us": 1169.529052734375
+          },
+          "kernel_sum_us": {
+            "max_us": 1268.314,
+            "median_us": 1116.993,
+            "min_us": 1006.515,
+            "p95_us": 1169.473
+          },
+          "median_all_reduce_count": 0.0,
+          "median_kernel_count": 57.0,
+          "median_oneshot_count": 0.0,
+          "median_rmsnorm_count": 0.0,
+          "median_twoshot_count": 2.0
+        }
+      },
+      "trace": "raw/current/gpt-oss-120b/mi350x/2026-07-24/traces/torch/tp4-fused-generic-block512/tp4-fused-generic-block512-rank2.trace.json.gz"
+    },
+    {
+      "graphs": {
+        "fused_oneshot": {
+          "comm_sum_us": {
+            "max_us": 3207.912,
+            "median_us": 72.99900000000001,
+            "min_us": 69.038,
+            "p95_us": 3023.676
+          },
+          "count": 50,
+          "gpu_span_us": {
+            "max_us": 15359.2138671875,
+            "median_us": 430.14306640625,
+            "min_us": 354.882080078125,
+            "p95_us": 15108.911865234375
+          },
+          "kernel_sum_us": {
+            "max_us": 15347.129,
+            "median_us": 430.1,
+            "min_us": 354.839,
+            "p95_us": 15097.646
+          },
+          "median_all_reduce_count": 0.0,
+          "median_kernel_count": 44.0,
+          "median_oneshot_count": 2.0,
+          "median_rmsnorm_count": 0.0,
+          "median_twoshot_count": 0.0
+        },
+        "fused_twoshot": {
+          "comm_sum_us": {
+            "max_us": 387.877,
+            "median_us": 360.49649999999997,
+            "min_us": 335.238,
+            "p95_us": 375.47700000000003
+          },
+          "count": 72,
+          "gpu_span_us": {
+            "max_us": 1178.25,
+            "median_us": 1115.608642578125,
+            "min_us": 1009.407958984375,
+            "p95_us": 1154.41015625
+          },
+          "kernel_sum_us": {
+            "max_us": 1178.194,
+            "median_us": 1115.5525,
+            "min_us": 1009.355,
+            "p95_us": 1154.354
+          },
+          "median_all_reduce_count": 0.0,
+          "median_kernel_count": 57.0,
+          "median_oneshot_count": 0.0,
+          "median_rmsnorm_count": 0.0,
+          "median_twoshot_count": 2.0
+        }
+      },
+      "trace": "raw/current/gpt-oss-120b/mi350x/2026-07-24/traces/torch/tp4-fused-generic-block512/tp4-fused-generic-block512-rank3.trace.json.gz"
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+world_size,M,N,path,baseline_transport,copyin_ms,barrier_ms,kernel_derived_ms,inkbarrier_derived_ms,copyout_ms,full_sep_ms,full_ink_ms,full_fold_ms,full_default_ms,serve_transport_ms,serve_norm_ms,serve_unfused_ms,serve_speedup
+4,32,2880,oneshot:blocked,triton_ar,0.019160501658916473,0.015479999594390392,0.02156049944460392,0.03061950020492077,0.0,0.07168100029230118,0.07134050130844116,0.0644410029053688,0.0644410029053688,0.03202050179243088,0.03036000020802021,0.06136099994182587,0.9522042981226425

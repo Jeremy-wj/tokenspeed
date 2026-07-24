@@ -1,0 +1,128 @@
+{
+  "traces": [
+    {
+      "graphs": {
+        "unfused_ar_rmsnorm": {
+          "comm_sum_us": {
+            "max_us": 8661.586,
+            "median_us": 3178.403,
+            "min_us": 2249.59,
+            "p95_us": 6703.001
+          },
+          "count": 15,
+          "gpu_span_us": {
+            "max_us": 20834.492919921875,
+            "median_us": 15077.044921875,
+            "min_us": 12451.080078125,
+            "p95_us": 19091.927978515625
+          },
+          "kernel_sum_us": {
+            "max_us": 20823.624,
+            "median_us": 15066.256,
+            "min_us": 12440.514,
+            "p95_us": 19081.059
+          },
+          "median_all_reduce_count": 73,
+          "median_kernel_count": 1830,
+          "median_oneshot_count": 0,
+          "median_rmsnorm_count": 73,
+          "median_twoshot_count": 0
+        }
+      },
+      "trace": "raw/current/gpt-oss-120b/mi350x/2026-07-24/traces/torch/tp4-unfused/tp4-unfused-rank0.trace.json.gz"
+    },
+    {
+      "graphs": {
+        "unfused_ar_rmsnorm": {
+          "comm_sum_us": {
+            "max_us": 9553.842,
+            "median_us": 3045.436,
+            "min_us": 2146.71,
+            "p95_us": 6877.25
+          },
+          "count": 15,
+          "gpu_span_us": {
+            "max_us": 20830.602783203125,
+            "median_us": 15078.885009765625,
+            "min_us": 12450.079833984375,
+            "p95_us": 19088.189208984375
+          },
+          "kernel_sum_us": {
+            "max_us": 20820.053,
+            "median_us": 15067.696,
+            "min_us": 12439.834,
+            "p95_us": 19077.48
+          },
+          "median_all_reduce_count": 73,
+          "median_kernel_count": 1830,
+          "median_oneshot_count": 0,
+          "median_rmsnorm_count": 73,
+          "median_twoshot_count": 0
+        }
+      },
+      "trace": "raw/current/gpt-oss-120b/mi350x/2026-07-24/traces/torch/tp4-unfused/tp4-unfused-rank1.trace.json.gz"
+    },
+    {
+      "graphs": {
+        "unfused_ar_rmsnorm": {
+          "comm_sum_us": {
+            "max_us": 9590.816,
+            "median_us": 3219.118,
+            "min_us": 2280.311,
+            "p95_us": 6953.574
+          },
+          "count": 15,
+          "gpu_span_us": {
+            "max_us": 20830.2529296875,
+            "median_us": 15078.885009765625,
+            "min_us": 12448.990966796875,
+            "p95_us": 19089.578857421875
+          },
+          "kernel_sum_us": {
+            "max_us": 20820.144,
+            "median_us": 15068.216,
+            "min_us": 12439.066,
+            "p95_us": 19078.27
+          },
+          "median_all_reduce_count": 73,
+          "median_kernel_count": 1830,
+          "median_oneshot_count": 0,
+          "median_rmsnorm_count": 73,
+          "median_twoshot_count": 0
+        }
+      },
+      "trace": "raw/current/gpt-oss-120b/mi350x/2026-07-24/traces/torch/tp4-unfused/tp4-unfused-rank2.trace.json.gz"
+    },
+    {
+      "graphs": {
+        "unfused_ar_rmsnorm": {
+          "comm_sum_us": {
+            "max_us": 8442.028,
+            "median_us": 2270.672,
+            "min_us": 2095.753,
+            "p95_us": 5957.44
+          },
+          "count": 15,
+          "gpu_span_us": {
+            "max_us": 20830.512939453125,
+            "median_us": 15075.525146484375,
+            "min_us": 12447.840087890625,
+            "p95_us": 19083.93798828125
+          },
+          "kernel_sum_us": {
+            "max_us": 20819.964,
+            "median_us": 15064.176,
+            "min_us": 12437.194,
+            "p95_us": 19071.829
+          },
+          "median_all_reduce_count": 73,
+          "median_kernel_count": 1830,
+          "median_oneshot_count": 0,
+          "median_rmsnorm_count": 73,
+          "median_twoshot_count": 0
+        }
+      },
+      "trace": "raw/current/gpt-oss-120b/mi350x/2026-07-24/traces/torch/tp4-unfused/tp4-unfused-rank3.trace.json.gz"
+    }
+  ]
+}

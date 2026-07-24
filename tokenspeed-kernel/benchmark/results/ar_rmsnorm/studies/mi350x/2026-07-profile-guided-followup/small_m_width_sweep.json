@@ -1,0 +1,41 @@
+{
+  "study": "cross-model residual-width candidates",
+  "hardware": "MI350X gfx950",
+  "world_size": 4,
+  "M": 32,
+  "metric": "max-rank median graph replay latency, us",
+  "rows": [
+    {
+      "N": 1536,
+      "block_n_512_us": 30.76,
+      "best_candidate": "block_n_2048",
+      "candidate_us": 27.58,
+      "unfused_us": 43.32
+    },
+    {
+      "N": 2880,
+      "block_n_512_us": 38.6,
+      "best_candidate": "block_n_1024",
+      "candidate_us": 33.52,
+      "unfused_us": 44.6
+    },
+    {
+      "N": 5120,
+      "block_n_512_us": 50.52,
+      "best_candidate": "block_n_2048",
+      "candidate_us": 40.64,
+      "unfused_us": 51.14
+    },
+    {
+      "N": 7168,
+      "block_n_512_us": 63.08,
+      "best_candidate": "block_n_1024",
+      "candidate_us": 48.78,
+      "unfused_us": 62.52
+    }
+  ],
+  "decision": {
+    "promoted": false,
+    "reason": "A width-aware automatic policy passed isolated and multilayer fixed-shape graph probes but triggered HSA_STATUS_ERROR_ILLEGAL_INSTRUCTION during a real serving transition after the first 32-request arm. Keep BLOCK_N=512 by default and retain the override only for diagnostics."
+  }
+}

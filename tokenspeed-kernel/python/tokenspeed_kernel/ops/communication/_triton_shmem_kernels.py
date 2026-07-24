@@ -27,7 +27,7 @@ symmetric memory** instead of rocSHMEM. The only device-code change vs. upstream
 is that the two-shot kernel takes **three** per-tensor peer-pointer tables
 (input / output / residual_out) instead of one shared rocSHMEM ``heap_bases``
 array, because symm_mem hands out an independent ``buffer_ptrs_dev`` per
-allocation (see the migration doc §4). The one-shot kernels are unchanged apart
+allocation (see the canonical backend design). The one-shot kernels are unchanged apart
 from being vendored: they only translate ``input``, so a single table suffices.
 
 ``triton``/``tl`` are imported from ``tokenspeed_kernel._triton`` (the vendored
@@ -56,7 +56,7 @@ KERNELS = ("twoshot_blocked", "oneshot_blocked", "oneshot_wholerow")
 # Device-side symmetric pointer translation (vendored from
 # triton_shmem/utils/symmetric.py). Given a per-tensor peer-pointer table
 # ``bases`` (rocSHMEM ``heap_bases`` OR symm_mem ``buffer_ptrs_dev`` -- the math
-# is identical, see migration doc §4), translate ``local_ptr`` from my rank's
+# is identical; see the canonical backend design), translate ``local_ptr`` from my rank's
 # address space into ``peer``'s.
 # ---------------------------------------------------------------------------
 @triton.jit
@@ -228,7 +228,7 @@ def fused_ar_rmsnorm_oneshot_wholerow_kernel(
 
     ``INKERNEL_BARRIER`` folds the leading + trailing signal-pad barriers into the
     kernel (per-block at index ``pid``), removing two separate barrier-kernel
-    launches — the dominant small-M/decode overhead (companion doc §6). Safe here
+    launches — the dominant small-M/decode overhead. Safe here
     because this kernel is pull-only (reads peers, writes local): entry acquire
     makes peers' copy-in visible before the pull; exit release lets peers know we
     finished reading our symmetric input before the next call overwrites it. Same
@@ -236,8 +236,8 @@ def fused_ar_rmsnorm_oneshot_wholerow_kernel(
 
     ``FOLD_COPYIN`` (requires ``INKERNEL_BARRIER``) writes this rank's local input
     (``local_src``) into its symmetric ``input`` buffer in a phase-0 pass *before*
-    the leading barrier, replacing the separate ``copy_`` launch (companion doc §7
-    lever A). The leading barrier then orders the write before any peer pull, so
+    the leading barrier, replacing the separate ``copy_`` launch. The leading
+    barrier then orders the write before any peer pull, so
     the same barrier that already existed does double duty."""
     tl.static_assert(
         (N & (N - 1)) == 0,
@@ -332,7 +332,7 @@ def fused_ar_rmsnorm_twoshot_blocked_kernel(
     the caller's copy-out. Two-shot serves M>oneshot_max_m (eager prefill only; not
     inside a decode graph), where TP ranks always share M -- so the barrier
     participant set (``NUM_SMS`` blocks) matches across ranks. Same M-divergence
-    caveat as the one-shot path (companion doc §6 plan)."""
+    caveat as the one-shot path."""
     tl.static_assert(
         (BLOCK_N & (BLOCK_N - 1)) == 0,
         "fused_ar_rmsnorm_twoshot_blocked_kernel requires BLOCK_N to be a power of two",
@@ -433,14 +433,13 @@ def fused_ar_rmsnorm_oneshot_blocked_kernel(
     Only ``input`` is symmetric, so a single peer-pointer table is used.
 
     ``INKERNEL_BARRIER`` folds the leading + trailing signal-pad barriers into the
-    kernel (per-block at ``pid``), removing two separate barrier-kernel launches
-    (companion doc §6). Pull-only ⇒ same proven pattern as the native
+    kernel (per-block at ``pid``), removing two separate barrier-kernel launches.
+    Pull-only ⇒ same proven pattern as the native
     ``amd_allreduce_residual_rmsnorm_kernel`` (no cross-thread push to order).
 
     ``FOLD_COPYIN`` (requires ``INKERNEL_BARRIER``) writes this rank's local input
     (``local_src``) into its symmetric ``input`` buffer in a phase-0 pass *before*
-    the leading barrier, replacing the separate ``copy_`` launch (companion doc §7
-    lever A)."""
+    the leading barrier, replacing the separate ``copy_`` launch."""
     tl.static_assert(
         (BLOCK_N & (BLOCK_N - 1)) == 0,
         "fused_ar_rmsnorm_oneshot_blocked_kernel requires BLOCK_N to be a power of two",

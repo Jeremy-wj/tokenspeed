@@ -1,0 +1,37 @@
+{
+  "profile": "gpt_oss_120b_mi350x",
+  "hardware": "MI350X gfx950",
+  "hidden_size": 2880,
+  "workload": {
+    "model": "gpt-oss-120b",
+    "world_size": 4,
+    "input_tokens": 128,
+    "output_tokens": 16,
+    "prompts": 32,
+    "concurrency": 32,
+    "profile_steps": 16
+  },
+  "fused_generic_block_n_512": {
+    "trace_directory": "raw/current/gpt-oss-120b/mi350x/2026-07-24/traces/torch/tp4-fused-generic-block512",
+    "kernel_count_per_rank": 29967,
+    "gpu_window_span_ms": [313.93, 313.8, 313.873, 313.797],
+    "oneshot_calls_per_rank": 1080,
+    "max_rank_oneshot_median_us": 36.519,
+    "twoshot_calls_per_rank": 144,
+    "max_rank_twoshot_median_us": 161.901
+  },
+  "unfused": {
+    "trace_directory": "raw/current/gpt-oss-120b/mi350x/2026-07-24/traces/torch/tp4-unfused",
+    "kernel_count_per_rank": 31333,
+    "gpu_window_span_ms": [340.523, 340.41, 340.488, 340.436],
+    "all_reduce_calls_per_rank": 1095,
+    "rmsnorm_calls_per_rank": 1241,
+    "max_same_rank_all_reduce_plus_rmsnorm_median_us": 36.919
+  },
+  "interpretation": {
+    "kernel_launch_reduction_per_rank": 1366,
+    "median_gpu_window_span_change_pct": -7.8,
+    "decode_fused_vs_unfused_median_change_pct": -1.1,
+    "note": "The corrected generic fused kernel is already near parity with the unfused median sum. Prefill two-shot calls are present and must not be described as absent."
+  }
+}

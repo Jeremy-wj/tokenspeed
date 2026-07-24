@@ -1,0 +1,32 @@
+{
+  "profile": "gpt_oss_120b_mi350x",
+  "model": "gpt-oss-120b",
+  "hardware": "MI350X gfx950",
+  "world_size": 4,
+  "N": 2880,
+  "metric": "max-rank median graph replay latency, us",
+  "rows": [
+    {
+      "M": 32,
+      "generic_block_n_512_us": 38.44,
+      "candidate_block_n_2048_us": 34.04,
+      "change_pct": -11.4,
+      "decision": "candidate only"
+    },
+    {
+      "M": 64,
+      "generic_block_n_512_us": 42.04,
+      "candidate_block_n_2048_us": 41.76,
+      "change_pct": -0.7,
+      "decision": "keep generic"
+    },
+    {
+      "M": 128,
+      "generic_block_n_512_us": 51.0,
+      "candidate_block_n_2048_us": 56.8,
+      "change_pct": 11.4,
+      "decision": "keep generic"
+    }
+  ],
+  "overall_decision": "Do not promote a shape-specific block override: the incremental e2e TPOT change was below noise, and a broader width-aware policy later faulted in serving."
+}

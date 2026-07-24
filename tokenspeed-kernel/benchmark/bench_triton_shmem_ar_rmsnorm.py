@@ -69,6 +69,8 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.nn.functional as F
 
+from benchmark.shape_axes import DEFAULT_N_VALUES
+
 _EPS = 1e-6
 _TRITON_AR_MAX_BYTES = 512 * 1024
 
@@ -109,7 +111,7 @@ _DEFAULT_WORLD_SIZES: List[int] = [2, 4, 8]
 _M_VALUES: List[int] = _env_list(
     "BENCH_M_VALUES", [1, 8, 32, 128, 256, 512, 1024, 2048, 4096]
 )
-_N_VALUES: List[int] = _env_list("BENCH_N_VALUES", [512, 1536, 2880, 5120, 7168])
+_N_VALUES: List[int] = _env_list("BENCH_N_VALUES", DEFAULT_N_VALUES)
 _DEFAULT_BACKENDS: List[str] = ["rccl_unfused", "triton_shmem"]
 
 # Noise control: high warmup/repeat (this box cannot pin GPU clocks -- sysfs is

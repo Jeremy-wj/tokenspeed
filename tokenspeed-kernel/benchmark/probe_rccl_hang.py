@@ -1,22 +1,34 @@
 """Isolate the RCCL all-reduce hang seen under serve (ws=4, no GPU3).
 
-Standalone multi-proc RCCL all-reduce stress at the sizes the serve's unfused
-large-prefill path uses (M in {2048,4096,6656,8192} x N=2880 bf16). Optionally
+Standalone multi-proc RCCL all-reduce stress at configurable unfused
+large-prefill sizes. Optionally
 injects per-rank timing jitter (RANK_JITTER=1) to mimic scheduler desync, since
 the hang showed only 2/4 ranks spinning. If this hangs standalone -> RCCL/driver
 issue; if not -> the serve's mixed symm_mem/custom-AR + RCCL usage or scheduler
 desync is the trigger.
 
 Run (avoid GPU3=HIP0):
-    HIP_VISIBLE_DEVICES=1,2,3,5 WS=4 ITERS=300 python3 rccl_hang_probe.py
-    HIP_VISIBLE_DEVICES=1,2,3,5 WS=4 RANK_JITTER=1 python3 rccl_hang_probe.py
+    HIP_VISIBLE_DEVICES=1,2,3,5 WS=4 BENCH_N=2880 ITERS=300 \
+      python3 -m benchmark.probe_rccl_hang
+    HIP_VISIBLE_DEVICES=1,2,3,5 WS=4 BENCH_N=7168 \
+      M_VALUES=2048,4096 RANK_JITTER=1 python3 -m benchmark.probe_rccl_hang
 """
-import os, socket, time
-import torch, torch.distributed as dist
+import os
+import socket
+import time
+
+import torch
+import torch.distributed as dist
 import torch.multiprocessing as mp
 
-N = 2880
-MS = [2048, 4096, 6656, 8192]
+from benchmark.shape_axes import default_hidden_size
+
+N = default_hidden_size()
+MS = [
+    int(value)
+    for value in os.environ.get("M_VALUES", "2048,4096,6656,8192").split(",")
+    if value
+]
 ITERS = int(os.environ.get("ITERS", "300"))
 JITTER = os.environ.get("RANK_JITTER", "0") == "1"
 

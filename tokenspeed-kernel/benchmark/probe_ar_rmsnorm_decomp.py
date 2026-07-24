@@ -26,6 +26,8 @@ import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
+from benchmark.shape_axes import default_hidden_size
+
 _EPS = 1e-6
 _TRITON_AR_MAX_BYTES = 512 * 1024
 
@@ -40,7 +42,7 @@ def _env_ints(name: str, default: list[int]) -> list[int]:
     return [int(v.strip()) for v in raw.split(",") if v.strip()] if raw else default
 
 
-_N = _env_int("BENCH_N", 2880)
+_N = default_hidden_size()
 _MS = _env_ints("BENCH_M_VALUES", [8, 32, 64, 128, 256, 512, 1024])
 _WARM = _env_int("BENCH_N_WARMUP", 30)
 _REP = _env_int("BENCH_N_REPEAT", 100)

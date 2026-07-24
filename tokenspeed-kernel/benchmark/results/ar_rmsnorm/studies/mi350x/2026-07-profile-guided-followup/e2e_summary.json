@@ -1,0 +1,43 @@
+{
+  "profile": "gpt_oss_120b_mi350x",
+  "hardware": "MI350X gfx950",
+  "hidden_size": 2880,
+  "workload": {
+    "model": "gpt-oss-120b",
+    "world_size": 4,
+    "input_tokens": 128,
+    "output_tokens": 512,
+    "prompts": 128,
+    "concurrency": 32,
+    "seeds": [0, 1]
+  },
+  "arms": [
+    {
+      "name": "unfused",
+      "median_tpot_ms": [13.02, 12.49],
+      "mean_median_tpot_ms": 12.755,
+      "output_tokens_per_second": [2403.54, 2506.08],
+      "mean_output_tokens_per_second": 2454.81
+    },
+    {
+      "name": "fused_generic_block_n_512",
+      "median_tpot_ms": [12.65, 12.47],
+      "mean_median_tpot_ms": 12.56,
+      "output_tokens_per_second": [2403.36, 2510.94],
+      "mean_output_tokens_per_second": 2457.15
+    },
+    {
+      "name": "fused_m32_block_n_2048",
+      "median_tpot_ms": [12.46, 12.64],
+      "mean_median_tpot_ms": 12.55,
+      "output_tokens_per_second": [2466.93, 2480.95],
+      "mean_output_tokens_per_second": 2473.94
+    }
+  ],
+  "decision": {
+    "fused_vs_unfused_tpot_change_pct": -1.5,
+    "block_2048_vs_generic_fused_tpot_change_pct": -0.1,
+    "promote_block_override": false,
+    "reason": "The block override has no measurable incremental TPOT benefit. Keep the generic launch policy and TP=4 opt-in deployment."
+  }
+}

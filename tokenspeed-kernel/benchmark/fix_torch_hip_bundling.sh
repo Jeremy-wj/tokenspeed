@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Make a torch ROCm wheel use the container's SYSTEM ROCm runtime instead of
 # its own bundled copy. Required to fix the ROCm 7.2.0 graph-capture bug
-# (see AR_RMSNORM_MI350X_E2E_BENCHMARKS.md §6).
+# (see benchmark/results/ar_rmsnorm/docs/profiling-workflow.md).
 #
 # Why: torch's ROCm wheels (e.g. `torch==2.11.0+rocm7.2`, the only torch-2.11
 # ROCm build download.pytorch.org publishes) bundle libamdhip64/librccl/... in

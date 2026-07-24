@@ -1,0 +1,96 @@
+{
+  "traces": [
+    {
+      "kernels": {
+        "_rmsnorm_kernel": {
+          "count": 89,
+          "median_us": 17.399,
+          "p95_us": 19.639,
+          "total_us": 1385.04
+        },
+        "amd_all_reduce_kernel": {
+          "count": 16,
+          "median_us": 30.999000000000002,
+          "p95_us": 445.003,
+          "total_us": 4544.024
+        },
+        "fused_ar_rmsnorm_oneshot_blocked_kernel": {
+          "count": 1152,
+          "median_us": 34.219,
+          "p95_us": 65.519,
+          "total_us": 47695.191
+        }
+      },
+      "trace": "raw/history/mi350x/2026-07-24/experiments/tp4-block2048/opt3-truefused-block2048-TP0.trace.json.gz"
+    },
+    {
+      "kernels": {
+        "_rmsnorm_kernel": {
+          "count": 89,
+          "median_us": 17.199,
+          "p95_us": 19.52,
+          "total_us": 1381.363
+        },
+        "amd_all_reduce_kernel": {
+          "count": 16,
+          "median_us": 28.439,
+          "p95_us": 34.08,
+          "total_us": 2265.922
+        },
+        "fused_ar_rmsnorm_oneshot_blocked_kernel": {
+          "count": 1152,
+          "median_us": 28.5395,
+          "p95_us": 51.64,
+          "total_us": 37989.49
+        }
+      },
+      "trace": "raw/history/mi350x/2026-07-24/experiments/tp4-block2048/opt3-truefused-block2048-TP1.trace.json.gz"
+    },
+    {
+      "kernels": {
+        "_rmsnorm_kernel": {
+          "count": 89,
+          "median_us": 17.159,
+          "p95_us": 19.439,
+          "total_us": 1369.561
+        },
+        "amd_all_reduce_kernel": {
+          "count": 16,
+          "median_us": 25.8595,
+          "p95_us": 2206.017,
+          "total_us": 6237.357
+        },
+        "fused_ar_rmsnorm_oneshot_blocked_kernel": {
+          "count": 1152,
+          "median_us": 26.92,
+          "p95_us": 39.84,
+          "total_us": 34632.38
+        }
+      },
+      "trace": "raw/history/mi350x/2026-07-24/experiments/tp4-block2048/opt3-truefused-block2048-TP2.trace.json.gz"
+    },
+    {
+      "kernels": {
+        "_rmsnorm_kernel": {
+          "count": 89,
+          "median_us": 16.959,
+          "p95_us": 19.279,
+          "total_us": 1367.48
+        },
+        "amd_all_reduce_kernel": {
+          "count": 16,
+          "median_us": 23.719,
+          "p95_us": 38.64,
+          "total_us": 733.79
+        },
+        "fused_ar_rmsnorm_oneshot_blocked_kernel": {
+          "count": 1152,
+          "median_us": 27.639499999999998,
+          "p95_us": 45.279,
+          "total_us": 36804.787
+        }
+      },
+      "trace": "raw/history/mi350x/2026-07-24/experiments/tp4-block2048/opt3-truefused-block2048-TP3.trace.json.gz"
+    }
+  ]
+}

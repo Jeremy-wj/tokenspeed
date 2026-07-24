@@ -1,6 +1,6 @@
 """Minimal HIP-graph capture/replay repro for the in-kernel signal-pad barrier.
 
-Isolates the BLOCKED item in AR_RMSNORM_MI350X_E2E_BENCHMARKS.md §6.2: the
+See benchmark/results/ar_rmsnorm/docs/backend-design-and-safety.md: the
 one-shot fused kernels fold their leading+trailing barriers in-kernel
 (``TS_TRITON_SHMEM_INKERNEL_BARRIER=1``) and reach parity in eager, but fault
 under CUDA/HIP graph replay in the served decode path.
@@ -19,8 +19,8 @@ even across many layers/replays/skew. The in-kernel barrier only DEADLOCKS in
 ``PROBE_MODE=multigraph`` with ``PROBE_RNG_SHARED=0`` -- i.e. when TP ranks replay
 DIFFERENT-M graphs at the same time (its signal-pad slot range is M-dependent).
 With ``PROBE_RNG_SHARED=1`` (serve-faithful: all TP ranks pick the same M each
-step) it PASSES. ``sep`` passes in all modes (block_id=0, M-independent). See the
-companion doc §6.2.
+step) it PASSES. ``sep`` passes in all modes (block_id=0, M-independent). See
+the canonical backend design and historical incident record.
 
 Run (inside container, ws=4 avoids GPU3=HIP0):
     # single-op graph (both pass):
@@ -29,7 +29,7 @@ Run (inside container, ws=4 avoids GPU3=HIP0):
     # multigraph divergence repro (inkernel HANGS, sep PASSES):
     HIP_VISIBLE_DEVICES=1,2,3,5 BENCH_WS=4 PROBE_MODE=multigraph \
         PROBE_RNG_SHARED=0 python3 -m benchmark.probe_inkernel_barrier_graph
-Optional: PROBE_MS="1 4 8 64 256"
+Optional: BENCH_N=2880 PROBE_MS="1 4 8 64 256"
           PROBE_VARIANTS="sep inkernel inkernel_fold"
           PROBE_REPLAYS=300  PROBE_BS="1 8 64 160"  PROBE_TIMEOUT=90
 """
@@ -43,7 +43,9 @@ import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
-_N = 2880
+from benchmark.shape_axes import default_hidden_size
+
+_N = default_hidden_size()
 _EPS = 1e-6
 
 
