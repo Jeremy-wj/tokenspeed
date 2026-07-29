@@ -2,6 +2,12 @@
 
 Updated: 2026-07-29
 
+> **Legacy integration analysis:** this report describes the pre-rebase
+> `triton_shmem` serving path. The upstream-main rebase made Iris the default
+> fused AMD backend and changed ordinary all-reduce. Mechanisms and safety
+> contracts remain useful; performance conclusions require new baselines. See
+> [upstream-main rebase impact](upstream-main-rebase-impact-2026-07.md).
+
 ## Purpose and evidence boundary
 
 This report analyzes how the Triton symmetric-memory all-reduce + residual-add +

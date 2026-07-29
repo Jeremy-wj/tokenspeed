@@ -8,6 +8,13 @@ This document defines the evidence needed to promote an AR+RMSNorm integration
 change. Qualified environments, commands, implemented harness behavior, and
 artifact layout belong in the [profiling workflow](profiling-workflow.md).
 
+The upstream-main rebase at `3f88dcc2` is a mandatory baseline reset. It
+changed the default fused backend, the ordinary AMD all-reduce control, and
+the surrounding runtime. All campaigns described below are legacy examples of
+the evidence ladder. New work must first establish upstream-unfused and
+Iris-first controls, then compare explicit candidates on the same rebased
+code. See [upstream-main rebase impact](upstream-main-rebase-impact-2026-07.md).
+
 > The candidate is the complete serving state machine, not only the fused
 > kernel.
 
@@ -15,7 +22,7 @@ Allocation, rendezvous, graph capture, health transitions, prefill/decode,
 buffer lifetime, fallback, topology, scheduling, and restart behavior are part
 of the measured object. Fixed-shape timing is screening evidence only.
 
-The completed GPT-OSS-120B profile-v4 campaign demonstrates the distinction.
+The legacy GPT-OSS-120B profile-v4 campaign demonstrates the distinction.
 After the request-padding and output-lifetime fixes, all three restart blocks
 and fifteen pairs completed without a safety failure, yet fused median TPOT
 changed **+1.44%** and output throughput changed **-1.46%**. Both intervals

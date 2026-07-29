@@ -2,20 +2,27 @@
 
 Updated: 2026-07-29
 
+> **Legacy performance analysis:** the upstream-main rebase changed both fused
+> and unfused AMD communication backends. Every measured value and projected
+> ceiling in this document is tied to the pre-rebase `triton_shmem` runtime.
+> Preserve the arithmetic as historical opportunity analysis; do not use it as
+> a post-rebase budget. See
+> [upstream-main rebase impact](upstream-main-rebase-impact-2026-07.md).
+
 ## Decision-relevant evidence
 
 For GPT-OSS-120B decode at TP=4 on MI350X (gfx950), keep measured serving
 results separate from arithmetic ceilings:
 
-- **Current qualified end-to-end result:** profile v4 passed the complete safety
+- **Legacy qualified end-to-end result:** profile v4 passed the complete safety
   campaign, but fused median TPOT changed **+1.44%** and output throughput
   changed **-1.46%**. Both intervals exclude zero in the unfavorable
-  direction, so the current implementation is not promoted.
+  direction, so the legacy implementation was not promoted.
 - **Historical observation only:** the small 2026-07-24 old-profile pair
   improved unprofiled median TPOT by **0.195 ms / 1.53%** while throughput moved
   **+0.09%**. It is useful for transfer arithmetic, not current deployment
   evidence.
-- **Current-kernel-family ceiling:** **0.76-1.02 ms**, or **5.0-6.7%** of the
+- **Legacy kernel-family ceiling:** **0.76-1.02 ms**, or **5.0-6.7%** of the
   profiled decode period and **6.0-8.0%** of the historical unprofiled TPOT
   denominator if the same absolute saving transfers.
 - **Aggressive systems ceiling:** **1.38-2.10 ms**, or **9.0-13.7%** profiled

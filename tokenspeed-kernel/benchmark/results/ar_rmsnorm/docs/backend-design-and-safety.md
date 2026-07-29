@@ -1,5 +1,19 @@
 # `triton_shmem` backend design and safety
 
+## Post-rebase status
+
+This document describes the local experimental backend, not the upstream
+default. After rebasing onto upstream `3f88dcc2`:
+
+- `TS_ARNORM_BACKEND=auto` uses Iris first and native symmetric memory as
+  fallback;
+- `TS_ARNORM_BACKEND=triton_shmem` is required to select this implementation;
+- all performance and qualification evidence below is legacy;
+- the pointer, graph-lifetime, synchronization, and complete-fallback
+  invariants remain requirements for future candidates.
+
+See [upstream-main rebase impact](upstream-main-rebase-impact-2026-07.md).
+
 ## Contract
 
 The AMD backend fuses:
@@ -21,6 +35,7 @@ is taken from the tensor at runtime; production dispatch does not assume 2880.
 ```text
 runtime/layers/layernorm.py
   -> communication/triton.py::allreduce_residual_rmsnorm
+  -> TS_ARNORM_BACKEND=triton_shmem
   -> communication/triton_shmem.py
   -> communication/_triton_shmem_kernels.py
 ```
@@ -132,7 +147,7 @@ must sweep their own widths and token ranges before treating it as optimal.
 8. Persistent caller-owned storage for outputs referenced by captured custom
    kernels; transient capture-time allocations are not a lifetime contract.
 
-## Validation evidence
+## Legacy validation evidence
 
 - MI300X correctness: ws=1/2/4/8; graph capture at ws=2/8.
 - MI350X correctness and serving: ws=2/4/8.

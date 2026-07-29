@@ -9,6 +9,13 @@ TokenSpeed `triton_shmem` AR+residual+RMSNorm integration. It does not own
 deployment policy, execution order, or rejected-candidate priorities; those
 remain in [GPT-OSS-120B status](gpt-oss-120b-status.md).
 
+After the upstream-main rebase, `triton_shmem` is an explicit experimental
+backend and every measured opportunity in this document is legacy. The first
+priority is no longer another local optimization: establish upstream-unfused
+and upstream Iris baselines on the rebased runtime, then compare explicit
+`triton_shmem` under identical conditions. See
+[upstream-main rebase impact](upstream-main-rebase-impact-2026-07.md).
+
 The profile-v4 graph-lifetime investigation is closed. Its evidence and
 chronology live in the
 [serving root-cause record](gpt-oss-120b-serving-root-cause.md), not here.
@@ -19,17 +26,18 @@ output lifetime contracts established there.
 
 ```text
 closed graph-lifetime contracts
-  -> deterministic state initialization and observable identity
+  -> new upstream-unfused and Iris baselines
+     -> deterministic state initialization and observable identity
      -> graph-stable ring epoch/slot ownership
         -> optional two-slot reuse without a trailing barrier
      -> unified model/topology/shape dispatch
         -> producer-direct input and progress publication
 ```
 
-State observability can proceed independently of performance work. Two-slot
-reuse depends on graph-stable identity. Producer-direct input depends on both
-safe reuse semantics and an exact caller-owned output API. Qualification gates
-are defined in
+State observability can proceed independently of baseline gathering. No old
+latency or crossover transfers to Iris. Two-slot reuse depends on graph-stable
+identity. Producer-direct input depends on both safe reuse semantics and an
+exact caller-owned output API. Qualification gates are defined in
 [benchmark methodology](benchmark-methodology-recommendations-2026-07.md).
 
 ## Deterministic state initialization and identity

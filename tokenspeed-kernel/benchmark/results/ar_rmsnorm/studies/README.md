@@ -4,6 +4,12 @@ Curated studies answer dated questions; they do not override the current
 deployment decision in the
 [GPT-OSS-120B status](../docs/gpt-oss-120b-status.md).
 
+All studies indexed here predate the upstream-main rebase at `3f88dcc2` and
+are **legacy performance evidence**. This includes profile v4. Safety incidents
+and lifetime findings remain historical engineering evidence, but no latency,
+throughput, kernel, graph, or crossover number is a post-rebase baseline.
+See [upstream-main rebase impact](../docs/upstream-main-rebase-impact-2026-07.md).
+
 ## MI350X (gfx950)
 
 - `2026-07-serving-baseline/` — initial TP=2, TP=4, and TP=8 serving crossover.

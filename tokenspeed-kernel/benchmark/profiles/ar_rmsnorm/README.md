@@ -3,10 +3,14 @@
 Profiles make model paths, hidden sizes, serving arguments, and validated
 performance policies explicit.
 
-- `gpt_oss_120b_mi350x.env` is the qualified gpt-oss-120B MI350X profile.
+All profiles here are pre-rebase regression profiles. They do not qualify the
+upstream Iris default introduced by the `3f88dcc2` baseline. Use them to
+reproduce legacy `triton_shmem` behavior only, with an explicit backend.
+
+- `gpt_oss_120b_mi350x.env` is the legacy qualified gpt-oss-120B MI350X profile.
 - `model_template.env` is a conservative starting point for another model.
 
-The qualified manual-serving profile emits
+The legacy manual-serving profile emits
 `AR_NORM_PROFILE_ID=gpt-oss-120b-mi350x-qualified-v4` and
 `TS_TRITON_SHMEM_OUTPUT_RING=72`. Campaign runs also validate the resolved
 server arguments; the profile ID alone does not hide command-line overrides.

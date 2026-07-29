@@ -1,4 +1,7 @@
 {
+  "status": "legacy_pre_upstream_main_rebase",
+  "profile_identity": "2026-07-23 pre-profile-v4 eager Proton traces for the old triton_shmem and native-AR runtime; not a post-3f88dcc2 baseline.",
+  "superseded_for_performance_by": "../../../docs/upstream-main-rebase-impact-2026-07.md",
   "traces": [
     {
       "communication_kernels": {

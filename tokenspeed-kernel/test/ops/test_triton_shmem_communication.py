@@ -325,17 +325,15 @@ def _fusion_gate_worker(rank, world_size, port, error_dict):
         assert state.max_token_num == 2048
 
         x, residual = _make_inputs(512, hidden, rank, device)
-        for backend in ("triton_shmem", "auto"):
-            os.environ["TS_ARNORM_BACKEND"] = backend
-            declined = triton.allreduce_residual_rmsnorm(
-                x,
-                residual,
-                weight,
-                rank,
-                dist.group.WORLD,
-                max_token_num=2048,
-            )
-            assert declined[:2] == (None, None)
+        declined = triton.allreduce_residual_rmsnorm(
+            x,
+            residual,
+            weight,
+            rank,
+            dist.group.WORLD,
+            max_token_num=2048,
+        )
+        assert declined[:2] == (None, None)
     except Exception:
         error_dict[rank] = traceback.format_exc()
     finally:

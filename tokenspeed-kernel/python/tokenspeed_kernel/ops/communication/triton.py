@@ -34,12 +34,10 @@ logger = logging.getLogger(__file__)
 
 # Selects which fused AllReduce+residual+RMSNorm backend the AMD path uses, so
 # the implementations can be A/B/C benchmarked without code changes:
-#   "auto"         (default) -- production behavior: the vendored triton-shmem
-#                               fused kernels on PyTorch symmetric memory (the
-#                               migrated backend), then the native symm_mem
-#                               kernel as fallback. This supersedes Iris.
-#   "triton_shmem" -- force the triton-shmem fused kernels only.
-#   "iris"         -- force the (superseded) Iris backend only; retained for A/B.
+#   "auto"         (default) -- upstream production behavior: Iris first, then
+#                               the native symm_mem kernel as fallback.
+#   "triton_shmem" -- force the experimental triton-shmem fused kernels only.
+#   "iris"         -- force Iris only.
 #   "symm_mem"     -- force the native torch symmetric-memory kernel only.
 _ARNORM_BACKEND_ENV = "TS_ARNORM_BACKEND"
 _TRITON_SHMEM_FUSION_MAX_M_ENV = "TS_TRITON_SHMEM_FUSION_MAX_M"
@@ -1617,12 +1615,9 @@ def allreduce_residual_rmsnorm(
         )
         key = (id(group), max_token_num, hidden_dim, input_tensor.dtype)
 
-        # --- triton_shmem fused path (vendored triton-shmem kernels on PyTorch
-        # symmetric memory): the default "auto" backend, or forced "triton_shmem".
-        # This is the migrated production path and supersedes Iris; the kernels
-        # take arbitrary (M, N). An optional backend-specific M gate can decline
-        # shapes that are valid for the allocated workspace but slower than the
-        # production unfused path.
+        # --- Explicit experimental triton_shmem path. Upstream's default is
+        # Iris; retaining this backend behind an explicit selector preserves the
+        # local research implementation without overriding upstream behavior.
         triton_shmem_max_m = _triton_shmem_fusion_max_m()
         triton_shmem_gate_declined = (
             eligible
@@ -1630,7 +1625,7 @@ def allreduce_residual_rmsnorm(
             and token_num > triton_shmem_max_m
         )
         triton_shmem_eligible = eligible and not triton_shmem_gate_declined
-        if backend in ("auto", "triton_shmem") and triton_shmem_eligible:
+        if backend == "triton_shmem" and triton_shmem_eligible:
             from . import triton_shmem as _ts_mod
 
             ts_state = _ts_mod.TRITON_SHMEM_AR_RMSNORM_STATES.get(key)
@@ -1655,21 +1650,16 @@ def allreduce_residual_rmsnorm(
                     )
                 )
                 return norm_out, residual_out, None, None
-            # triton_shmem unavailable: "auto" falls through to native symm_mem;
-            # a forced request degrades to the unfused caller fallback.
-            if backend == "triton_shmem":
-                return None, None, None, None
-
-        if backend == "triton_shmem" or (
-            backend == "auto" and triton_shmem_gate_declined
-        ):
-            # A forced backend or explicit performance-gate decline must use
-            # the complete caller fallback, not another fused implementation.
+            # A forced request degrades to the complete caller fallback.
             return None, None, None, None
 
-        # --- Iris fused path: forced "iris" only (superseded by triton_shmem as
-        # the "auto" default; retained so the two can still be A/B benchmarked).
-        if backend == "iris":
+        if backend == "triton_shmem":
+            # Ineligible or performance-gated requests do not silently switch
+            # implementations during an explicit triton_shmem experiment.
+            return None, None, None, None
+
+        # --- Upstream Iris fused path: default "auto", or forced "iris".
+        if backend in ("auto", "iris"):
             if eligible:
                 from . import iris as _iris_mod
 
@@ -1691,11 +1681,12 @@ def allreduce_residual_rmsnorm(
                     eps=eps,
                 )
                 return norm_out, residual_out, None, None
-            # Forced Iris but ineligible -> unfused fallback.
-            return None, None, None, None
+            if backend == "iris":
+                # Forced Iris but ineligible -> complete caller fallback.
+                return None, None, None, None
 
-        # --- Native symm_mem kernel: backend "symm_mem", or "auto" fall-through
-        # (only reached when triton_shmem was ineligible or unavailable).
+        # --- Native symm_mem kernel: backend "symm_mem", or upstream-compatible
+        # "auto" fall-through when Iris is ineligible.
         state = allreduce_residual_rmsnorm_get_state(
             group=group,
             rank_in_group=rank,

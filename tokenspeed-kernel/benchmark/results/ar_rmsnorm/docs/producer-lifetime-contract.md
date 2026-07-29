@@ -2,6 +2,11 @@
 
 Updated: 2026-07-29
 
+This contract was derived from the pre-rebase `triton_shmem` implementation.
+It remains a safety requirement for explicit `triton_shmem` and useful prior
+art for any captured backend; its performance assumptions are legacy after
+upstream `3f88dcc2`.
+
 ## Scope
 
 This document establishes the ownership requirements that must be satisfied

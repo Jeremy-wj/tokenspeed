@@ -2,6 +2,11 @@
 
 Investigation: 2026-07-28 through 2026-07-29
 
+This is a durable pre-rebase incident record. Its padding, captured-address,
+and output-lifetime findings remain applicable safety evidence, but its
+performance observations are legacy after upstream `3f88dcc2`. See
+[upstream-main rebase impact](upstream-main-rebase-impact-2026-07.md).
+
 ## Outcome
 
 Two application-level graph-lifetime defects caused the recurrent GPU memory

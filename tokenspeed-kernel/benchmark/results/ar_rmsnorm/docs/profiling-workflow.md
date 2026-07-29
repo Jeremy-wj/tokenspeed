@@ -1,5 +1,11 @@
 # AR+RMSNorm profiling workflow
 
+All existing traces and summaries produced by this workflow are legacy after
+the upstream-main rebase at `3f88dcc2`. The workflow remains the starting
+point for new captures, but post-rebase runs must record the resolved ordinary
+AR backend, fused backend, kernel signatures, and new scope schema. See
+[upstream-main rebase impact](upstream-main-rebase-impact-2026-07.md).
+
 ## Qualified environment
 
 ```text

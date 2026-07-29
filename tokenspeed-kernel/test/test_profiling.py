@@ -217,7 +217,7 @@ def test_kernel_scope_uses_proton_scope_when_active(monkeypatch):
 
     assert fake.scope_calls == [
         (
-            "gemm.mm[triton_mm_fp8_scaled]{dtype=torch.float16}",
+            "gemm.mm[triton_mm_fp8_scaled]",
             {
                 "M": 32,
                 "N": 64,

@@ -7,21 +7,27 @@ TP=4, on MI350X (gfx950).
 
 ## Deployment decision
 
-- TP=2 continues to auto-enable fusion.
-- TP=4 and TP=8 remain explicit opt-in.
-- The qualified TP=4 profile
-  `gpt-oss-120b-mi350x-qualified-v4` passed safety qualification but is not
-  promoted: fused decode median TPOT regressed 1.44% (95% CI +1.20% to +1.65%)
-  and output throughput regressed 1.46% (95% CI -1.91% to -1.02%).
-- The base graph-padding fault and the fusion-specific captured-output lifetime
-  fault are closed. This is a performance rejection, not an unresolved
-  stability workaround.
+- There is no post-rebase project performance baseline or promotion decision.
+- Upstream `main` at `3f88dcc2` now makes AMD `auto` use Iris for fused
+  AR+RMSNorm and ordinary small all-reduce. Upstream may auto-enable fusion for
+  supported single-node AMD TP mappings.
+- `TS_ARNORM_BACKEND=triton_shmem` is an explicit experimental candidate; it
+  no longer replaces upstream `auto`.
+- Profile `gpt-oss-120b-mi350x-qualified-v4` is legacy performance evidence.
+  It qualified the old `triton_shmem` integration, not Iris or the rebased
+  runtime.
+- The graph-padding and captured-output lifetime faults remain closed
+  historical incidents. Their invariants still apply to captured buffers.
 
-The final campaign completed three independent restart blocks and fifteen
-fused/unfused pairs without a safety failure. Raw campaign:
+The old final campaign completed three independent restart blocks and fifteen
+fused/unfused pairs without a safety failure, but is not a post-rebase
+baseline. Raw campaign:
 `../raw/current/gpt-oss-120b/mi350x/2026-07-29/2026-07-29-output-ring-v4-fused-vs-unfused/`.
 
-## Qualified TP=4 profile
+See [upstream-main rebase impact](upstream-main-rebase-impact-2026-07.md) for
+the backend analysis and baseline reset.
+
+## Legacy qualified TP=4 profile
 
 Scope:
 
@@ -30,7 +36,7 @@ Scope:
 - runtime: torch 2.11 with released ROCm 7.2.4 userspace;
 - shared-host rule: exclude physical GPU 3 / HIP index 0 for TP<8.
 
-Profile v4 requires:
+The pre-rebase profile-v4 reproduction requires:
 
 ```text
 AR_NORM_PROFILE_ID=gpt-oss-120b-mi350x-qualified-v4
@@ -60,8 +66,8 @@ and fused kernel signatures in every rank trace.
 ## Historical 2026-07-24 evidence
 
 The favorable 2026-07-24 matched pair used an older serving profile. It is
-historical mechanism evidence and is deployment-superseded by profile v4; it
-must not be described as the current TP=4 result.
+historical mechanism evidence and was superseded first by profile v4 and then
+by the upstream baseline reset; it must not be described as current.
 
 - generic fused decode median: 34.1–36.5 µs across ranks;
 - maximum same-rank unfused AR + RMSNorm median sum: 36.919 µs;
@@ -75,10 +81,10 @@ Sources:
 `../studies/mi350x/2026-07-profile-guided-followup/e2e_summary.json`, and
 `../raw/current/gpt-oss-120b/mi350x/2026-07-24/`.
 
-## Current dispositions
+## Legacy dispositions
 
-- Keep the profile-v4 fused implementation opt-in; do not rerun the same
-  candidate for promotion.
+- Profile-v4's `triton_shmem` performance rejection remains the final decision
+  for the pre-rebase implementation only.
 - Keep the M=256 performance gate rejected.
 - Keep the host-alternated two-slot/no-exit input ring rejected until slot
   identity is graph-stable across captured variants and request waves.
@@ -90,16 +96,19 @@ Sources:
 
 ## Priorities
 
-1. Require a changed performance mechanism before another promotion campaign;
-   target copy/ownership overhead and prefill dispatch without weakening the
-   proven lifetime contract.
-2. Use the repeatability runner's three-block/fifteen-pair minimum, fresh
-   servers, GPU isolation, signature proof, checksums, and failure gates.
-3. Replace host-phase input-ring reuse with explicit graph/call-site slot
-   identity or a device-side epoch before reconsidering exit-barrier removal.
-4. Defer producer-direct output until input reuse is transition-safe.
-5. Keep prefill and decode separate and retain model-specific op, graph,
-   transition, and end-to-end safety gates.
+1. Establish an upstream-unfused control on the rebased code and record the
+   ordinary AR backend and kernel signatures.
+2. Establish the upstream Iris-first fused baseline with correctness, decline,
+   graph, and transition evidence.
+3. Compare explicit `triton_shmem` against those controls on the identical
+   code, image, topology, and workload. Do not transfer old percentages.
+4. Evaluate `all_reduce_two` and the NVIDIA lane/latent-norm APIs as separate
+   primitives; they are not GPT-OSS AR+RMSNorm results.
+5. Only after operator, graph, transition, and marker-aligned profiling gates
+   pass, run the repeatability runner's three-block/fifteen-pair campaign with
+   fresh servers, GPU isolation, signature proof, checksums, and failure gates.
+6. Preserve graph-stable output lifetime, universal sink padding, complete
+   fallback, and explicit completion/barrier contracts in every candidate.
 
 Technical ownership:
 [serving root cause](gpt-oss-120b-serving-root-cause.md),
