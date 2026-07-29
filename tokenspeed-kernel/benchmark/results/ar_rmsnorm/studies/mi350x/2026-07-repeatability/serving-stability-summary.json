@@ -1,0 +1,208 @@
+{
+  "date": "2026-07-29",
+  "status": "historical_2026_07_27_controls_superseded_by_profile_v4_final_qualification",
+  "profile": "gpt_oss_120b_mi350x",
+  "profile_identity": "Historical study label for the 2026-07-27 controls; the final qualified configuration is gpt-oss-120b-mi350x-qualified-v4.",
+  "topology": {
+    "fabric": "fully connected XGMI",
+    "all_peer_links": {
+      "num_hops": 1,
+      "weight": 15,
+      "coherent": true,
+      "bidirectional": true
+    },
+    "hip_to_physical": {
+      "0": 3,
+      "1": 0,
+      "2": 2,
+      "3": 1,
+      "4": 7,
+      "5": 4,
+      "6": 6,
+      "7": 5
+    },
+    "conclusion": "XGMI path locality is uniform. Noncanonical rank sets showed long-run instability in both fused and unfused controls and are excluded from performance qualification."
+  },
+  "root_causes": [
+    {
+      "name": "invasive custom deep health",
+      "mechanism": "HealthCheck enqueues a one-token generation and may cancel/abort it after any unrelated scheduler output.",
+      "evidence": [
+        "generate and passive_when_busy modes emitted HEALTH_CHECK_* M=1 batches",
+        "fully passive mode emitted no HEALTH_CHECK_* generation",
+        "input ring with generate health still timed out",
+        "passive health is required even with input-ring buffering"
+      ],
+      "fix": {
+        "engine_module": "tokenspeed.runtime.entrypoints.safe_smg_server",
+        "environment": "TOKENSPEED_DEEP_HEALTH_MODE=passive"
+      }
+    },
+    {
+      "name": "host-alternated no-exit ring phase",
+      "mechanism": "Mutable host slot alternation during graph capture does not establish one graph-stable phase across all captured variants and request waves.",
+      "evidence": [
+        "one long unfused physical-GPU-6 control passed, but later noncanonical unfused campaigns also timed out",
+        "short fused workload passed on physical GPU 6",
+        "long fused workload faulted on physical GPU 6",
+        "long fused workload passed twice with the ring but later canonical ring runs faulted",
+        "two order-opposed graph passes saved 5.37 us/site, proving performance but not serving lifetime safety"
+      ],
+      "fix": {
+        "current": "retain the original one-slot exit barrier",
+        "future": "assign ring slots explicitly per graph/call site or use a device-side epoch before omitting the exit barrier"
+      }
+    },
+    {
+      "name": "overlapped M/graph transitions",
+      "mechanism": "Later request waves change active M while overlap scheduling is still draining prior work, so TP ranks can enter different graph/barrier phases.",
+      "evidence": [
+        "input ring plus passive health still faulted in a later small prefill wave",
+        "fixed grid 32 passed decode but deadlocked the first canonical M=128 prefill bucket",
+        "disabling overlap scheduling passed all canonical prefill buckets and decode while retaining the M-dependent grid",
+        "two consecutive long physical-GPU-6 runs passed without overlap"
+      ],
+      "fix": {
+        "serve_argument": "--disable-overlap-schedule",
+        "qualification_scope": "GPT-OSS-120B TP4"
+      }
+    }
+  ],
+  "serving_matrix": [
+    {
+      "rank_set": "HIP 1,2,3,5 / physical 0,2,1,4",
+      "fusion": false,
+      "deep_health": "passive",
+      "input_ring": 0,
+      "workload": "128/128, 128 prompts, C32",
+      "result": "passed"
+    },
+    {
+      "rank_set": "HIP 1,2,3,5 / physical 0,2,1,4",
+      "fusion": true,
+      "deep_health": "passive",
+      "input_ring": 1,
+      "workload": "two consecutive 128/512 runs, 128 prompts, C32",
+      "result": "passed"
+    },
+    {
+      "rank_set": "HIP 1,2,3,5 / physical 0,2,1,4",
+      "fusion": true,
+      "deep_health": "passive",
+      "input_ring": 2,
+      "overlap_schedule": false,
+      "workload": "multi-server 128/512 campaign",
+      "result": "later memory fault"
+    },
+    {
+      "rank_set": "HIP 1,2,3,6 / physical 0,2,1,6",
+      "fusion": false,
+      "deep_health": "passive",
+      "input_ring": 0,
+      "workload": "128/512, 128 prompts, C32",
+      "result": "passed"
+    },
+    {
+      "rank_set": "HIP 1,2,3,6 / physical 0,2,1,6",
+      "fusion": true,
+      "deep_health": "passive",
+      "input_ring": 1,
+      "workload": "128/512, 128 prompts, C32",
+      "result": "memory fault / timeout"
+    },
+    {
+      "rank_set": "HIP 1,2,3,6 / physical 0,2,1,6",
+      "fusion": true,
+      "deep_health": "passive",
+      "input_ring": 2,
+      "workload": "two consecutive 128/512 runs, 128 prompts, C32",
+      "result": "passed in one run but later failed without fixed participants"
+    },
+    {
+      "rank_set": "HIP 1,2,3,6 / physical 0,2,1,6",
+      "fusion": true,
+      "deep_health": "generate",
+      "input_ring": 2,
+      "workload": "128/512, 128 prompts, C32",
+      "result": "timeout"
+    },
+    {
+      "rank_set": "HIP 1,2,3,6 / physical 0,2,1,6",
+      "fusion": true,
+      "deep_health": "passive",
+      "input_ring": 2,
+      "barrier_grid": 32,
+      "workload": "two consecutive 128/512 runs, 128 prompts, C32",
+      "result": "passed"
+    },
+    {
+      "rank_set": "HIP 1,2,3,6 / physical 0,2,1,6",
+      "fusion": true,
+      "deep_health": "passive",
+      "input_ring": 2,
+      "overlap_schedule": false,
+      "workload": "two consecutive 128/512 runs, 128 prompts, C32",
+      "result": "passed"
+    }
+  ],
+  "historical_combined_control": {
+    "deep_health": "passive",
+    "double_buffer_input": false,
+    "barrier_grid": 0,
+    "overlap_schedule": false,
+    "fixed_grid_decode_control": {
+      "rank_set": "HIP 1,2,3,6",
+      "arm": "cap2048",
+      "fresh_seeds": 3,
+      "result": "all three long decode servers passed"
+    },
+    "long_decode_no_overlap": {
+      "rank_set": "HIP 1,2,3,6",
+      "repeats": 2,
+      "result": "passed"
+    },
+    "full_smoke": {
+      "decode": true,
+      "prefill_buckets": [
+        128,
+        256,
+        512,
+        1024,
+        2048,
+        4096
+      ],
+      "rank_set": "HIP 1,2,3,5",
+      "result": "all six prefill buckets followed by decode passed on one server"
+    }
+  },
+  "representative_ring_result": {
+    "rank_set": "HIP 1,2,3,6",
+    "workload": "128/512, 128 prompts, C32, seed 1",
+    "median_tpot_ms": 12.4489,
+    "mean_tpot_ms": 12.5098,
+    "output_tokens_per_second": 2496.89
+  },
+  "decision": {
+    "immediate_fused_path_blockers_mitigated": true,
+    "repeatability_blocker_resolved": true,
+    "residual_failure": null,
+    "gpt_oss_profile_defaults": {
+      "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT": 0,
+      "TS_TRITON_SHMEM_OUTPUT_RING": 72,
+      "TS_TRITON_SHMEM_BARRIER_GRID": 0,
+      "TS_SERVE_ENGINE_MODULE": "tokenspeed.runtime.entrypoints.safe_smg_server",
+      "TOKENSPEED_DEEP_HEALTH_MODE": "passive",
+      "serve_argument": "--disable-overlap-schedule"
+    },
+    "tp4_auto_enable": false,
+    "deployment_change": false,
+    "m256_gate": "rejected after timing out on the stable baseline control",
+    "input_ring": "rejected pending graph-stable slot identity",
+    "final_profile": "gpt-oss-120b-mi350x-qualified-v4",
+    "latest_followup": "Reserved-sink request padding and persistent per-site fused outputs closed both graph-lifetime faults. The full three-block/fifteen-pair campaign passed safety but rejected promotion on decode performance.",
+    "followup_sources": [
+      "graph-padding-sentinel-root-cause.json",
+      "fused-output-lifetime-root-cause.json"
+    ]
+  }
+}

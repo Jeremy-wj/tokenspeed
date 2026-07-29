@@ -1,0 +1,35 @@
+{
+  "date_analyzed": "2026-07-27",
+  "analysis_quality": "heuristic_legacy",
+  "profile_identity": "Historical 2026-07-24 performance profile; not gpt-oss-120b-mi350x-qualified-v4.",
+  "source_traces": "raw/current/gpt-oss-120b/mi350x/2026-07-24/traces/torch",
+  "configuration": {
+    "eligible_sites": 72,
+    "unfused_sites": 73,
+    "decode_m": 32
+  },
+  "fused": {
+    "forward_count_per_rank": 15,
+    "max_of_rank_median_period_us": 15062.878,
+    "max_of_rank_median_fused_site_sum_us": 2800.236,
+    "max_of_rank_median_total_target_sum_us": 2828.674
+  },
+  "unfused": {
+    "forward_count_per_rank": 15,
+    "max_of_rank_median_period_us": 15262.887,
+    "max_of_rank_median_total_target_sum_us": 3219.118
+  },
+  "differences": {
+    "period_reduction_us": 200.01,
+    "period_reduction_pct": 1.31,
+    "total_target_sum_reduction_us": 390.444,
+    "total_target_sum_reduction_pct": 12.13,
+    "target_sum_to_period_capture_pct": 51.23
+  },
+  "methodology": {
+    "forward_segmentation": "Heuristically accumulate whole-model and split graph correlations to expected site counts.",
+    "period_metric": "Maximum of per-rank median start-to-start decode periods.",
+    "target_sum_metric": "Maximum of per-rank median AR+RMSNorm target-stage sums.",
+    "note": "Retained traces have no authoritative forward ID/mode/M marker. Fused-site-only sum excludes the one remaining explicit AR+RMSNorm pair; total target sum includes it."
+  }
+}

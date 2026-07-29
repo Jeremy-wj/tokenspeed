@@ -1,0 +1,131 @@
+{
+  "date": "2026-07-28",
+  "status": "superseded_by_graph_padding_sentinel_root_cause",
+  "root_cause_class": "graph-conditioned application metadata corruption, not an unresolved HIP runtime defect",
+  "scope": "GPT-OSS-120B TP4 base runtime below AR+RMSNorm",
+  "supersession": "Fault-address underflow geometry, a positive slot-0 alias control, and post-fix formal gates identify ordinary graph padding aliasing live request slot 0. See graph-padding-sentinel-root-cause.json.",
+  "decisive_failure": {
+    "campaign": "raw/current/gpt-oss-120b/mi350x/2026-07-28/2026-07-28-qualified-v2-fused-vs-unfused",
+    "arm": "block-00/p0-unfused",
+    "configuration": "fusion off, 0.90 HBM, C32 decode graph only, eager prefill, passive health, overlap disabled, explicit copy-in",
+    "phase": "first measured one-token warmup after server readiness",
+    "result": "GPU node-5 memory access fault",
+    "foreign_selected_gpu_process": false
+  },
+  "necessary_condition": {
+    "hip_graph_capture": true,
+    "evidence": [
+      "Three fresh post-fault fully eager canonical servers passed.",
+      "Earlier fully eager 0.95 three-seed controls passed.",
+      "C32 faults reproduced with fusion and standalone Triton all-reduce disabled."
+    ]
+  },
+  "memory_pressure": {
+    "classification": "amplifier_not_root",
+    "evidence": "At 0.95, capping only KV capacity removed a reproducible boundary; a later 0.90/C32 unfused arm still faulted.",
+    "source": "kv-cache-headroom-root-cause.json"
+  },
+  "hardware_and_placement": {
+    "canonical_set": {
+      "hip": [
+        1,
+        2,
+        3,
+        5
+      ],
+      "physical": [
+        0,
+        2,
+        1,
+        4
+      ]
+    },
+    "rotated_controls": [
+      {
+        "hip": [
+          1,
+          3,
+          5,
+          6
+        ],
+        "physical": [
+          0,
+          1,
+          4,
+          6
+        ],
+        "result": "three fresh C32 servers passed"
+      },
+      {
+        "hip": [
+          2,
+          3,
+          5,
+          6
+        ],
+        "physical": [
+          2,
+          1,
+          4,
+          6
+        ],
+        "result": "one C32 server passed"
+      },
+      {
+        "hip": [
+          1,
+          2,
+          5,
+          6
+        ],
+        "physical": [
+          0,
+          2,
+          4,
+          6
+        ],
+        "result": "one C32 server passed"
+      }
+    ],
+    "fault_nodes_observed": [
+      3,
+      4,
+      5
+    ],
+    "ecc_ras": "zero correctable, uncorrectable, and deferred counts for UMC, SDMA, GFX, MMHUB, and XGMI-WAFL on canonical selected GPUs",
+    "pcie": "zero replay, recovery, rollover, and NAK counters",
+    "conclusion": "No single physical GPU is isolated as defective. A drained GPU reset is no longer required to resolve this incident because the application metadata mechanism was reproduced directly and fixed."
+  },
+  "falsified_sufficient_causes": [
+    "AR+RMSNorm fusion",
+    "folded copy-in",
+    "prefill graph",
+    "overlap scheduling",
+    "deep-health generation",
+    "standalone Triton all-reduce",
+    "foreign selected-GPU PID",
+    "KV capacity alone",
+    "one physical GPU",
+    "torch.topk alone in a small raw graph"
+  ],
+  "diagnostic_limit": {
+    "exact_captured_component": "not isolated",
+    "gpu_coredump": "HSA inherited an unavailable host pipe handler; a direct dump could consume a prohibitive fraction of the remaining 373 GiB disk and was not enabled on four 225+ GiB processes",
+    "upstream_context": "Known ROCm/PyTorch raw and inductor HIP graph faults exist for large graphs and selected captured operations; the standalone topk transition stress passed in this environment."
+  },
+  "historical_intermediate_safe_profile": {
+    "profile_id": "gpt-oss-120b-mi350x-safe-eager-v1",
+    "enforce_eager": true,
+    "gpu_memory_utilization": 0.9,
+    "deep_health": "passive",
+    "overlap_schedule": false,
+    "fold_copyin": false
+  },
+  "decision": {
+    "historical_graph_based_tp4_promotion": false,
+    "qualified_profile_id": "gpt-oss-120b-mi350x-qualified-v4",
+    "qualification_status": "completed: three restart blocks and fifteen pairs without a safety failure",
+    "deployment_outcome": "fusion remains opt-in because paired decode performance regressed",
+    "reopen_condition": "not applicable; this intermediate diagnosis is superseded"
+  }
+}

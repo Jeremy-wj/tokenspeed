@@ -32,6 +32,7 @@ Run (inside container, ws=4 avoids GPU3=HIP0):
 Optional: BENCH_N=2880 PROBE_MS="1 4 8 64 256"
           PROBE_VARIANTS="sep inkernel inkernel_fold"
           PROBE_REPLAYS=300  PROBE_BS="1 8 64 160"  PROBE_TIMEOUT=90
+          PROBE_MODE=graph_eager PROBE_EAGER_MS="1 4"
 """
 from __future__ import annotations
 
@@ -175,6 +176,120 @@ def _multigraph_main(rank, ws, variant, replays, port, n_layers):
         dist.destroy_process_group()
 
 
+def _graph_eager_worker(rank, ws, variant, replays, port, err, n_layers):
+    try:
+        _graph_eager_main(rank, ws, variant, replays, port, n_layers)
+    except Exception:
+        err[rank] = traceback.format_exc()
+
+
+def _graph_eager_main(rank, ws, variant, replays, port, n_layers):
+    """Capture C32, then alternate eager M values on the same fused state."""
+    torch.cuda.set_device(rank)
+    dist.init_process_group(
+        "nccl", init_method=f"tcp://localhost:{port}", rank=rank, world_size=ws
+    )
+    dev = torch.device(f"cuda:{rank}")
+    try:
+        os.environ["TS_TRITON_SHMEM_INKERNEL_BARRIER"] = (
+            "1" if variant.startswith("inkernel") else "0"
+        )
+        os.environ["TS_TRITON_SHMEM_FOLD_COPYIN"] = (
+            "1" if "fold" in variant else "0"
+        )
+        os.environ["TS_TRITON_SHMEM_WORKGROUP_SYNC"] = (
+            "0" if "nosync" in variant else "1"
+        )
+        os.environ["TS_TRITON_SHMEM_BARRIER_GRID"] = "0"
+        from tokenspeed_kernel.ops.communication import triton_shmem as ts
+
+        capture_m = int(os.environ.get("PROBE_CAPTURE_M", "32"))
+        eager_ms = [
+            int(value)
+            for value in os.environ.get("PROBE_EAGER_MS", "1 4").split()
+        ]
+        sizes = sorted(set([capture_m, *eager_ms]))
+        state = ts.create_triton_shmem_ar_rmsnorm_state(
+            group=dist.group.WORLD,
+            rank_in_group=rank,
+            max_token_num=max(256, max(sizes)),
+            hidden_dim=_N,
+            dtype=torch.bfloat16,
+        )
+        assert state is not None
+        weight = torch.linspace(0.5, 1.5, _N, dtype=torch.bfloat16, device=dev)
+        bufs = {}
+        for m in sizes:
+            x = torch.full(
+                (m, _N), rank + 1, dtype=torch.bfloat16, device=dev
+            )
+            residual = torch.zeros_like(x)
+            bufs[m] = (x, residual, torch.empty_like(x), torch.empty_like(x))
+
+        def launch(m):
+            x, residual, norm_out, res_out = bufs[m]
+            if os.environ.get("PROBE_CHAINED") == "1":
+                current = x
+                current_residual = residual
+                for _ in range(n_layers):
+                    current, current_residual = (
+                        ts.triton_shmem_allreduce_residual_rmsnorm(
+                            state,
+                            input_tensor=current,
+                            residual=current_residual,
+                            weight=weight,
+                            eps=_EPS,
+                        )
+                    )
+                norm_out.copy_(current)
+                res_out.copy_(current_residual)
+            else:
+                for _ in range(n_layers):
+                    ts.triton_shmem_allreduce_residual_rmsnorm(
+                        state,
+                        input_tensor=x,
+                        residual=residual,
+                        weight=weight,
+                        eps=_EPS,
+                        norm_out=norm_out,
+                        residual_out=res_out,
+                    )
+
+        side = torch.cuda.Stream()
+        side.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(side):
+            for _ in range(4):
+                launch(capture_m)
+        torch.cuda.current_stream().wait_stream(side)
+        torch.cuda.synchronize()
+        dist.barrier()
+
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph, stream=side):
+            launch(capture_m)
+        torch.cuda.synchronize()
+        dist.barrier()
+
+        import time as _time
+
+        skew_seconds = (
+            float(os.environ.get("PROBE_SKEW_US", "0")) * rank / 1_000_000
+        )
+        for iteration in range(replays):
+            if iteration:
+                if skew_seconds:
+                    _time.sleep(skew_seconds)
+                graph.replay()
+            for m in eager_ms:
+                if skew_seconds:
+                    _time.sleep(skew_seconds)
+                launch(m)
+        torch.cuda.synchronize()
+        dist.barrier()
+    finally:
+        dist.destroy_process_group()
+
+
 def _worker(rank, ws, m, variant, replays, port, err, n_layers):
     try:
         _worker_main(rank, ws, m, variant, replays, port, n_layers)
@@ -292,6 +407,44 @@ def main():
     n_layers = int(os.environ.get("PROBE_LAYERS", "36"))
     print(f"ws={ws} N={_N} replays={replays} layers/graph={n_layers}  "
           f"(kernel=oneshot small-M path)")
+
+    if os.environ.get("PROBE_MODE") == "graph_eager":
+        import time as _t
+
+        timeout = float(os.environ.get("PROBE_TIMEOUT", "120"))
+        for variant in variants:
+            err = mp.Manager().dict()
+            proc = mp.spawn(
+                _graph_eager_worker,
+                args=(ws, variant, replays, _port(), err, n_layers),
+                nprocs=ws,
+                join=False,
+            )
+            deadline = _t.time() + timeout
+            done = False
+            while _t.time() < deadline:
+                if proc.join(timeout=2):
+                    done = True
+                    break
+            if not done:
+                result = f"HANG/DEADLOCK (timeout {timeout:.0f}s)"
+                for child in proc.processes:
+                    if child.is_alive():
+                        child.terminate()
+                _t.sleep(3)
+                for child in proc.processes:
+                    if child.is_alive():
+                        child.kill()
+            elif err:
+                first = sorted(err)[0]
+                result = "FAIL:" + err[first].strip().splitlines()[-1][:70]
+            else:
+                result = "PASS"
+            print(
+                f"graph_eager variant={variant:>18}: {result}",
+                flush=True,
+            )
+        return
 
     if os.environ.get("PROBE_MODE", "single") == "multigraph":
         import time as _t

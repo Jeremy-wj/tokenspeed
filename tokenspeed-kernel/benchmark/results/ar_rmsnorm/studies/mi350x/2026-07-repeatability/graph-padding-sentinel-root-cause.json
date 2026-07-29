@@ -1,0 +1,87 @@
+{
+  "date": "2026-07-28",
+  "status": "root_cause_confirmed",
+  "root_cause": {
+    "class": "CUDA/HIP graph padding aliased live request-pool slot 0",
+    "mechanism": "When an actual decode batch was padded to C32, _pad_graph_req_pool_indices mapped every dummy row to request-pool slot 0. Slot 0 is scheduler-owned and mutable; padded attention and sampling rows therefore consumed a live or stale request's page-table and runtime state. GPT-OSS uses 8 KiB KV pages per layer/rank. Stale or hole page indices produced reads/writes at exact 8 KiB multiples below 2 MiB-aligned KV allocation bases, causing the observed GPU memory aperture faults.",
+    "code": "python/tokenspeed/runtime/execution/cuda_graph_wrapper.py:_pad_graph_req_pool_indices",
+    "regression_commit": "7777f490d32cbd3b854c3d3f1a51ed441bc2563e",
+    "regression": "A Qwen3.5 TP8 performance change restricted the reserved sink-row mapping to DFLASH and restored slot-0 padding for ordinary decode graphs."
+  },
+  "address_proof": {
+    "faults_analyzed": 21,
+    "alignment": "21/21 current GPT-OSS fault addresses are exact multiples of 0x2000 below the next 2 MiB boundary",
+    "kv_page_bytes": 8192,
+    "kv_page_geometry": "page_size 64 * 2 TP-sharded KV heads * head_dim 64 * fp8 byte",
+    "underflow_page_counts_observed": [
+      1,
+      2,
+      4,
+      5,
+      8,
+      12,
+      13,
+      15,
+      29,
+      83,
+      91,
+      94,
+      205
+    ],
+    "allocator_evidence": "Allocator snapshots and KV pointer logs show each large KV tensor begins on a 2 MiB-aligned segment; fault addresses land immediately before such bases at integer KV-page strides."
+  },
+  "positive_control": {
+    "configuration": "C32 actual M=1, legacy slot-0 behavior re-enabled diagnostically, KV metadata validation enabled",
+    "result": "all ranks failed closed before graph replay",
+    "message": "graph padding aliased a live request-pool row expected=257 actual=[0 ... 0]",
+    "source": "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-slot0-alias-proof-v3"
+  },
+  "fix": {
+    "behavior": "All graph padding rows use max_req_pool_size, the reserved sink row.",
+    "invariants": [
+      "req_to_page has max_req_pool_size + 1 rows",
+      "runtime and sampling pool buffers have max_req_pool_size + 1 rows",
+      "the sink row remains zero/neutral and is never scheduler-owned",
+      "padded KV write locations remain the dummy slot"
+    ],
+    "regression_test": "test/runtime/test_dp_sampling_routing_metadata.py::test_cuda_graph_req_pool_padding_uses_reserved_sink_row"
+  },
+  "post_fix_validation": {
+    "bounded_m1_fresh_servers": {
+      "passed": 10,
+      "failed": 0
+    },
+    "long_decode_fresh_servers": {
+      "passed": 5,
+      "failed": 0,
+      "workload": "128 input, 512 output, 128 prompts, concurrency 32"
+    },
+    "formal_unfused_gate": {
+      "passed": 3,
+      "required": 3,
+      "failed": 0,
+      "eligible": true,
+      "source": "raw/current/gpt-oss-120b/mi350x/2026-07-28/2026-07-28-sentinel-v3-unfused-stability/stability-summary.json"
+    }
+  },
+  "falsified_primary_causes": [
+    "AR+RMSNorm fusion",
+    "folded copy-in",
+    "KV capacity alone",
+    "prefill graphs",
+    "overlap scheduling",
+    "deep-health generation",
+    "standalone Triton all-reduce",
+    "foreign selected-GPU process",
+    "one physical GPU",
+    "HIP graph runtime without application metadata corruption"
+  ],
+  "decision": {
+    "base_runtime_root_cause": "closed",
+    "profile_id": "gpt-oss-120b-mi350x-qualified-v4",
+    "tp4_promotion": false,
+    "fusion_followup": "A separate captured-output lifetime fault was fixed by persistent per-site output storage; see fused-output-lifetime-root-cause.json.",
+    "final_gate": "The three-block/fifteen-pair profile-v4 campaign completed without safety failures.",
+    "promotion_result": "rejected because decode median TPOT and output throughput regressed with confidence intervals excluding zero"
+  }
+}

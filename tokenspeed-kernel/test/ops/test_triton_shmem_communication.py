@@ -184,6 +184,181 @@ def test_triton_shmem_arrms_world4():
     _run_corr(world_size=4, hidden=2880)
 
 
+def _random_corr_worker(rank, world_size, port, hidden, error_dict):
+    try:
+        torch.cuda.set_device(rank)
+        dist.init_process_group(
+            backend="nccl",
+            init_method=f"tcp://localhost:{port}",
+            rank=rank,
+            world_size=world_size,
+        )
+        try:
+            os.environ["TS_TRITON_SHMEM_FOLD_COPYIN"] = "0"
+            from tokenspeed_kernel.ops.communication.triton_shmem import (
+                create_triton_shmem_ar_rmsnorm_state,
+                triton_shmem_allreduce_residual_rmsnorm,
+            )
+
+            device = torch.device(f"cuda:{rank}")
+            state = create_triton_shmem_ar_rmsnorm_state(
+                group=dist.group.WORLD,
+                rank_in_group=rank,
+                max_token_num=256,
+                hidden_dim=hidden,
+                dtype=torch.bfloat16,
+            )
+            assert state is not None
+            weight = torch.linspace(
+                0.5, 1.5, hidden, dtype=torch.bfloat16, device=device
+            )
+            iterations = 16  # 80 calls total, wrapping the profile's 72-site ring.
+            for tokens in (1, 4, 32, 128, 256):
+                for iteration in range(iterations):
+                    generator = torch.Generator(device=device).manual_seed(
+                        10_000 * iteration + rank
+                    )
+                    x = torch.randn(
+                        (tokens, hidden),
+                        dtype=torch.bfloat16,
+                        device=device,
+                        generator=generator,
+                    )
+                    residual_generator = torch.Generator(device=device).manual_seed(
+                        20_000 + iteration
+                    )
+                    residual = torch.randn(
+                        (tokens, hidden),
+                        dtype=torch.bfloat16,
+                        device=device,
+                        generator=residual_generator,
+                    )
+                    norm_out, residual_out = (
+                        triton_shmem_allreduce_residual_rmsnorm(
+                            state,
+                            input_tensor=x,
+                            residual=residual,
+                            weight=weight,
+                            eps=_EPS,
+                        )
+                    )
+                    reduced = x.float()
+                    dist.all_reduce(reduced)
+                    ref_residual = reduced + residual.float()
+                    ref_norm = ref_residual * torch.rsqrt(
+                        ref_residual.pow(2).mean(dim=-1, keepdim=True) + _EPS
+                    )
+                    ref_norm *= weight.float()
+                    torch.testing.assert_close(
+                        residual_out.float(),
+                        ref_residual,
+                        atol=2e-2,
+                        rtol=2e-2,
+                    )
+                    torch.testing.assert_close(
+                        norm_out.float(),
+                        ref_norm,
+                        atol=2e-2,
+                        rtol=2e-2,
+                    )
+            if state._output_ring_size:
+                assert state._output_ring_index == (
+                    len((1, 4, 32, 128, 256)) * iterations
+                ) % state._output_ring_size
+        finally:
+            dist.destroy_process_group()
+    except Exception:
+        error_dict[rank] = traceback.format_exc()
+
+
+def test_triton_shmem_arrms_random_correctness_world4():
+    _skip_if_unsupported(4)
+    _spawn_and_collect(
+        _random_corr_worker,
+        (4, _get_open_port(), 2880),
+        4,
+    )
+
+
+def test_triton_shmem_arrms_output_ring_random_world4(monkeypatch):
+    _skip_if_unsupported(4)
+    monkeypatch.setenv("TS_TRITON_SHMEM_OUTPUT_RING", "72")
+    _spawn_and_collect(
+        _random_corr_worker,
+        (4, _get_open_port(), 2880),
+        4,
+    )
+
+
+def _fusion_gate_worker(rank, world_size, port, error_dict):
+    try:
+        os.environ["TS_ARNORM_BACKEND"] = "triton_shmem"
+        os.environ["TS_TRITON_SHMEM_FUSION_MAX_M"] = "256"
+        device = torch.device(f"cuda:{rank}")
+        torch.cuda.set_device(device)
+        dist.init_process_group(
+            backend="nccl",
+            init_method=f"tcp://localhost:{port}",
+            rank=rank,
+            world_size=world_size,
+        )
+
+        from tokenspeed_kernel.ops.communication import triton, triton_shmem
+
+        hidden = 2880
+        weight = torch.linspace(
+            0.5, 1.5, hidden, dtype=torch.bfloat16, device=device
+        )
+        x, residual = _make_inputs(256, hidden, rank, device)
+        norm_out, residual_out, *_ = triton.allreduce_residual_rmsnorm(
+            x,
+            residual,
+            weight,
+            rank,
+            dist.group.WORLD,
+            max_token_num=2048,
+        )
+        assert norm_out is not None and residual_out is not None
+        state = triton_shmem.TRITON_SHMEM_AR_RMSNORM_STATES[
+            (id(dist.group.WORLD), 2048, hidden, torch.bfloat16)
+        ]
+        assert state.max_token_num == 2048
+
+        x, residual = _make_inputs(512, hidden, rank, device)
+        for backend in ("triton_shmem", "auto"):
+            os.environ["TS_ARNORM_BACKEND"] = backend
+            declined = triton.allreduce_residual_rmsnorm(
+                x,
+                residual,
+                weight,
+                rank,
+                dist.group.WORLD,
+                max_token_num=2048,
+            )
+            assert declined[:2] == (None, None)
+    except Exception:
+        error_dict[rank] = traceback.format_exc()
+    finally:
+        if dist.is_initialized():
+            dist.destroy_process_group()
+
+
+def test_triton_shmem_arrms_separate_performance_gate_world4():
+    """M=256 fuses while M=512 declines with a 2048-row workspace."""
+    _skip_if_unsupported(4)
+    error_dict = mp.Manager().dict()
+    mp.spawn(
+        _fusion_gate_worker,
+        args=(4, _get_open_port(), error_dict),
+        nprocs=4,
+        join=True,
+    )
+    if error_dict:
+        raise RuntimeError(
+            "\n".join(f"Rank {r}: {e}" for r, e in error_dict.items())
+        )
+
+
 def test_triton_shmem_arrms_world8():
     # ws=8: twoshot_blocked -- the production path.
     _run_corr(world_size=8, hidden=2880)
@@ -447,6 +622,135 @@ def test_triton_shmem_arrms_gridcap_graph_world4():
         fold_copyin=True,
         replays=100,
     )
+
+
+def _double_buffer_graph_worker(
+    rank, world_size, port, hidden, tokens, replays, error_dict
+):
+    try:
+        os.environ["TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT"] = "1"
+        device = torch.device(f"cuda:{rank}")
+        torch.cuda.set_device(device)
+        dist.init_process_group(
+            backend="nccl",
+            init_method=f"tcp://localhost:{port}",
+            rank=rank,
+            world_size=world_size,
+        )
+        from tokenspeed_kernel.ops.communication.triton_shmem import (
+            create_triton_shmem_ar_rmsnorm_state,
+            triton_shmem_allreduce_residual_rmsnorm,
+        )
+
+        state = create_triton_shmem_ar_rmsnorm_state(
+            group=dist.group.WORLD,
+            rank_in_group=rank,
+            max_token_num=tokens,
+            hidden_dim=hidden,
+            dtype=torch.bfloat16,
+        )
+        assert state is not None
+        assert len(state._input_ring) == 2
+        weight = torch.linspace(
+            0.5, 1.5, hidden, dtype=torch.bfloat16, device=device
+        )
+        residual = (
+            torch.arange(tokens * hidden, dtype=torch.float32, device=device)
+            .reshape(tokens, hidden)
+            .mul_(0.001)
+            .to(torch.bfloat16)
+        )
+        xs = [
+            torch.empty((tokens, hidden), dtype=torch.bfloat16, device=device)
+            for _ in range(2)
+        ]
+        norm_outs = [torch.empty_like(xs[0]) for _ in range(2)]
+        residual_outs = [torch.empty_like(xs[0]) for _ in range(2)]
+
+        def launch_pair():
+            for index in range(2):
+                triton_shmem_allreduce_residual_rmsnorm(
+                    state,
+                    input_tensor=xs[index],
+                    residual=residual,
+                    weight=weight,
+                    eps=_EPS,
+                    norm_out=norm_outs[index],
+                    residual_out=residual_outs[index],
+                )
+
+        stream = torch.cuda.Stream()
+        stream.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(stream):
+            for index, x in enumerate(xs):
+                x.fill_(rank + index + 1)
+            launch_pair()
+        torch.cuda.current_stream().wait_stream(stream)
+        torch.cuda.synchronize()
+        dist.barrier()
+
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph, stream=stream):
+            launch_pair()
+        assert state._input_ring_index == 0
+        dist.barrier()
+
+        for iteration in range(1, replays + 1):
+            for index, x in enumerate(xs):
+                x.fill_((rank + index + 1) * iteration)
+            graph.replay()
+            if iteration % 10 == 0 or iteration == replays:
+                torch.cuda.synchronize()
+                for index in range(2):
+                    rank_sum = (
+                        world_size * (world_size + 1) // 2
+                        + index * world_size
+                    )
+                    reduced = torch.full(
+                        (tokens, hidden),
+                        rank_sum * iteration,
+                        dtype=torch.float32,
+                        device=device,
+                    )
+                    ref_residual = reduced + residual.float()
+                    ref_norm = ref_residual * torch.rsqrt(
+                        ref_residual.square().mean(-1, keepdim=True) + _EPS
+                    )
+                    ref_norm *= weight.float()
+                    torch.testing.assert_close(
+                        residual_outs[index].float(),
+                        ref_residual,
+                        atol=2e-2,
+                        rtol=2e-2,
+                    )
+                    torch.testing.assert_close(
+                        norm_outs[index].float(),
+                        ref_norm,
+                        atol=2e-2,
+                        rtol=2e-2,
+                    )
+                dist.barrier()
+    except Exception:
+        error_dict[rank] = traceback.format_exc()
+    finally:
+        if dist.is_initialized():
+            dist.destroy_process_group()
+
+
+def test_triton_shmem_double_buffer_even_graph_world4():
+    """Two captured calls safely reuse two input slots without exit barriers."""
+    _skip_if_unsupported(4)
+    error_dict = mp.Manager().dict()
+    mp.spawn(
+        _double_buffer_graph_worker,
+        args=(4, _get_open_port(), 2880, 32, 100, error_dict),
+        nprocs=4,
+        join=True,
+    )
+    if error_dict:
+        raise RuntimeError(
+            "\n".join(f"Rank {r}: {e}" for r, e in error_dict.items())
+        )
 
 
 def test_triton_shmem_arrms_twoshot_graph_world8():

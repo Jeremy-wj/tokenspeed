@@ -33,13 +33,19 @@ State cache key:
 
 A different model hidden size creates a distinct state and symmetric allocation.
 
+`TS_TRITON_SHMEM_FUSION_MAX_M` is an optional performance eligibility gate
+independent of `max_token_num`. With workspace cap 2048 and gate 256, M<=256
+uses the fused backend while larger valid calls decline to the complete
+unfused fallback; the allocated state remains 2048 rows. Zero disables this
+additional gate.
+
 Kernel variants:
 
 - `oneshot_wholerow`: power-of-two hidden size, pull reduction, local output;
 - `oneshot_blocked`: arbitrary hidden size, blocked reduction with fp32 scratch;
 - `twoshot_blocked`: row-sharded reduction with symmetric output pushes.
 
-At world size 4 or 8, the state is normally two-shot, while the call-level
+At TP=4 or TP=8, the state is normally two-shot, while the call-level
 one-shot overlay handles small token counts.
 
 ## Symmetric pointer translation
@@ -77,6 +83,14 @@ Every operation requires:
 1. a leading cross-rank barrier so peer input writes are visible;
 2. a trailing barrier so peers finish reading persistent input before reuse.
 
+Generic behavior retains both. The two-slot input ring delays input reuse by one
+call, allowing one-shot to omit its exit barrier because the next call's
+leading rendezvous proves all peers completed the older slot. That proof also
+requires graph-stable slot identity; even GPT-OSS's 72-call parity did not make
+mutable host capture phase serving-safe. The ring is disabled after canonical
+serving faults. Two-shot retains its output-completion barrier. See the
+[lifetime contract](producer-lifetime-contract.md).
+
 The scalar signal-pad CAS uses system-scope release/acquire semantics.
 Multi-wave programs require workgroup barriers around that scalar operation.
 
@@ -100,20 +114,23 @@ It is a robustness control for DP/speculative/overlapped execution, not a
 default optimization.
 
 The gfx950/ws4 selective compute cap activates at M>=256. It was validated in
-the gpt-oss campaign and remains environment-overridable. New model profiles
+the GPT-OSS-120B campaign and remains environment-overridable. New model profiles
 must sweep their own widths and token ranges before treating it as optimal.
 
 ## Preserved invariants
 
 1. Per-allocation peer-pointer tables.
-2. Leading and trailing ordering around persistent-buffer reuse.
+2. Leading and trailing ordering around persistent-buffer reuse, or a
+   graph-stable two-slot/epoch contract that replaces one-shot trailing
+   ordering.
 3. Coarse data buffers and fine-grained signal pad.
-4. Single-wave folded copy-in.
+4. Explicit stream-ordered copy-in; folded copy-in remains diagnostic because
+   serving invalidated the narrower single-wave synthetic proof.
 5. Workgroup synchronization for multi-wave barrier participants.
 6. Grid residency below the deadlock limit.
 7. Full unfused fallback if fused state creation or eligibility declines.
-8. Caller ownership of returned outputs unless an explicit graph-stable lifetime
-   contract is introduced.
+8. Persistent caller-owned storage for outputs referenced by captured custom
+   kernels; transient capture-time allocations are not a lifetime contract.
 
 ## Validation evidence
 
@@ -121,13 +138,16 @@ must sweep their own widths and token ranges before treating it as optimal.
 - MI350X correctness and serving: ws=2/4/8.
 - Captured RCCL: ws=2/4/8 with blocking wait disabled.
 - TP=4 default shared-state multigraph transitions: pass.
-- Current studies:
-  - `../studies/mi350x/2026-07-serving-baseline/`
-  - `../studies/mi350x/2026-07-grid-and-two-shot/`
-  - `../studies/mi350x/2026-07-path-and-width-sweeps/`
-  - `../studies/mi300x/migration-baseline/`
+- The model-specific persistent-output lifetime contract was validated for
+  GPT-OSS-120B's 72 captured fused sites; see the
+  [lifetime contract](producer-lifetime-contract.md).
+- Two-slot/no-exit ring: even-call graph and shared multigraph tests pass, but
+  later canonical serving faults; keep disabled pending graph-stable slot phase.
 
 Current model policy is documented in
-[gpt-oss-120B status](gpt-oss-120b-status.md), not in this implementation
+[GPT-OSS-120B status](gpt-oss-120b-status.md), not in this implementation
 reference.
+
+Producer-direct inputs, borrowed outputs, and trailing-barrier removal require
+the separate [producer and buffer lifetime contract](producer-lifetime-contract.md).
 

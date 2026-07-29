@@ -20,6 +20,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import os
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -301,6 +303,7 @@ class ModelExecutor:
         self._mirror_idx_cpu: torch.Tensor | None = None
         self._mirror_idx_dev: torch.Tensor | None = None
         self._mirror_row_buf: torch.Tensor | None = None
+        self._profile_forward_id = 0
         self.draft_attn_backend = draft_attn_backend
         self.draft_token_to_kv_pool = draft_token_to_kv_pool
         self._layerwise_mamba_cow_done = None
@@ -783,6 +786,61 @@ class ModelExecutor:
             ],
             multimodal_context=self._active_multimodal_context,
         )
+
+    def _forward_profile_marker(
+        self,
+        bs: int,
+        ctx: ForwardContext,
+        num_extends: int,
+    ):
+        """Return a versioned model-forward marker outside graph capture."""
+        if os.environ.get(
+            "TOKENSPEED_PROFILE_FORWARD_MARKERS", "0"
+        ) in ("0", "false", "False"):
+            return contextlib.nullcontext()
+
+        mode_obj = ctx.forward_mode
+        if mode_obj is None:
+            mode = "unknown"
+        elif mode_obj.is_idle():
+            mode = "idle"
+        elif mode_obj.is_mixed():
+            mode = "mixed"
+        elif mode_obj.is_extend():
+            mode = "extend"
+        elif mode_obj.is_decode():
+            mode = "decode"
+        else:
+            mode = "unknown"
+
+        actual_m = int(ctx.input_num_tokens)
+        padded_bs = bs
+        executed_m = actual_m
+        execution = "eager"
+        if mode == "decode" and self.forward_step.can_run(bs, ctx):
+            padded_bs = self.forward_step.padded_bs(bs, ctx)
+            executed_m = padded_bs * self.forward_step.max_tokens_per_req
+            execution = "decode_graph"
+        elif mode in ("extend", "mixed"):
+            bucket = self.prefill_graph.selected_bucket(ctx)
+            if bucket is not None:
+                executed_m = bucket
+                execution = "prefill_graph"
+
+        forward_id = self._profile_forward_id
+        self._profile_forward_id += 1
+        name = (
+            "tokenspeed.model_forward.v1"
+            f"|id={forward_id}"
+            f"|mode={mode}"
+            f"|actual_m={actual_m}"
+            f"|executed_m={executed_m}"
+            f"|bs={bs}"
+            f"|padded_bs={padded_bs}"
+            f"|num_extends={num_extends}"
+            f"|execution={execution}"
+        )
+        return torch.profiler.record_function(name)
 
     def _apply_force_single_token_verify(
         self,
@@ -1955,7 +2013,9 @@ class ModelExecutor:
                             time.perf_counter() - sampling_start
                         ) * 1000.0
 
-                with nvtx_range(
+                with self._forward_profile_marker(
+                    bs, ctx, num_extends
+                ), nvtx_range(
                     f"forward_step ext={num_extends} dec={bs - num_extends}",
                     color="blue",
                 ):

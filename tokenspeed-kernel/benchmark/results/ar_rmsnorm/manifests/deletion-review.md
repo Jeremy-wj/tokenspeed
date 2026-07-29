@@ -1,6 +1,13 @@
 # AR+RMSNorm deletion review
 
-56 non-obvious artifacts were moved to `raw/review/delete_candidates/` rather than deleted. Review the evidence and remove only after approval.
+Current quarantine inventory: 9 files under `raw/review/delete_candidates/`.
+Review the evidence and remove only after approval.
+
+The 2026-07-24 migration originally quarantined 56 artifacts. That original
+56-item history remains in `artifacts-pre-migration.csv` and
+`migration-map.csv`; this current snapshot does not infer a disposition for the
+47 entries no longer present. Absolute original paths below are retained as
+historical provenance, not as current workspace references.
 
 | Quarantined path | Original path | Size (bytes) | Reason |
 |---|---|---:|---|
@@ -9,54 +16,7 @@
 | `raw/review/delete_candidates/profiles/early-mm-19473.proton.chrome_trace` | `/home/jeremwan/ar_rmsnorm_profiles/early-mm-19473.proton.chrome_trace` | 2829 | nonempty profiler bring-up artifact pending review |
 | `raw/review/delete_candidates/profiles/early-mm-19552.proton.chrome_trace` | `/home/jeremwan/ar_rmsnorm_profiles/early-mm-19552.proton.chrome_trace` | 5503 | nonempty profiler bring-up artifact pending review |
 | `raw/review/delete_candidates/profiles/early-site-18230.proton.chrome_trace` | `/home/jeremwan/ar_rmsnorm_profiles/early-site-18230.proton.chrome_trace` | 3001 | nonempty profiler bring-up artifact pending review |
-| `raw/review/delete_candidates/profiles/opt3_generic512_ws4_torch/opt3-generic512-ws4-TP0.trace.json.gz` | `/home/jeremwan/ar_rmsnorm_profiles/opt3_generic512_ws4_torch/opt3-generic512-ws4-TP0.trace.json.gz` | 1446660 | mislabeled fused arm; actually unfused |
-| `raw/review/delete_candidates/profiles/opt3_generic512_ws4_torch/opt3-generic512-ws4-TP1.trace.json.gz` | `/home/jeremwan/ar_rmsnorm_profiles/opt3_generic512_ws4_torch/opt3-generic512-ws4-TP1.trace.json.gz` | 1449338 | mislabeled fused arm; actually unfused |
-| `raw/review/delete_candidates/profiles/opt3_generic512_ws4_torch/opt3-generic512-ws4-TP2.trace.json.gz` | `/home/jeremwan/ar_rmsnorm_profiles/opt3_generic512_ws4_torch/opt3-generic512-ws4-TP2.trace.json.gz` | 1445800 | mislabeled fused arm; actually unfused |
-| `raw/review/delete_candidates/profiles/opt3_generic512_ws4_torch/opt3-generic512-ws4-TP3.trace.json.gz` | `/home/jeremwan/ar_rmsnorm_profiles/opt3_generic512_ws4_torch/opt3-generic512-ws4-TP3.trace.json.gz` | 1438098 | mislabeled fused arm; actually unfused |
-| `raw/review/delete_candidates/profiles/opt3_generic_ws4_torch/opt3-generic-ws4-TP0.trace.json.gz` | `/home/jeremwan/ar_rmsnorm_profiles/opt3_generic_ws4_torch/opt3-generic-ws4-TP0.trace.json.gz` | 1444691 | mislabeled fused arm; actually unfused |
-| `raw/review/delete_candidates/profiles/opt3_generic_ws4_torch/opt3-generic-ws4-TP1.trace.json.gz` | `/home/jeremwan/ar_rmsnorm_profiles/opt3_generic_ws4_torch/opt3-generic-ws4-TP1.trace.json.gz` | 1447065 | mislabeled fused arm; actually unfused |
-| `raw/review/delete_candidates/profiles/opt3_generic_ws4_torch/opt3-generic-ws4-TP2.trace.json.gz` | `/home/jeremwan/ar_rmsnorm_profiles/opt3_generic_ws4_torch/opt3-generic-ws4-TP2.trace.json.gz` | 1448642 | mislabeled fused arm; actually unfused |
-| `raw/review/delete_candidates/profiles/opt3_generic_ws4_torch/opt3-generic-ws4-TP3.trace.json.gz` | `/home/jeremwan/ar_rmsnorm_profiles/opt3_generic_ws4_torch/opt3-generic-ws4-TP3.trace.json.gz` | 1434821 | mislabeled fused arm; actually unfused |
 | `raw/review/delete_candidates/profiles/proton-cycle1.chrome_trace` | `/home/jeremwan/ar_rmsnorm_profiles/proton-cycle1.chrome_trace` | 1874 | nonempty profiler bring-up artifact pending review |
 | `raw/review/delete_candidates/profiles/proton-cycle2.chrome_trace` | `/home/jeremwan/ar_rmsnorm_profiles/proton-cycle2.chrome_trace` | 1622 | nonempty profiler bring-up artifact pending review |
 | `raw/review/delete_candidates/profiles/proton-instrumentation-tree.hatchet` | `/home/jeremwan/ar_rmsnorm_profiles/proton-instrumentation-tree.hatchet` | 391 | nonempty profiler bring-up artifact pending review |
 | `raw/review/delete_candidates/profiles/proton-nohook.chrome_trace` | `/home/jeremwan/ar_rmsnorm_profiles/proton-nohook.chrome_trace` | 1625 | nonempty profiler bring-up artifact pending review |
-| `raw/review/delete_candidates/e2e/logs/bench_policy_check_ws4_conservative_c32_seed0.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_last_ws4_conservative_c32_seed0.log` | 3570 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_policy_check_ws4_conservative_c32_seed1.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_last_ws4_conservative_c32_seed1.log` | 3570 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_policy_check_ws4_policy_c16_seed0.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_last_ws4_policy_c16_seed0.log` | 3565 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_policy_check_ws4_policy_c16_seed1.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_last_ws4_policy_c16_seed1.log` | 3565 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_policy_check_ws4_policy_c32_seed0.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_last_ws4_policy_c32_seed0.log` | 3570 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_policy_check_ws4_policy_c32_seed1.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_last_ws4_policy_c32_seed1.log` | 39981 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_policy_check_ws4_policy_c8_seed0.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_last_ws4_policy_c8_seed0.log` | 3562 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_policy_check_ws4_policy_c8_seed1.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_last_ws4_policy_c8_seed1.log` | 3562 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt2_ws4_candidate_c16_seed0.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt2_ws4_candidate_c16_seed0.log` | 3565 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt2_ws4_candidate_c16_seed1.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt2_ws4_candidate_c16_seed1.log` | 3765 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt2_ws4_candidate_c8_seed0.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt2_ws4_candidate_c8_seed0.log` | 3562 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt2_ws4_candidate_c8_seed1.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt2_ws4_candidate_c8_seed1.log` | 3562 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt2_ws4_superseded_candidate_c16_seed0.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt2_ws4_final_c16_seed0.log` | 3765 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt2_ws4_superseded_candidate_c8_seed0.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt2_ws4_final_c8_seed0.log` | 3562 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt2_ws4_superseded_candidate_c8_seed1.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt2_ws4_final_c8_seed1.log` | 3562 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt2_ws4_shipped_c16_seed0.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt2_ws4_shipped_c16_seed0.log` | 3565 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt3_block2048_ws4_explicit_rerun_seed0.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt3_block2048_ws4_explicit_rerun_seed0.log` | 3688 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt3_block2048_ws4_explicit_seed0.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt3_block2048_ws4_explicit_seed0.log` | 5154 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt3_block2048_ws4_explicit_seed1.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt3_block2048_ws4_explicit_seed1.log` | 3688 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt3_generic512_ws4_explicit_seed0.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt3_generic512_ws4_explicit_seed0.log` | 3688 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt3_generic512_ws4_explicit_seed1.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt3_generic512_ws4_explicit_seed1.log` | 3688 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt3_generic512_ws4_profile_seed0.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt3_generic512_ws4_profile_seed0.log` | 3877 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt3_generic_ws4_fused_seed0.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt3_generic_ws4_fused_seed0.log` | 4477 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt3_generic_ws4_fused_seed1.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt3_generic_ws4_fused_seed1.log` | 3688 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt3_generic_ws4_profile_seed0.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt3_generic_ws4_profile_seed0.log` | 3871 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt3_segmented_ws4_explicit_seed0.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt3_segmented_ws4_explicit_seed0.log` | 13511 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt3_segmented_ws4_explicit_seed1.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt3_segmented_ws4_explicit_seed1.log` | 34193 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt3_segmented_ws4_fused_seed0.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt3_segmented_ws4_fused_seed0.log` | 3688 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/bench_opt3_segmented_ws4_fused_seed1.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/bench_opt3_segmented_ws4_fused_seed1.log` | 3688 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/serve_policy_check_ws4_conservative.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/serve_last_ws4_conservative.log` | 142686 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/serve_policy_check_ws4_policy.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/serve_last_ws4_policy.log` | 325210 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/serve_opt2_ws4_candidate.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/serve_opt2_ws4_candidate.log` | 135855 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/serve_opt2_ws4_superseded_candidate.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/serve_opt2_ws4_final.log` | 97950 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/serve_opt2_ws4_shipped.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/serve_opt2_ws4_shipped.log` | 67350 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/serve_opt3_block2048_ws4_explicit.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/serve_opt3_block2048_ws4_explicit.log` | 238575 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/serve_opt3_generic512_ws4_explicit.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/serve_opt3_generic512_ws4_explicit.log` | 156566 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/serve_opt3_generic_ws4_fused.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/serve_opt3_generic_ws4_fused.log` | 157414 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/serve_opt3_segmented_ws4_explicit.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/serve_opt3_segmented_ws4_explicit.log` | 83866 | mislabeled, superseded, or invalid candidate run |
-| `raw/review/delete_candidates/e2e/logs/serve_opt3_segmented_ws4_fused.log` | `/home/jeremwan/ar_rmsnorm_e2e/logs/serve_opt3_segmented_ws4_fused.log` | 141959 | mislabeled, superseded, or invalid candidate run |

@@ -219,6 +219,7 @@ def fused_ar_rmsnorm_oneshot_wholerow_kernel(
     RANK: tl.constexpr = 0,
     INKERNEL_BARRIER: tl.constexpr = False,
     FOLD_COPYIN: tl.constexpr = False,
+    EXIT_BARRIER: tl.constexpr = True,
     WORKGROUP_SYNC: tl.constexpr = True,
 ):
     """One-shot pull, whole-row. Every PE reduces all rows by pulling each peer's
@@ -238,7 +239,8 @@ def fused_ar_rmsnorm_oneshot_wholerow_kernel(
     (``local_src``) into its symmetric ``input`` buffer in a phase-0 pass *before*
     the leading barrier, replacing the separate ``copy_`` launch. The leading
     barrier then orders the write before any peer pull, so
-    the same barrier that already existed does double duty."""
+    the same barrier that already existed does double duty. ``EXIT_BARRIER`` may
+    be disabled only when a qualified symmetric input ring delays slot reuse."""
     tl.static_assert(
         (N & (N - 1)) == 0,
         "fused_ar_rmsnorm_oneshot_wholerow_kernel requires N to be a power of two; "
@@ -282,7 +284,7 @@ def fused_ar_rmsnorm_oneshot_wholerow_kernel(
         rms_norm = (acc * norm_factor * gamma_row).to(output.dtype.element_ty)
         tl.store(output + offsets_io, rms_norm)
 
-    if INKERNEL_BARRIER:
+    if INKERNEL_BARRIER and EXIT_BARRIER:
         # No peer may reuse its persistent input until every wavefront in this
         # workgroup has finished the pull.
         if WORKGROUP_SYNC:
@@ -424,6 +426,7 @@ def fused_ar_rmsnorm_oneshot_blocked_kernel(
     RANK: tl.constexpr = 0,
     INKERNEL_BARRIER: tl.constexpr = False,
     FOLD_COPYIN: tl.constexpr = False,
+    EXIT_BARRIER: tl.constexpr = True,
     WORKGROUP_SYNC: tl.constexpr = True,
 ):
     """One-shot pull, two-pass, N-blocked (arbitrary ``N``). No row ownership, no
@@ -439,7 +442,8 @@ def fused_ar_rmsnorm_oneshot_blocked_kernel(
 
     ``FOLD_COPYIN`` (requires ``INKERNEL_BARRIER``) writes this rank's local input
     (``local_src``) into its symmetric ``input`` buffer in a phase-0 pass *before*
-    the leading barrier, replacing the separate ``copy_`` launch."""
+    the leading barrier, replacing the separate ``copy_`` launch.
+    ``EXIT_BARRIER`` may be disabled only with qualified delayed slot reuse."""
     tl.static_assert(
         (BLOCK_N & (BLOCK_N - 1)) == 0,
         "fused_ar_rmsnorm_oneshot_blocked_kernel requires BLOCK_N to be a power of two",
@@ -499,7 +503,7 @@ def fused_ar_rmsnorm_oneshot_blocked_kernel(
             rms_norm = (reduced * norm_factor * block_g).to(output.dtype.element_ty)
             tl.store(output + offs, rms_norm, mask=mask)
 
-    if INKERNEL_BARRIER:
+    if INKERNEL_BARRIER and EXIT_BARRIER:
         if WORKGROUP_SYNC:
             tl.debug_barrier()
         symm_mem_barrier(signal_pad, pid, RANK, ws)

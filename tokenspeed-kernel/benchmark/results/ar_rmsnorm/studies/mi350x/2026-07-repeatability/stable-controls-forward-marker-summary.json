@@ -1,0 +1,48 @@
+{
+  "analysis": "tokenspeed.ar_rmsnorm_model_forwards",
+  "cohorts": [
+    {
+      "count": 7,
+      "executed_m": 32,
+      "max_rank_gpu_period_us": {
+        "max": 17927.0,
+        "median": 13350.04443359375,
+        "min": 13273.72412109375,
+        "p95": 17927.0
+      },
+      "max_rank_target_kernel_sum_us": {
+        "max": 5340.519,
+        "median": 3497.349,
+        "min": 3320.668,
+        "p95": 5340.519
+      },
+      "mode": "decode",
+      "primary_paths": [
+        "fused_oneshot"
+      ]
+    }
+  ],
+  "inputs": [
+    {
+      "path": "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-fused-stable-marker-trace/traces/repro-repeat0/2026-07-28-fused-stable-marker-trace-repro-repeat0-TP0.trace.json.gz",
+      "rank": 0
+    },
+    {
+      "path": "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-fused-stable-marker-trace/traces/repro-repeat0/2026-07-28-fused-stable-marker-trace-repro-repeat0-TP1.trace.json.gz",
+      "rank": 1
+    },
+    {
+      "path": "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-fused-stable-marker-trace/traces/repro-repeat0/2026-07-28-fused-stable-marker-trace-repro-repeat0-TP2.trace.json.gz",
+      "rank": 2
+    },
+    {
+      "path": "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-fused-stable-marker-trace/traces/repro-repeat0/2026-07-28-fused-stable-marker-trace-repro-repeat0-TP3.trace.json.gz",
+      "rank": 3
+    }
+  ],
+  "schema_version": 1,
+  "validation": {
+    "status": "ok",
+    "warnings": []
+  }
+}

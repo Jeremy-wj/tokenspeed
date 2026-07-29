@@ -1,5 +1,6 @@
 {
   "profile": "gpt_oss_120b_mi350x",
+  "profile_identity": "Historical 2026-07-24 serving profile; not gpt-oss-120b-mi350x-qualified-v4.",
   "hardware": "MI350X gfx950",
   "hidden_size": 2880,
   "workload": {

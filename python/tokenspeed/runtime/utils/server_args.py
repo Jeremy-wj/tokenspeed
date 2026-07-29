@@ -41,7 +41,10 @@ from tokenspeed.runtime.utils import (
     maybe_model_redirect,
     nullable_str,
 )
-from tokenspeed.runtime.utils.network import is_port_available
+from tokenspeed.runtime.utils.network import (
+    get_free_port_cluster,
+    is_port_available,
+)
 
 logger = get_colorful_logger(__name__)
 
@@ -2024,9 +2027,6 @@ def prepare_server_args(argv: list[str]) -> ServerArgs:
     return server_args
 
 
-ZMQ_TCP_PORT_DELTA = 233
-
-
 @dataclasses.dataclass
 class PortArgs:
     # The ipc filename for AsyncLLM to receive BatchTokenIDOut directly
@@ -2049,17 +2049,12 @@ class PortArgs:
 
     @staticmethod
     def init_new(server_args: ServerArgs, dp_rank: int | None = None) -> "PortArgs":
-        port = server_args.port + random.randint(100, 1000)
-        while True:
-            if is_port_available(port):
-                break
-            if port < 60000:
-                port += 42
-            else:
-                port -= 43
-
         # DP attention. Use TCP + port to handle both single-node and multi-node.
-        if server_args.mapping.nnodes == 1 and server_args.dist_init_addr is None:
+        local_auto_cluster = (
+            server_args.mapping.nnodes == 1
+            and server_args.dist_init_addr is None
+        )
+        if local_auto_cluster:
             # Only use default port fallback when dp_size == 1
             # For dp_size > 1, we need explicit dist_init_addr to avoid port conflicts
             if server_args.mapping.has_attn_dp:
@@ -2067,8 +2062,16 @@ class PortArgs:
                     f"When dp_size > 1 (dp_size={server_args.mapping.attn.dp_size}), you must provide --dist-init-addr. "
                     f"Example: --dist-init-addr 127.0.0.1:4000"
                 )
-            dist_init_addr = ("127.0.0.1", server_args.port + ZMQ_TCP_PORT_DELTA)
+            # Keep the internal cluster outside Linux's normal ephemeral range.
+            # A rotating, locked allocator prevents rapid fresh-server launches
+            # from selecting a still-unbound or TIME_WAIT port from a prior run.
+            dist_init_port = get_free_port_cluster((0, 1, 3, 4, 5, 6, 8))
+            dist_init_addr = ("127.0.0.1", dist_init_port)
+            port = dist_init_port + 8
         else:
+            port = server_args.port + random.randint(100, 1000)
+            while not is_port_available(port):
+                port = port + 42 if port < 60000 else port - 43
             dist_init_addr = server_args.dist_init_addr.split(":")
         if len(dist_init_addr) != 2:
             raise ValueError(
@@ -2106,7 +2109,11 @@ class PortArgs:
                 ]
             ):
                 break
-            dist_init_port += 10
+            if local_auto_cluster:
+                dist_init_port = get_free_port_cluster((0, 1, 3, 4, 5, 6, 8))
+                port = dist_init_port + 8
+            else:
+                dist_init_port += 10
 
         return PortArgs(
             tokenizer_ipc_name=f"tcp://{dist_init_host}:{port_base}",

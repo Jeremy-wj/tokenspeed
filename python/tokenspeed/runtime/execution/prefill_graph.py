@@ -652,6 +652,10 @@ class PrefillGraph:
             return None
         return bucket
 
+    def selected_bucket(self, ctx: ForwardContext) -> int | None:
+        """Return the side-effect-free replay bucket for profiling metadata."""
+        return self._replay_bucket(ctx)
+
     def _select_bucket(self, ctx: ForwardContext) -> int | None:
         """The padded bucket for this forward, or ``None`` to run eager.
 

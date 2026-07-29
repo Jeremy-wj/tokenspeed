@@ -24,6 +24,7 @@ export TOKENSPEED_PROFILER_DIR="${TOKENSPEED_PROFILER_DIR:-${PROFILE_ROOT}}"
 case "$MODE" in
   torch)
     export RUN_LABEL="${RUN_LABEL:-profile_torch_${MODEL_LABEL}_tp${WS}}"
+    export TOKENSPEED_PROFILE_FORWARD_MARKERS=1
     ;;
   proton-roctracer-graph)
     export RUN_LABEL="${RUN_LABEL:-profile_proton_roctracer_${MODEL_LABEL}_tp${WS}}"

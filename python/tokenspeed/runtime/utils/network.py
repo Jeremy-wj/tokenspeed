@@ -22,10 +22,13 @@
 
 from __future__ import annotations
 
+import fcntl
 import logging
 import os
 import socket
 import warnings
+from pathlib import Path
+from typing import Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +37,6 @@ def is_port_available(port):
     """Return whether a port is available."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.bind(("", port))
             s.listen(1)
             return True
@@ -53,6 +55,57 @@ def get_free_port():
         with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as s:
             s.bind(("", 0))
             return s.getsockname()[1]
+
+
+def get_free_port_cluster(
+    offsets: Iterable[int],
+    *,
+    start: int = 20_000,
+    end: int = 30_000,
+    stride: int = 10,
+    state_path: str | os.PathLike[str] = "/tmp/tokenspeed-port-cluster",
+) -> int:
+    """Allocate a rotating non-ephemeral local port cluster.
+
+    Probing a port and closing the socket is inherently unreserved. A persistent
+    counter under ``flock`` prevents concurrent/restarted TokenSpeed launchers
+    from choosing the same still-unbound cluster, while the availability scan
+    skips live and TIME_WAIT sockets. The caller receives the cluster base and
+    adds the requested offsets.
+    """
+    normalized = tuple(sorted(set(int(offset) for offset in offsets)))
+    if not normalized or normalized[0] < 0:
+        raise ValueError("offsets must contain non-negative integers")
+    if stride <= normalized[-1]:
+        raise ValueError("stride must exceed the largest cluster offset")
+    if start <= 0 or end > 65_536 or start + normalized[-1] >= end:
+        raise ValueError("invalid port-cluster range")
+
+    path = Path(state_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a+", encoding="utf-8") as state:
+        fcntl.flock(state.fileno(), fcntl.LOCK_EX)
+        state.seek(0)
+        raw = state.read().strip()
+        candidate = int(raw) if raw else start
+        if candidate < start or candidate + normalized[-1] >= end:
+            candidate = start
+
+        attempts = max(1, (end - start) // stride)
+        for _ in range(attempts):
+            if all(is_port_available(candidate + offset) for offset in normalized):
+                following = candidate + stride
+                if following + normalized[-1] >= end:
+                    following = start
+                state.seek(0)
+                state.truncate()
+                state.write(str(following))
+                state.flush()
+                return candidate
+            candidate += stride
+            if candidate + normalized[-1] >= end:
+                candidate = start
+    raise RuntimeError(f"no free port cluster in [{start}, {end})")
 
 
 def set_uvicorn_logging_configs():

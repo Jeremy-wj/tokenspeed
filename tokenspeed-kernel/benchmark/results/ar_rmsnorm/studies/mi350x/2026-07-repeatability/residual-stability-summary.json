@@ -1,0 +1,100 @@
+{
+  "date": "2026-07-28",
+  "status": "historical_failed_gate_superseded_by_profile_v4_final_qualification",
+  "profile": "gpt_oss_120b_mi350x",
+  "profile_identity": "Historical study label for a failed intermediate unfused gate; the final qualified configuration is gpt-oss-120b-mi350x-qualified-v4.",
+  "superseded_by": [
+    "e2e-stability-resolution-summary.json",
+    "graph-padding-sentinel-root-cause.json",
+    "fused-output-lifetime-root-cause.json"
+  ],
+  "supersession_note": "Reserved-sink graph padding closed the base fault, persistent per-site outputs closed the fusion-specific fault, and profile-v4 then completed three restart blocks and fifteen pairs without a safety failure.",
+  "purpose": "Record the failed intermediate unfused gate that temporarily prevented paired qualification.",
+  "harness": {
+    "runner": "benchmark/run_ar_rmsnorm_repeatability.py",
+    "mode": "single-arm --stability-only",
+    "fresh_container_per_seed": true,
+    "gpu_pid_interval_seconds": 2,
+    "gpu_pid_source": "nonintrusive KFD sysfs",
+    "phase_boundary_gpu_diagnostics": true,
+    "amd_smi_transient_query_filter": true
+  },
+  "configuration": {
+    "arm": "unfused",
+    "hip_visible_devices": "1,2,3,5",
+    "physical_gpus": [
+      0,
+      2,
+      1,
+      4
+    ],
+    "deep_health": "passive",
+    "overlap_schedule": false,
+    "double_buffer_input": false,
+    "barrier_grid": 0,
+    "input_tokens": 128,
+    "output_tokens": 512,
+    "prompts": 128,
+    "concurrency": 32,
+    "benchmark_timeout_seconds": 300,
+    "seed_order": [
+      2,
+      0,
+      1
+    ]
+  },
+  "result": {
+    "status": "failed",
+    "attempted_seed": 2,
+    "completed_required_seeds": 0,
+    "server_startup_warmup": "passed",
+    "benchmark_warmup": "failed on the initial one-token endpoint check",
+    "decode": "memory fault before the 32-request warmup workload, followed by client timeout",
+    "server_evidence": {
+      "fault": "Memory access fault by GPU node-3",
+      "node_mapping": "GPU node-3 is physical GPU 0, HIP visibility index 1, and TP local rank 0 in the canonical launch.",
+      "address": "0x779f139fc000",
+      "last_logged_phase": "one-token prefill for the benchmark endpoint check",
+      "gpu_coredump": "failed because no handler executable was available"
+    },
+    "contention_evidence": {
+      "foreign_pid_detected": false,
+      "gpu_guard_samples": "continuous through the failure",
+      "selected_gpu_processes": "container-owned model processes only",
+      "known_ignored_process": "physical GPU 3 only",
+      "monitoring_method": "KFD sysfs; no amd-smi process polling while the server was live"
+    },
+    "client_evidence": "No result JSON was produced; the client was terminated at the 300-second hard timeout."
+  },
+  "methodology_incident": {
+    "invalidated_run": "2026-07-28-canonical-unfused-stability-gate-v4",
+    "cause": "amd-smi process polling briefly created its own GPU context on physical GPU 1 every sample.",
+    "resolution": "Continuous monitoring now reads KFD sysfs and performs no GPU API call. The v5 failure reproduced with the nonintrusive guard."
+  },
+  "historical_decision": {
+    "unfused_stability_gate_passed": false,
+    "resume_fused_performance_qualification": false,
+    "implement_input_ring_redesign_now": false,
+    "deployment_change": false,
+    "reason": "The first canonical unfused seed reproduced a GPU memory fault with a nonintrusive KFD guard and no foreign GPU process. This remains below the AR+RMSNorm fusion path."
+  },
+  "final_qualification": {
+    "profile_id": "gpt-oss-120b-mi350x-qualified-v4",
+    "status": "completed_without_safety_failure",
+    "restart_blocks": 3,
+    "paired_observations": 15,
+    "promotion": "rejected on decode performance, not blocked on stability"
+  },
+  "next_diagnostics": [
+    "Install or configure a working bounded GPU coredump handler before the next reproduction.",
+    "Capture scheduler and last-forward state immediately on process failure rather than waiting for the client timeout.",
+    "Reduce the unfused fault across communication-only, RCCL-only, graph-disabled, and model-component controls before changing AR+RMSNorm lifetime code.",
+    "Investigate the one-token prefill/breakable-graph transition on physical GPU 0 because the failure occurred before steady decode."
+  ],
+  "raw_roots": [
+    "raw/current/gpt-oss-120b/mi350x/2026-07-28/2026-07-28-canonical-unfused-stability-gate-v2",
+    "raw/current/gpt-oss-120b/mi350x/2026-07-28/2026-07-28-canonical-unfused-stability-gate-v3",
+    "raw/current/gpt-oss-120b/mi350x/2026-07-28/2026-07-28-canonical-unfused-stability-gate-v4",
+    "raw/current/gpt-oss-120b/mi350x/2026-07-28/2026-07-28-canonical-unfused-stability-gate-v5-kfd-guard"
+  ]
+}

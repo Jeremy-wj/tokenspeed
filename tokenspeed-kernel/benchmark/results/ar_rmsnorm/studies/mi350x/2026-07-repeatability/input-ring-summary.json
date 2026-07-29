@@ -1,0 +1,86 @@
+{
+  "date": "2026-07-27",
+  "profile": "gpt_oss_120b_mi350x",
+  "profile_identity": "Historical pre-v4 input-ring candidate study; this candidate is not part of gpt-oss-120b-mi350x-qualified-v4.",
+  "candidate": {
+    "environment": "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT=1",
+    "input_ring_slots": 2,
+    "oneshot_exit_barrier": false,
+    "shipping_default": false
+  },
+  "hardware": {
+    "world_size": 4,
+    "hidden_size": 2880,
+    "hip_visible_devices": "1,2,5,6",
+    "physical_gpus": [
+      0,
+      2,
+      4,
+      6
+    ],
+    "note": "Exploratory disjoint set used while physical GPUs 1 and 3 were occupied. Canonical serving validation remains required on the established campaign set."
+  },
+  "graph_replay": {
+    "M": 32,
+    "calls_per_graph": 2,
+    "warmups": 100,
+    "repeats": 1000,
+    "passes": [
+      {
+        "order": [
+          "baseline",
+          "double_buffer"
+        ],
+        "baseline_us_per_call": 34.619998,
+        "double_buffer_us_per_call": 29.9605,
+        "change_pct": -13.46
+      },
+      {
+        "order": [
+          "double_buffer",
+          "baseline"
+        ],
+        "baseline_us_per_call": 36.079999,
+        "double_buffer_us_per_call": 29.999999,
+        "change_pct": -16.85
+      }
+    ],
+    "two_pass_mean": {
+      "baseline_us_per_call": 35.349999,
+      "double_buffer_us_per_call": 29.98025,
+      "saving_us_per_call": 5.369749,
+      "change_pct": -15.19
+    }
+  },
+  "eager_decomposition": {
+    "baseline_folded_us": 41.760501,
+    "double_buffer_folded_us": 42.040501,
+    "interpretation": "No eager win; the benefit appears in fixed graph replay where barrier completion is on the captured critical path."
+  },
+  "correctness": {
+    "selected_tp4_tests_passed": 4,
+    "even_call_graph_replays": 100,
+    "shared_multigraph": {
+      "M_values": [
+        32,
+        64,
+        256,
+        512
+      ],
+      "layers_per_graph": 72,
+      "replays": 100,
+      "one_shot_two_shot_transition": true,
+      "result": "passed"
+    }
+  },
+  "decision": {
+    "status": "serving_rejected_pending_graph_stable_slots",
+    "promote_to_profile": false,
+    "tp4_auto_enable": false,
+    "required_barrier_grid": 0,
+    "required_deep_health_mode": "passive",
+    "required_disable_overlap_schedule": true,
+    "serving_qualification": "serving-stability-summary.json",
+    "reason": "The graph saving clears 5 us/site, but mutable host-side slot phase later faulted in canonical serving even with passive health and disabled overlap scheduling."
+  }
+}

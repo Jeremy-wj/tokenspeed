@@ -6,6 +6,13 @@ performance policies explicit.
 - `gpt_oss_120b_mi350x.env` is the qualified gpt-oss-120B MI350X profile.
 - `model_template.env` is a conservative starting point for another model.
 
+The qualified manual-serving profile emits
+`AR_NORM_PROFILE_ID=gpt-oss-120b-mi350x-qualified-v4` and
+`TS_TRITON_SHMEM_OUTPUT_RING=72`. Campaign runs also validate the resolved
+server arguments; the profile ID alone does not hide command-line overrides.
+Its graph-lifetime safety gates passed, but TP4 fusion remains opt-in because
+the complete campaign rejected it on decode performance.
+
 Usage:
 
 ```bash

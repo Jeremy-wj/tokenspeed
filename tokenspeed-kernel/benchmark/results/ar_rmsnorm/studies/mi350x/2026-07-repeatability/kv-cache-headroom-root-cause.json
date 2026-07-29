@@ -1,0 +1,105 @@
+{
+  "date": "2026-07-28",
+  "profile": "gpt_oss_120b_mi350x",
+  "profile_identity": "Historical study label for the pre-v4 root-cause investigation; safe_action names the final qualified profile.",
+  "status": "causal_amplifier_confirmed_root_cause_superseded",
+  "causal_factor": {
+    "class": "KV cache sizing omits post-allocation graph and execution headroom",
+    "mechanism": "profile_available_cache_memory_bytes sizes the KV pool before decode graph capture by subtracting only total_gpu_memory * (1 - gpu_memory_utilization) from then-available memory. At TP=4's 0.95 default this produced a 21,361,024-token pool and left 10.94 GiB before C32 capture. Subsequent generation faulted. Holding gpu_memory_utilization at 0.95 but capping the pool to the passing 0.94-run size, 21,097,536 tokens, removed the fault.",
+    "code": [
+      "python/tokenspeed/runtime/layers/attention/utils.py:120-142",
+      "python/tokenspeed/runtime/layers/attention/registry.py:661-689",
+      "python/tokenspeed/runtime/execution/cuda_graph_wrapper.py:295-329"
+    ],
+    "scope": "Base GPT-OSS runtime below AR+RMSNorm; reproduced with fusion disabled.",
+    "supersession": "KV capacity changes incidence but is not the root cause. Graph padding aliased live request slot 0; see graph-padding-sentinel-root-cause.json."
+  },
+  "causal_controls": [
+    {
+      "gpu_memory_utilization": 0.95,
+      "max_total_tokens": 21361024,
+      "capture": "C32 only",
+      "prefill_graph": false,
+      "workload_m": 4096,
+      "result": "GPU node-5 memory access fault at the first measured prefill",
+      "source": "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-flat-negative-page-assert-mem95"
+    },
+    {
+      "gpu_memory_utilization": 0.92,
+      "capture": "C32 only",
+      "prefill_graph": false,
+      "workload_m": 4096,
+      "result": "32/32 requests passed",
+      "source": "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-headroom-boundary-mem092"
+    },
+    {
+      "gpu_memory_utilization": 0.94,
+      "max_total_tokens": 21097536,
+      "capture_available_gib": 13.19,
+      "capture": "C32 only",
+      "prefill_graph": false,
+      "workload_m": 4096,
+      "result": "32/32 requests passed",
+      "source": "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-headroom-boundary-mem094"
+    },
+    {
+      "gpu_memory_utilization": 0.945,
+      "max_total_tokens": 21228864,
+      "capture_available_gib": 12.06,
+      "capture": "C32 only",
+      "prefill_graph": false,
+      "workload_m": 4096,
+      "result": "32/32 requests passed",
+      "source": "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-headroom-boundary-mem0945-m4096"
+    },
+    {
+      "gpu_memory_utilization": 0.95,
+      "max_total_tokens": 21361024,
+      "capture": "C32 only",
+      "prefill_graph": false,
+      "workload_m": 2048,
+      "result": "GPU node-5 memory access fault at the first measured prefill",
+      "source": "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-headroom-boundary-mem095-m2048"
+    },
+    {
+      "gpu_memory_utilization": 0.95,
+      "max_total_tokens": 21097536,
+      "capture": "C32 only",
+      "prefill_graph": false,
+      "workload_m": 4096,
+      "result": "32/32 requests passed",
+      "source": "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-mem095-kv-cap-21097536"
+    }
+  ],
+  "falsified_hypotheses": [
+    {
+      "hypothesis": "negative flat-KV page write",
+      "evidence": "The live GPT-OSS configuration reported paged_cache_groups=[]; an opt-in negative-page invariant never fired; the fault occurred in eager prefill before decode."
+    },
+    {
+      "hypothesis": "AR+RMSNorm or standalone Triton all-reduce",
+      "evidence": "The fault reproduced with fusion disabled and in prior RCCL-only controls."
+    },
+    {
+      "hypothesis": "prefill graph, overlap, or asynchronous launch alone",
+      "evidence": "The boundary controls used eager prefill, disabled overlap, and prior serialization controls still faulted at the larger KV pool."
+    },
+    {
+      "hypothesis": "foreign process or one defective selected GPU",
+      "evidence": "KFD monitoring found no foreign selected-GPU process; pass and fail controls used the same canonical physical GPUs 0,2,1,4 and differed only in KV allocation."
+    }
+  ],
+  "safe_action": {
+    "profile_id": "gpt-oss-120b-mi350x-qualified-v4",
+    "gpu_memory_utilization": 0.9,
+    "cudagraph_capture_sizes": [
+      32
+    ],
+    "prefill_graph": false,
+    "overlap_schedule": false,
+    "output_ring": 72,
+    "reason": "0.90 retains conservative memory margin; the graph-padding sentinel fix closes the metadata corruption mechanism.",
+    "fold_copyin": false,
+    "runtime_change": "No global TP=4 memory default change; folded copy-in is disabled globally until its producer-publication contract is proven. Other models and graph/workload envelopes require their own memory qualification."
+  }
+}

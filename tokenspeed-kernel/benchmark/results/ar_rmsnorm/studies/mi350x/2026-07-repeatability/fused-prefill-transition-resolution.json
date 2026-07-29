@@ -1,0 +1,96 @@
+{
+  "date": "2026-07-28",
+  "status": "historical_transition_evidence_superseded_by_profile_v4_output_lifetime_fix",
+  "profile_v1_failure": {
+    "campaign": "raw/current/gpt-oss-120b/mi350x/2026-07-28/2026-07-28-qualified-fused-vs-unfused-v2",
+    "completed_before_failure": {
+      "unfused_decode_seeds": 5,
+      "unfused_prefill_buckets": 30,
+      "fused_decode_seeds": 5
+    },
+    "failure": "GPU node-4 memory access fault on the first eager M=4 request of the separate fused prefill server",
+    "serve_log": "block-00/p1-fused_stable/prefill-phase/serve-b00-p1-fused_stable-prefill.log"
+  },
+  "candidate_specific_safety_action": {
+    "class": "folded copy-in lacked a serving-qualified producer-publication contract",
+    "reasoning": "The folded one-shot path writes producer output into the symmetric buffer from data lanes, then relies on a scalar system-scope release before peer pulls. Single-wave synthetic graph tests passed, but the full serving transition invalidated that proof. Explicit stream-ordered copy-in followed by the existing leading barrier removes that publication dependency. A later unfused graph fault proves this was not the base-runtime root cause.",
+    "hardware_evidence": "Selected GPUs reported zero ECC, UMC, SDMA, GFX, MMHUB, XGMI-WAFL, and PCIe replay/error counters."
+  },
+  "controls": {
+    "folded_m4_fresh_servers": {
+      "passed": 2,
+      "invalid_startups": 1,
+      "invalid_reason": "pre-fix internal distributed port collision"
+    },
+    "explicit_copy_m4_fresh_servers": {
+      "passed": 3,
+      "failed": 0
+    },
+    "fully_eager_folded_same_server": {
+      "passed": 2,
+      "failed": 0
+    },
+    "separate_barrier_same_server": {
+      "passed": 2,
+      "failed": 0
+    },
+    "synthetic_graph_eager": {
+      "capture_m": 32,
+      "eager_m": [
+        1,
+        4
+      ],
+      "sites": [
+        36,
+        72
+      ],
+      "separate_copy": "passed",
+      "folded_copy": "passed",
+      "interpretation": "necessary but not serving-sufficient"
+    }
+  },
+  "profile_v2": {
+    "profile_id": "gpt-oss-120b-mi350x-qualified-v2",
+    "fold_copyin": false,
+    "gpu_memory_utilization": 0.9,
+    "cudagraph_capture_sizes": [
+      32
+    ],
+    "prefill_graph": false,
+    "overlap_schedule": false,
+    "deep_health": "passive",
+    "full_suite_gate": {
+      "fresh_servers": 3,
+      "passed_servers": 3,
+      "prefill_buckets_per_server": [
+        128,
+        256,
+        512,
+        1024,
+        2048,
+        4096
+      ],
+      "decode_per_server": "128 prompts, 128 output tokens, concurrency 32",
+      "sources": [
+        "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-qualified-v2-full-suite-2",
+        "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-qualified-v2-full-suite-3",
+        "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-qualified-v2-full-suite-4"
+      ]
+    }
+  },
+  "excluded_artifact": {
+    "source": "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-qualified-v2-full-suite-1",
+    "reason": "An overlapping local pointer diagnostic restarted the shared dedicated container during the first benchmark. The M=4 request itself completed; the client was then terminated. It is retained but excluded."
+  },
+  "decision": {
+    "profile_v2_transition_gate": "passed",
+    "folded_copyin": "disabled by default",
+    "historical_profile_v2_promotion": false,
+    "superseded_by": [
+      "graph-padding-sentinel-root-cause.json",
+      "fused-output-lifetime-root-cause.json"
+    ],
+    "final_profile": "gpt-oss-120b-mi350x-qualified-v4",
+    "final_result": "Three full transition servers and the three-block/fifteen-pair campaign passed without a safety failure. TP4 promotion remains false because decode TPOT and throughput regressed."
+  }
+}

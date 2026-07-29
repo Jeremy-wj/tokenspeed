@@ -1,0 +1,143 @@
+{
+  "profile": "gpt_oss_120b_mi350x",
+  "profile_identity": "Historical pre-v4 M=256 gate screen; not gpt-oss-120b-mi350x-qualified-v4.",
+  "status": "historical_screen_superseded_by_repeatability_rejection",
+  "date": "2026-07-26",
+  "world_size": 4,
+  "hidden_size": 2880,
+  "devices": "HIP_VISIBLE_DEVICES=1,2,3,5",
+  "candidate": {
+    "workspace_cap": 2048,
+    "performance_gate_env": "TS_TRITON_SHMEM_FUSION_MAX_M",
+    "performance_gate_m": 256
+  },
+  "trace_validation": {
+    "workload": {
+      "input_tokens_per_request": 16,
+      "output_tokens_per_request": 8,
+      "prompts": 32,
+      "concurrency": 32,
+      "profile_steps": 8
+    },
+    "per_rank": {
+      "fused_oneshot_calls": 576,
+      "fused_twoshot_calls": 0,
+      "rmsnorm_calls": 81
+    },
+    "state_max_tokens": 2048,
+    "result": "M=512 prefill declined to unfused; all eight decode forwards retained 72 fused one-shot sites."
+  },
+  "prefill_screen": {
+    "workload": {
+      "prompts": 128,
+      "concurrency": 32,
+      "output_tokens_per_request": 8,
+      "seed": 0
+    },
+    "median_ttft_ms": [
+      {
+        "target_first_batch_m": 128,
+        "cap2048": 94.92,
+        "cap2048_gate256": 98.57,
+        "change_pct": 3.8
+      },
+      {
+        "target_first_batch_m": 256,
+        "cap2048": 103.41,
+        "cap2048_gate256": 102.93,
+        "change_pct": -0.5
+      },
+      {
+        "target_first_batch_m": 512,
+        "cap2048": 99.56,
+        "cap2048_gate256": 98.67,
+        "change_pct": -0.9
+      },
+      {
+        "target_first_batch_m": 1024,
+        "cap2048": 108.91,
+        "cap2048_gate256": 108.98,
+        "change_pct": 0.1
+      },
+      {
+        "target_first_batch_m": 2048,
+        "cap2048": 120.01,
+        "cap2048_gate256": 118.64,
+        "change_pct": -1.1
+      },
+      {
+        "target_first_batch_m": 4096,
+        "cap2048": 124.71,
+        "cap2048_gate256": 119.76,
+        "change_pct": -4.0,
+        "disposition": "Exclude: both arms unfused and baseline had a large tail outlier."
+      }
+    ]
+  },
+  "decode_screen": {
+    "workload": {
+      "input_tokens_per_request": 128,
+      "output_tokens_per_request": 512,
+      "prompts": 128,
+      "concurrency": 32,
+      "seeds": [
+        0,
+        1
+      ]
+    },
+    "arms": [
+      {
+        "name": "cap2048",
+        "median_tpot_ms": [
+          12.74,
+          13.09
+        ],
+        "mean_median_tpot_ms": 12.915,
+        "output_tokens_per_second": [
+          2461.62,
+          2390.11
+        ],
+        "mean_output_tokens_per_second": 2425.87
+      },
+      {
+        "name": "cap256",
+        "median_tpot_ms": [
+          12.84,
+          12.6
+        ],
+        "mean_median_tpot_ms": 12.72,
+        "output_tokens_per_second": [
+          2451.58,
+          2481.14
+        ],
+        "mean_output_tokens_per_second": 2466.36
+      },
+      {
+        "name": "cap2048_gate256",
+        "median_tpot_ms": [
+          12.81,
+          13.54
+        ],
+        "mean_median_tpot_ms": 13.175,
+        "output_tokens_per_second": [
+          2447.94,
+          2288.33
+        ],
+        "mean_output_tokens_per_second": 2368.14
+      }
+    ],
+    "interpretation": "Dispatch-identical gate arms moved in opposite directions versus baseline; the screen is below the run-to-run variance floor."
+  },
+  "tests": {
+    "selected_tp4_tests_passed": 3,
+    "result": "passed"
+  },
+  "decision": {
+    "promote_gate": false,
+    "deployment_change": false,
+    "screen_conclusion": "Trace and correctness validation passed, but short sequential e2e results were noisy and inconclusive.",
+    "final_disposition": "The tested gate implementation is rejected after a later timeout under stable repeatability controls.",
+    "superseded_by": "../2026-07-repeatability/repeatability-summary.json"
+  },
+  "raw_artifacts": "raw/current/gpt-oss-120b/mi350x/2026-07-26/cap-gate-screen"
+}

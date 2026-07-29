@@ -156,7 +156,9 @@
       ],
       "kernel_count": 27359,
       "total_kernel_us": 318130.785,
-      "trace": "raw/history/mi350x/2026-07-23/proton/ws2_fused_scoped/ws2-fused-scoped-TP0.proton.chrome_trace"
+      "source_status": "migration_orphaned",
+      "source_note": "The migration manifests record this destination, but the trace is absent from the current raw tree. Aggregate metrics are retained as historical evidence.",
+      "trace": "raw/history/profiler-bringup/2026-07-23/ws2_fused_scoped/ws2-fused-scoped-TP0.proton.chrome_trace"
     },
     {
       "communication_kernels": {
@@ -212,7 +214,9 @@
       ],
       "kernel_count": 27359,
       "total_kernel_us": 812645.735,
-      "trace": "raw/history/mi350x/2026-07-23/proton/ws2_fused_scoped/ws2-fused-scoped-TP1.proton.chrome_trace"
+      "source_status": "migration_orphaned",
+      "source_note": "The migration manifests record this destination, but the trace is absent from the current raw tree. Aggregate metrics are retained as historical evidence.",
+      "trace": "raw/history/profiler-bringup/2026-07-23/ws2_fused_scoped/ws2-fused-scoped-TP1.proton.chrome_trace"
     },
     {
       "communication_kernels": {

@@ -6,8 +6,14 @@
 # SIGINT/SIGTERM to the orchestrator (renamed "ts-serve") lets it cleanly stop
 # the gateway + engine and release ports. Only then SIGKILL stragglers.
 set -uo pipefail
-CONTAINER="${CONTAINER:-jeremwan-tokenspeed}"
+CONTAINER="${CONTAINER:-jeremwan-tokenspeed-profiler}"
 docker exec "$CONTAINER" bash -lc '
+  # 0. Stop benchmark clients targeting this project server. A failed scheduler
+  # can leave clients blocked indefinitely even after the server exits.
+  bench_pids=$(ps -eo pid=,args= | awk \
+    "\$2 ~ /python/ && \$3 == \"-m\" && \$4 == \"tokenspeed.cli\" && \
+     \$5 == \"bench\" && \$6 == \"serve\" {print \$1}")
+  [ -z "$bench_pids" ] || kill -TERM $bench_pids 2>/dev/null || true
   # 1. Graceful: signal the orchestrator + control server.
   pkill -INT  -x ts-serve   2>/dev/null || true
   pkill -TERM -x ts-serve   2>/dev/null || true

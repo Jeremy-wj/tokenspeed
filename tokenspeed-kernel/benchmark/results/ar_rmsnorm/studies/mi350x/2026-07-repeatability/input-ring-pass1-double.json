@@ -1,0 +1,16 @@
+{
+  "M": 32,
+  "N": 2880,
+  "calls_per_graph": 2,
+  "double_buffer_input": true,
+  "impl": "generic",
+  "max_rank_median_per_call_us": 29.960500076413155,
+  "max_rank_median_us": 59.92100015282631,
+  "rank_medians_us": [
+    59.92000177502632,
+    59.92100015282631,
+    59.76099893450737,
+    59.76099893450737
+  ],
+  "world_size": 4
+}

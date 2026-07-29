@@ -10,9 +10,11 @@ Examples:
 """
 from __future__ import annotations
 
+import json
 import os
 import socket
 import statistics
+from pathlib import Path
 
 import torch
 import torch.distributed as dist
@@ -52,6 +54,17 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
     device = torch.device(f"cuda:{rank}")
     m = _env_int("BENCH_M", 32)
     n = default_hidden_size()
+    calls_per_graph = _env_int("BENCH_CALLS_PER_GRAPH", 1)
+    if calls_per_graph < 1:
+        raise ValueError("BENCH_CALLS_PER_GRAPH must be positive")
+    if (
+        os.environ.get("TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT", "0")
+        not in ("0", "false", "False")
+        and calls_per_graph % 2
+    ):
+        raise ValueError(
+            "double-buffer graph probes require an even BENCH_CALLS_PER_GRAPH"
+        )
     warmup = _env_int("BENCH_N_WARMUP", 50)
     repeat = _env_int("BENCH_N_REPEAT", 300)
     eps = 1e-6
@@ -60,7 +73,15 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
     from tokenspeed_kernel.ops.communication import triton_shmem as ts
     from tokenspeed_kernel.ops.layernorm.triton import rmsnorm as triton_rmsnorm
 
-    x = torch.full((m, n), rank + 1, dtype=torch.bfloat16, device=device)
+    xs = [
+        torch.full(
+            (m, n),
+            rank + call + 1,
+            dtype=torch.bfloat16,
+            device=device,
+        )
+        for call in range(calls_per_graph)
+    ]
     residual = (
         torch.arange(m * n, dtype=torch.float32, device=device)
         .reshape(m, n)
@@ -74,12 +95,15 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
             group=group,
             rank_in_group=rank,
             device=device,
-            max_numel=512 * 1024 // x.element_size(),
+            max_numel=512 * 1024 // xs[0].element_size(),
         )
 
         def launch():
-            tri.all_reduce(state, x)
-            return triton_rmsnorm(x, weight, eps, residual=residual)
+            result = None
+            for x in xs:
+                tri.all_reduce(state, x)
+                result = triton_rmsnorm(x, weight, eps, residual=residual)
+            return result
 
     else:
         state = ts.create_triton_shmem_ar_rmsnorm_state(
@@ -91,19 +115,22 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
         )
         if state is None:
             raise RuntimeError("triton_shmem state creation failed")
-        norm_out = torch.empty_like(x)
-        residual_out = torch.empty_like(x)
+        norm_outs = [torch.empty_like(x) for x in xs]
+        residual_outs = [torch.empty_like(x) for x in xs]
 
         def launch():
-            return ts.triton_shmem_allreduce_residual_rmsnorm(
-                state,
-                input_tensor=x,
-                residual=residual,
-                weight=weight,
-                eps=eps,
-                norm_out=norm_out,
-                residual_out=residual_out,
-            )
+            result = None
+            for call, x in enumerate(xs):
+                result = ts.triton_shmem_allreduce_residual_rmsnorm(
+                    state,
+                    input_tensor=x,
+                    residual=residual,
+                    weight=weight,
+                    eps=eps,
+                    norm_out=norm_outs[call],
+                    residual_out=residual_outs[call],
+                )
+            return result
 
     capture_stream = torch.cuda.Stream()
     capture_stream.wait_stream(torch.cuda.current_stream())
@@ -120,23 +147,32 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
     dist.barrier(group=group)
 
     if impl != "unfused":
-        x.fill_(rank + 1)
+        for call, x in enumerate(xs):
+            x.fill_(rank + call + 1)
         graph.replay()
         torch.cuda.synchronize()
-        reference_residual = (
-            torch.full_like(residual, ws * (ws + 1) // 2, dtype=torch.float32)
-            + residual.float()
-        )
-        reference_norm = reference_residual * torch.rsqrt(
-            reference_residual.pow(2).mean(dim=-1, keepdim=True) + eps
-        )
-        reference_norm *= weight.float()
-        torch.testing.assert_close(
-            residual_out.float(), reference_residual, atol=2e-2, rtol=2e-2
-        )
-        torch.testing.assert_close(
-            norm_out.float(), reference_norm, atol=2e-2, rtol=2e-2
-        )
+        for call in range(calls_per_graph):
+            rank_sum = ws * (ws + 1) // 2 + call * ws
+            reference_residual = (
+                torch.full_like(residual, rank_sum, dtype=torch.float32)
+                + residual.float()
+            )
+            reference_norm = reference_residual * torch.rsqrt(
+                reference_residual.pow(2).mean(dim=-1, keepdim=True) + eps
+            )
+            reference_norm *= weight.float()
+            torch.testing.assert_close(
+                residual_outs[call].float(),
+                reference_residual,
+                atol=2e-2,
+                rtol=2e-2,
+            )
+            torch.testing.assert_close(
+                norm_outs[call].float(),
+                reference_norm,
+                atol=2e-2,
+                rtol=2e-2,
+            )
         dist.barrier(group=group)
 
     starts = [torch.cuda.Event(enable_timing=True) for _ in range(repeat)]
@@ -158,7 +194,17 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
                 "world_size": ws,
                 "M": m,
                 "N": n,
+                "calls_per_graph": calls_per_graph,
+                "double_buffer_input": (
+                    os.environ.get(
+                        "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT", "0"
+                    )
+                    not in ("0", "false", "False")
+                ),
                 "max_rank_median_us": max(medians) * 1000,
+                "max_rank_median_per_call_us": (
+                    max(medians) * 1000 / calls_per_graph
+                ),
                 "rank_medians_us": [value * 1000 for value in medians],
             }
         )
@@ -170,7 +216,16 @@ def main() -> None:
     manager = mp.Manager()
     out = manager.list()
     mp.spawn(_worker, args=(ws, _port(), out), nprocs=ws, join=True)
-    print(dict(out[0]))
+    result = dict(out[0])
+    output = os.environ.get("BENCH_JSON")
+    if output:
+        path = Path(output)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(result, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    print(json.dumps(result, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":

@@ -161,6 +161,17 @@ def test_gateway_args_defaults_include_port_and_reasoning_parser():
     assert gateway_args[-1].isdigit()
 
 
+def test_gateway_args_can_defer_prometheus_port_until_spawn():
+    gateway_args = _gateway_args_with_defaults(
+        ["--model", "/tmp/x"], allocate_prometheus_port=False
+    )
+
+    assert "--prometheus-port" not in gateway_args
+    spawned_args = _gateway_args_with_default_prometheus_port(gateway_args)
+    assert spawned_args[-2] == "--prometheus-port"
+    assert spawned_args[-1].isdigit()
+
+
 def test_gateway_args_defaults_inject_passthrough_policy():
     """``ts serve`` fronts a single backend, so the default routing policy is
     ``passthrough`` (no load balancing / monitoring / KV-event subscription)."""

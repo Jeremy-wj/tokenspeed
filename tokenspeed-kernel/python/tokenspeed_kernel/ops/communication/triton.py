@@ -42,10 +42,17 @@ logger = logging.getLogger(__file__)
 #   "iris"         -- force the (superseded) Iris backend only; retained for A/B.
 #   "symm_mem"     -- force the native torch symmetric-memory kernel only.
 _ARNORM_BACKEND_ENV = "TS_ARNORM_BACKEND"
+_TRITON_SHMEM_FUSION_MAX_M_ENV = "TS_TRITON_SHMEM_FUSION_MAX_M"
 
 
 def _arnorm_backend() -> str:
     return os.environ.get(_ARNORM_BACKEND_ENV, "auto").strip().lower()
+
+
+def _triton_shmem_fusion_max_m() -> int:
+    """Optional performance gate independent of the allocated workspace cap."""
+    return max(0, int(os.environ.get(_TRITON_SHMEM_FUSION_MAX_M_ENV, "0")))
+
 
 __all__ = [
     "create_state",
@@ -1613,9 +1620,17 @@ def allreduce_residual_rmsnorm(
         # --- triton_shmem fused path (vendored triton-shmem kernels on PyTorch
         # symmetric memory): the default "auto" backend, or forced "triton_shmem".
         # This is the migrated production path and supersedes Iris; the kernels
-        # take arbitrary (M, N) so there is no input-size gate beyond the shared
-        # eligibility above (bf16 contract + the caller's token-count cap).
-        if backend in ("auto", "triton_shmem") and eligible:
+        # take arbitrary (M, N). An optional backend-specific M gate can decline
+        # shapes that are valid for the allocated workspace but slower than the
+        # production unfused path.
+        triton_shmem_max_m = _triton_shmem_fusion_max_m()
+        triton_shmem_gate_declined = (
+            eligible
+            and triton_shmem_max_m > 0
+            and token_num > triton_shmem_max_m
+        )
+        triton_shmem_eligible = eligible and not triton_shmem_gate_declined
+        if backend in ("auto", "triton_shmem") and triton_shmem_eligible:
             from . import triton_shmem as _ts_mod
 
             ts_state = _ts_mod.TRITON_SHMEM_AR_RMSNORM_STATES.get(key)
@@ -1645,8 +1660,11 @@ def allreduce_residual_rmsnorm(
             if backend == "triton_shmem":
                 return None, None, None, None
 
-        if backend == "triton_shmem":
-            # Forced triton_shmem but ineligible -> unfused fallback.
+        if backend == "triton_shmem" or (
+            backend == "auto" and triton_shmem_gate_declined
+        ):
+            # A forced backend or explicit performance-gate decline must use
+            # the complete caller fallback, not another fused implementation.
             return None, None, None, None
 
         # --- Iris fused path: forced "iris" only (superseded by triton_shmem as

@@ -419,14 +419,20 @@ def _prewarm_hf_tokenizer(model_id: str) -> None:
         logger.warning("HF tokenizer prewarm failed for %s: %s", model_id, exc)
 
 
-def _gateway_args_with_defaults(gateway_args: list[str]) -> list[str]:
+def _gateway_args_with_defaults(
+    gateway_args: list[str],
+    *,
+    allocate_prometheus_port: bool = True,
+) -> list[str]:
     gateway_args = _gateway_args_with_default_port(gateway_args)
     gateway_args = _gateway_args_with_default_reasoning_parser(gateway_args)
     gateway_args = _gateway_args_with_smg_disable_defaults(gateway_args)
     gateway_args = _gateway_args_with_default_policy(gateway_args)
     gateway_args = _gateway_args_with_default_tokenizer_cache(gateway_args)
     gateway_args = _gateway_args_with_default_log_level(gateway_args)
-    return _gateway_args_with_default_prometheus_port(gateway_args)
+    if allocate_prometheus_port:
+        return _gateway_args_with_default_prometheus_port(gateway_args)
+    return gateway_args
 
 
 def _add_rl_control_port(engine_args: list[str]) -> tuple[list[str], str]:
@@ -586,6 +592,10 @@ async def run_smg(
             label=ENGINE_TAG,
         )
 
+        # Allocate the unreserved metrics port only after the engine and its
+        # control ports are live. Allocating it during argv preprocessing left
+        # a long TOCTOU window in which this launch could claim the same port.
+        gateway_args = _gateway_args_with_default_prometheus_port(gateway_args)
         gateway = await spawn_gateway(
             gateway_args, engine_host="127.0.0.1", engine_port=engine_port
         )
@@ -700,7 +710,11 @@ def run_smg_from_args(args: argparse.Namespace, raw_argv: list[str]) -> None:
     engine_args, gateway_args = _args_with_default_model_parsers(
         split.engine, split.gateway
     )
-    gateway_args = _gateway_args_with_defaults(gateway_args)
+    # Delay the unreserved Prometheus-port probe until immediately before the
+    # gateway spawn, after engine/control ports have bound.
+    gateway_args = _gateway_args_with_defaults(
+        gateway_args, allocate_prometheus_port=False
+    )
     user_host, user_port = _user_host_port_from_gateway_args(gateway_args)
 
     model_id = _user_model_id(gateway_args)

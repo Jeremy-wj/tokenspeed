@@ -1,0 +1,170 @@
+{
+  "profile": "gpt_oss_120b_mi350x",
+  "profile_identity": "Historical 2026-07-24 performance profile; not gpt-oss-120b-mi350x-qualified-v4.",
+  "hardware": "MI350X gfx950",
+  "world_size": 4,
+  "hidden_size": 2880,
+  "decode": {
+    "active_tokens": 32,
+    "layers": 36,
+    "eligible_calls_per_layer": 2,
+    "eligible_calls_per_step": 72,
+    "matched_trace": {
+      "forward_count_per_rank": 15,
+      "fused_max_rank_median_replay_period_ms": 15.062878,
+      "unfused_max_rank_median_replay_period_ms": 15.262887,
+      "period_reduction_ms": 0.20001,
+      "period_reduction_pct": 1.31,
+      "fused_max_rank_median_fused_site_sum_ms": 2.800236,
+      "fused_max_rank_median_total_target_sum_ms": 2.828674,
+      "unfused_max_rank_median_total_target_sum_ms": 3.219118,
+      "total_target_sum_reduction_ms": 0.390444,
+      "total_target_sum_reduction_pct": 12.13,
+      "method": "heuristic legacy site-count reconstruction; maximum of per-rank medians",
+      "source": "../2026-07-repeatability/segmented-trace-summary.json"
+    },
+    "matched_unprofiled_e2e": {
+      "unfused_mean_median_tpot_ms": 12.755,
+      "fused_mean_median_tpot_ms": 12.56,
+      "tpot_reduction_ms": 0.195,
+      "tpot_reduction_pct": 1.5,
+      "unfused_mean_output_tokens_per_second": 2454.81,
+      "fused_mean_output_tokens_per_second": 2457.15,
+      "throughput_change_pct": 0.09,
+      "source": "../2026-07-profile-guided-followup/e2e_summary.json"
+    },
+    "bounds": {
+      "unfused_profiled_decode_period_ms": 15.262887,
+      "unfused_ar_rmsnorm_budget_ms": 3.219118,
+      "unfused_ar_rmsnorm_share_pct": 21.09,
+      "historical_observed_reduction_ms": 0.2,
+      "historical_observed_reduction_pct": 1.5,
+      "current_kernel_family": {
+        "assumed_fused_site_us_range": [
+          30.0,
+          33.5
+        ],
+        "absolute_saving_ms_range": [
+          0.763,
+          1.015
+        ],
+        "profiled_decode_reduction_pct_range": [
+          5.0,
+          6.7
+        ],
+        "unprofiled_tpot_equivalent_pct_range": [
+          6.0,
+          8.0
+        ]
+      },
+      "aggressive_systems": {
+        "assumed_fused_site_us_range": [
+          15.0,
+          25.0
+        ],
+        "absolute_saving_ms_range": [
+          1.375,
+          2.095
+        ],
+        "profiled_decode_reduction_pct_range": [
+          9.0,
+          13.7
+        ],
+        "unprofiled_tpot_equivalent_pct_range": [
+          10.8,
+          16.4
+        ],
+        "planning_center_absolute_ms": 1.735,
+        "planning_center_profiled_decode_pct": 11.4,
+        "planning_center_unprofiled_tpot_equivalent_pct": 13.6
+      },
+      "physical_link_floor": {
+        "fused_site_us": 2.4,
+        "absolute_saving_ms": 3.002,
+        "profiled_decode_reduction_pct": 19.7,
+        "unprofiled_tpot_equivalent_pct": 23.5
+      },
+      "zero_cost_amdahl_absolute_ms": 3.219,
+      "zero_cost_profiled_decode_reduction_pct": 21.1,
+      "zero_cost_unprofiled_tpot_equivalent_pct": 25.2,
+      "observed_transfer": {
+        "kernel_sum_to_replay_period_pct": 51.23,
+        "replay_period_to_unprofiled_tpot_pct": 97.5,
+        "note": "Observed old-profile ratios, not current profile-v4 results or universal projection factors."
+      }
+    }
+  },
+  "token_cap": {
+    "method": "two order-opposed passes; 50 warmups and 200 repeats per arm; max-rank p50",
+    "crossover": "between M=256 and M=512",
+    "rows": [
+      {
+        "M": 128,
+        "fused_us": 43.78,
+        "unfused_us": 65.45,
+        "fused_change_pct": -33.1
+      },
+      {
+        "M": 256,
+        "fused_us": 61.08,
+        "unfused_us": 66.84,
+        "fused_change_pct": -8.6
+      },
+      {
+        "M": 512,
+        "fused_us": 87.03,
+        "unfused_us": 68.68,
+        "fused_change_pct": 26.8
+      },
+      {
+        "M": 1024,
+        "fused_us": 110.13,
+        "unfused_us": 89.0,
+        "fused_change_pct": 23.7
+      },
+      {
+        "M": 1536,
+        "fused_us": 155.11,
+        "unfused_us": 118.5,
+        "fused_change_pct": 30.9
+      },
+      {
+        "M": 1920,
+        "fused_us": 184.86,
+        "unfused_us": 140.14,
+        "fused_change_pct": 31.9
+      },
+      {
+        "M": 2048,
+        "fused_us": 195.67,
+        "unfused_us": 143.89,
+        "fused_change_pct": 36.0
+      },
+      {
+        "M": 2304,
+        "fused_us": 218.54,
+        "unfused_us": 158.69,
+        "fused_change_pct": 37.7
+      },
+      {
+        "M": 3072,
+        "fused_us": 281.47,
+        "unfused_us": 200.59,
+        "fused_change_pct": 40.3
+      },
+      {
+        "M": 4096,
+        "fused_us": 369.18,
+        "unfused_us": 257.65,
+        "fused_change_pct": 43.3
+      },
+      {
+        "M": 8192,
+        "fused_us": 728.21,
+        "unfused_us": 486.16,
+        "fused_change_pct": 49.8
+      }
+    ],
+    "decision": "Do not raise 2048. Retain it as a workspace/scope ceiling and preserve the M=256 crossover as operator evidence; the tested TP=4 performance-gate implementation was later rejected."
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "analysis": "tokenspeed.ar_rmsnorm_model_forwards",
+  "cohorts": [
+    {
+      "count": 14,
+      "executed_m": 32,
+      "max_rank_gpu_period_us": {
+        "max": 14932.17822265625,
+        "median": 12945.103271484375,
+        "min": 12825.6435546875,
+        "p95": 13121.76611328125
+      },
+      "max_rank_target_kernel_sum_us": {
+        "max": 5070.283,
+        "median": 3009.886,
+        "min": 2930.663,
+        "p95": 3396.109
+      },
+      "mode": "decode",
+      "primary_paths": [
+        "fused_oneshot"
+      ]
+    }
+  ],
+  "inputs": [
+    {
+      "path": "raw/current/gpt-oss-120b/mi350x/2026-07-27/forward-marker-smoke/traces/forward-marker-smoke-TP0.trace.json.gz",
+      "rank": 0
+    },
+    {
+      "path": "raw/current/gpt-oss-120b/mi350x/2026-07-27/forward-marker-smoke/traces/forward-marker-smoke-TP1.trace.json.gz",
+      "rank": 1
+    },
+    {
+      "path": "raw/current/gpt-oss-120b/mi350x/2026-07-27/forward-marker-smoke/traces/forward-marker-smoke-TP2.trace.json.gz",
+      "rank": 2
+    },
+    {
+      "path": "raw/current/gpt-oss-120b/mi350x/2026-07-27/forward-marker-smoke/traces/forward-marker-smoke-TP3.trace.json.gz",
+      "rank": 3
+    }
+  ],
+  "schema_version": 1,
+  "validation": {
+    "status": "ok",
+    "warnings": []
+  }
+}

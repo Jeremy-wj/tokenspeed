@@ -1,0 +1,141 @@
+{
+  "date": "2026-07-28",
+  "profile": "gpt_oss_120b_mi350x",
+  "profile_identity": "Historical study label for the pre-v4 stability investigation; the final qualified configuration is gpt-oss-120b-mi350x-qualified-v4.",
+  "status": "superseded_by_profile_v4_final_qualification",
+  "root_cause_class": "Base C32 padding aliased live request-pool slot 0; fusion then exposed a separate captured-output graph-pool lifetime fault",
+  "evidence": {
+    "failing_controls": [
+      {
+        "configuration": "default broad decode and prefill graphs, memory utilization 0.95",
+        "result": "repeated one-token prefill and later decode memory faults across GPU nodes 3, 4, and 5"
+      },
+      {
+        "configuration": "prefill graph disabled, standalone Triton all-reduce enabled, memory utilization 0.95",
+        "result": "memory faults on GPU nodes 3 and 4"
+      },
+      {
+        "configuration": "standalone Triton all-reduce disabled, prefill graph enabled, memory utilization 0.95",
+        "result": "memory fault on GPU node 4"
+      },
+      {
+        "configuration": "prefill graph disabled, standalone Triton all-reduce disabled, memory utilization 0.95",
+        "result": "two full seeds passed, third seed faulted on GPU nodes 4 and 5"
+      },
+      {
+        "configuration": "single decode graph bucket 32, memory utilization 0.95",
+        "result": "single screen passed but the fresh-container gate faulted on its first seed"
+      },
+      {
+        "configuration": "single graph bucket 32 with serialized kernels/copies, memory utilization 0.95",
+        "result": "memory fault on GPU node 5; serialization did not remove the failure"
+      }
+    ],
+    "passing_controls": [
+      {
+        "configuration": "fully eager, standalone Triton all-reduce enabled",
+        "result": "three fresh-container canonical unfused seeds passed"
+      },
+      {
+        "configuration": "single decode graph bucket 32, eager prefill, memory utilization 0.90, standalone Triton all-reduce enabled",
+        "result": "three fresh-container canonical unfused seeds passed"
+      },
+      {
+        "configuration": "same stable graph controls with fused AR+RMSNorm enabled",
+        "result": "one full 128/512, 128-prompt, concurrency-32 screen passed"
+      }
+    ]
+  },
+  "root_cause_followup": {
+    "status": "causal_amplifier_confirmed_then_superseded",
+    "failing_boundary": "0.95, 21361024 KV tokens, 10.94 GiB available before C32 capture",
+    "passing_boundaries": [
+      "0.94, 21097536 KV tokens, 13.19 GiB available before C32 capture",
+      "0.945, 21228864 KV tokens, 12.06 GiB available before C32 capture"
+    ],
+    "causal_control": "0.95 passed when max_total_tokens alone capped the KV pool to 21097536",
+    "source": "kv-cache-headroom-root-cause.json",
+    "supersession": "KV capacity was an amplifier. The root cause is graph-padding slot-0 aliasing; see graph-padding-sentinel-root-cause.json."
+  },
+  "historical_decode_configuration": {
+    "hip_visible_devices": "1,2,3,5",
+    "physical_gpus": [
+      0,
+      2,
+      1,
+      4
+    ],
+    "gpu_memory_utilization": 0.9,
+    "cudagraph_capture_sizes": [
+      32
+    ],
+    "prefill_graph": false,
+    "overlap_schedule": false,
+    "deep_health": "passive",
+    "double_buffer_input": false,
+    "barrier_grid": 0,
+    "standalone_triton_allreduce": true
+  },
+  "unfused_stability_gate": {
+    "required_seeds": [
+      0,
+      1,
+      2
+    ],
+    "passed_seeds": [
+      0,
+      1,
+      2
+    ],
+    "fresh_container_per_seed": true,
+    "completed_requests_per_seed": 128,
+    "failed_requests": 0,
+    "median_tpot_ms": [
+      11.8248189276416,
+      12.011097799239355,
+      11.806275516041278
+    ],
+    "output_throughput_tokens_per_second": [
+      2502.2221075219613,
+      2531.533265511817,
+      2378.2191906925727
+    ],
+    "source": "raw/current/gpt-oss-120b/mi350x/2026-07-28/2026-07-28-canonical-unfused-graph32-mem90-v10/stability-summary.json"
+  },
+  "fused_screen": {
+    "completed": 128,
+    "failed": 0,
+    "median_tpot_ms": 15.28456644200649,
+    "output_throughput_tokens_per_second": 1980.0104153567497,
+    "interpretation": "Stability evidence only; one unpaired seed is not a performance comparison.",
+    "source": "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-fused-graph32-mem90-screen/summary.json"
+  },
+  "forward_marker_trace": {
+    "aligned_decode_forwards": 7,
+    "executed_m": 32,
+    "primary_path": "fused_oneshot",
+    "median_max_rank_gpu_period_us": 13350.04443359375,
+    "median_max_rank_target_kernel_sum_us": 3497.349,
+    "validation": "ok",
+    "source": "stable-controls-forward-marker-summary.json"
+  },
+  "decision": {
+    "base_runtime_stability_gate": "passed after universal reserved-sink graph padding: three fresh formal unfused seeds",
+    "historical_gate_disposition": "superseded after profile-v4 completed paired qualification",
+    "qualified_profile_id": "gpt-oss-120b-mi350x-qualified-v4",
+    "qualification_status": "completed: three restart blocks and fifteen pairs without a safety failure",
+    "deployment_outcome": "fusion remains opt-in because paired decode performance regressed",
+    "graph_runtime": "unblocked by graph-padding sentinel fix",
+    "fused_output_lifetime": "closed by a persistent 72-site output ring; see fused-output-lifetime-root-cause.json",
+    "promotion": "rejected because decode median TPOT and output throughput regressed",
+    "input_ring": "still rejected pending graph-stable slot identity",
+    "m256_gate": "still rejected",
+    "prefill_policy": "eager prefill with C32 decode capture"
+  },
+  "raw_roots": [
+    "raw/current/gpt-oss-120b/mi350x/2026-07-28/2026-07-28-canonical-unfused-eager-v9",
+    "raw/current/gpt-oss-120b/mi350x/2026-07-28/2026-07-28-canonical-unfused-graph32-mem90-v10",
+    "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-fused-graph32-mem90-screen",
+    "raw/current/gpt-oss-120b/mi350x/2026-07-28/serving-repros/2026-07-28-fused-stable-marker-trace"
+  ]
+}

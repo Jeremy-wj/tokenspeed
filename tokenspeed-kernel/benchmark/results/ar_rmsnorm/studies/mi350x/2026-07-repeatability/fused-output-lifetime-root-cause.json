@@ -1,0 +1,77 @@
+{
+  "date": "2026-07-29",
+  "status": "root_cause_confirmed_and_safety_gate_passed",
+  "root_cause": {
+    "class": "captured fused intermediate outputs had graph-pool-owned lifetime",
+    "mechanism": "The fused norm entry allocated norm_out and residual_out with torch.empty_like inside full-model HIP graph capture. Those custom-kernel intermediate pointers were owned and reused by the graph private pool across 72 fused sites. Their address/lifetime layout was unstable across fresh captures and later eager transitions, producing intermittent memory faults. Binding every captured site to persistent graph-stable caller-owned output storage removes graph-pool ownership from the custom fused outputs.",
+    "scope": "Fusion-specific failure after the base graph-padding sentinel fix"
+  },
+  "isolation": {
+    "failed_variants": [
+      "triton_shmem coarse HIP IPC",
+      "triton_shmem fine symmetric memory",
+      "native PyTorch symmetric-memory backend",
+      "one-shot and forced two-shot",
+      "in-kernel and separate barriers",
+      "folded and explicit copy-in",
+      "serialized HIP launches"
+    ],
+    "passing_controls": [
+      "15/15 graph servers where the fused backend declined during capture",
+      "10/10 fully eager fused servers",
+      "random per-element eager operator correctness",
+      "10/10 graph-stable output-ring servers",
+      "3/3 fresh full prefill/decode profile-v4 servers"
+    ],
+    "interpretation": "The common failing factor was a custom fused output allocated inside the captured full-model graph, not a collective algorithm, barrier, memory substrate, or numerical kernel defect."
+  },
+  "fix": {
+    "code": "tokenspeed-kernel/python/tokenspeed_kernel/ops/communication/triton_shmem.py",
+    "profile_id": "gpt-oss-120b-mi350x-qualified-v4",
+    "output_ring_sites": 72,
+    "max_ring_m": 256,
+    "buffers": [
+      "norm output",
+      "pre-norm residual output"
+    ],
+    "memory_per_rank": "202.5 MiB (212.3 MB)",
+    "lifetime": "one slot per GPT-OSS fused call site; 72-site forward parity returns to the same epoch only after all prior outputs have been consumed",
+    "fallback": "M above the one-shot threshold retains caller-owned dynamic outputs outside decode graph capture"
+  },
+  "validation": {
+    "focused_random_tests": "passed",
+    "fresh_full_transition_servers": {
+      "passed": 3,
+      "failed": 0
+    },
+    "paired_campaign": {
+      "source": "raw/current/gpt-oss-120b/mi350x/2026-07-29/2026-07-29-output-ring-v4-fused-vs-unfused/campaign-summary.json",
+      "restart_blocks": 3,
+      "paired_observations": 15,
+      "safety_failures": 0,
+      "promotion_eligible": false,
+      "performance_result": {
+        "decode_median_tpot_change_pct": 1.4374884092030493,
+        "decode_median_tpot_ci95": [
+          1.1963115827600672,
+          1.6519092716287709
+        ],
+        "decode_output_throughput_change_pct": -1.457021001261541,
+        "decode_output_throughput_ci95": [
+          -1.9113553847370264,
+          -1.01671806395825
+        ]
+      }
+    }
+  },
+  "non_fix_control": {
+    "output_ring_allocated_but_unused": "10/10 bounded screens passed",
+    "interpretation": "Graph-pool layout is incidence-sensitive, as were KV-capacity and logging controls. Merely reserving memory is not the production contract; persistent per-site output ownership is retained because it removes the unsafe ownership class directly and passed the full formal campaign."
+  },
+  "decision": {
+    "fusion_safety_blocker": "closed",
+    "tp4_promotion": false,
+    "reason": "The stable implementation regresses decode median TPOT and output throughput with confidence intervals excluding zero.",
+    "next_step": "Do not deploy TP4 fusion; revisit only with a safe integration that recovers the explicit-copy/output-ownership overhead and clears a new paired campaign."
+  }
+}

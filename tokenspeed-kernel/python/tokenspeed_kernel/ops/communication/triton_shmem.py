@@ -128,12 +128,25 @@ def _fold_copyin_enabled() -> bool:
     Removes the ~0.012 ms/op copy-in launch that is an
     untouched floor at decode M. Requires the in-kernel barrier (the phase-0 write
     must precede the leading barrier); no-op on the two-shot / separate-barrier
-    path. Default ON after adding workgroup synchronization around the scalar
-    cross-rank barriers; set ``TS_TRITON_SHMEM_FOLD_COPYIN=0`` to isolate the
-    separate-copy path."""
-    return os.environ.get("TS_TRITON_SHMEM_FOLD_COPYIN", "1") not in (
+    path. Default OFF: serving qualification reproduced a graph-to-eager small-M
+    fault despite the narrower synthetic transition probe passing. Re-enable
+    only after the producer-to-system-release publication contract is proven."""
+    return os.environ.get("TS_TRITON_SHMEM_FOLD_COPYIN", "0") not in (
         "0", "false", "False"
     )
+
+
+def _double_buffer_input_enabled() -> bool:
+    """Use two symmetric input slots and omit the one-shot exit barrier.
+
+    Diagnostic only. The next call's leading barrier proves peers completed the
+    prior slot before it is reused two calls later. Captured graphs must contain
+    an even number of fused calls (GPT-OSS has 72); odd-call graph replay is not
+    covered by this lifetime contract.
+    """
+    return os.environ.get(
+        "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT", "0"
+    ) not in ("0", "false", "False")
 
 
 def _workgroup_sync_enabled() -> bool:
@@ -305,6 +318,7 @@ class TritonShmemAllReduceResidualRMSNorm:
         # IPC, with only the signal pad left fine-grained.
         # This recovers the ~30x local-bandwidth penalty of fine-grained symm_mem.
         self._coarse = _coarse_enabled()
+        self._double_buffer_input = _double_buffer_input_enabled()
         self._coarse_buffers: list = []
         self._opened_cache: dict = {}
 
@@ -317,6 +331,10 @@ class TritonShmemAllReduceResidualRMSNorm:
             ws_check = pad_hdl.world_size
             xb = self._alloc_data(shape, dtype, group)
             self._x, self._input_bases = xb.tensor, xb.peer_ptrs_dev
+            if self._double_buffer_input:
+                xb_alt = self._alloc_data(shape, dtype, group)
+                self._x_alt = xb_alt.tensor
+                self._input_bases_alt = xb_alt.peer_ptrs_dev
         else:
             self._pad_tensor = None
             # Input is always pulled by peers -> must be symmetric.
@@ -327,6 +345,17 @@ class TritonShmemAllReduceResidualRMSNorm:
             self._input_bases = _peer_ptrs_dev(
                 x_hdl, shape, dtype, self.world_size, self.device
             )
+            if self._double_buffer_input:
+                self._x_alt, x_alt_hdl = _alloc_symm(
+                    shape, dtype, self.device, group
+                )
+                self._input_bases_alt = _peer_ptrs_dev(
+                    x_alt_hdl,
+                    shape,
+                    dtype,
+                    self.world_size,
+                    self.device,
+                )
         assert self.my_pe == rank_in_group, (
             f"rank mismatch: rank_in_group={rank_in_group}, symm_mem rank={self.my_pe}"
         )
@@ -334,7 +363,14 @@ class TritonShmemAllReduceResidualRMSNorm:
             f"symm_mem world {ws_check} != group size {self.world_size}"
         )
 
-        n_symm = 1
+        self._input_ring = [self._x]
+        self._input_bases_ring = [self._input_bases]
+        if self._double_buffer_input:
+            self._input_ring.append(self._x_alt)
+            self._input_bases_ring.append(self._input_bases_alt)
+        self._input_ring_index = 0
+
+        n_symm = len(self._input_ring)
         if self._is_twoshot:
             # Two-shot pushes normalized output and pre-norm residual_out into
             # peers, so both must be peer-accessible and each needs its OWN
@@ -353,7 +389,7 @@ class TritonShmemAllReduceResidualRMSNorm:
                 self._residual_out_bases = _peer_ptrs_dev(
                     r_hdl, shape, dtype, self.world_size, self.device
                 )
-            n_symm = 3
+            n_symm += 2
         else:
             self._y = None
             self._residual_out = None
@@ -416,12 +452,45 @@ class TritonShmemAllReduceResidualRMSNorm:
             self._oneshot_kernel = self.kernel  # ws<=2 is already one-shot
             self._oneshot_scratch = self._scratch
 
+        # Optional model-profile lifetime contract for outputs referenced by a
+        # captured custom kernel. Allocate before capture warmup so graph replay
+        # never depends on transient graph-pool output storage. The configured
+        # size must cover every simultaneously live fused site; generic default
+        # stays off because that count is model/control-flow specific.
+        self._output_ring_size = int(
+            os.environ.get("TS_TRITON_SHMEM_OUTPUT_RING", "0")
+        )
+        if self._output_ring_size < 0:
+            raise ValueError("TS_TRITON_SHMEM_OUTPUT_RING must be non-negative")
+        if self._output_ring_size:
+            self._output_ring_max_m = min(
+                max_token_num,
+                self._oneshot_max_m if self._oneshot_max_m > 0 else max_token_num,
+            )
+            self._norm_output_ring = torch.empty(
+                (
+                    self._output_ring_size,
+                    self._output_ring_max_m,
+                    hidden_dim,
+                ),
+                dtype=dtype,
+                device=self.device,
+            )
+            self._residual_output_ring = torch.empty_like(self._norm_output_ring)
+            self._output_ring_index = 0
+        else:
+            self._output_ring_max_m = 0
+            self._norm_output_ring = None
+            self._residual_output_ring = None
+            self._output_ring_index = 0
+
         logger.info(
             "triton_shmem AR+RMSNorm state: kernel=%s ws=%d max_tokens=%d hidden=%d "
             "substrate=%s data=%.1f MiB/rank inkernel_barrier=%s fold_copyin=%s "
             "workgroup_sync=%s fold_num_warps=%d oneshot_block_n=%d "
             "grid_cap=%d grid_cap_min_m=%d "
-            "small_m_oneshot=%s(<=%d)",
+            "small_m_oneshot=%s(<=%d) input_ring=%d output_ring=%d "
+            "oneshot_exit_barrier=%s",
             self.kernel,
             self.world_size,
             max_token_num,
@@ -437,6 +506,9 @@ class TritonShmemAllReduceResidualRMSNorm:
             self._dynamic_grid_cap_min_m,
             self._oneshot_kernel if self._is_twoshot else "n/a",
             self._oneshot_max_m if self._is_twoshot else 0,
+            len(self._input_ring),
+            self._output_ring_size,
+            not self._double_buffer_input,
         )
 
     def _alloc_data(self, shape, dtype, group):
@@ -484,8 +556,21 @@ class TritonShmemAllReduceResidualRMSNorm:
             grid = min(grid, self._dynamic_grid_cap)
         return max(1, grid)
 
-    def _run_oneshot(self, x, local_src, residual, weight, eps, m, n, ws,
-                     norm_out, residual_out, fold):
+    def _run_oneshot(
+        self,
+        x,
+        input_bases,
+        local_src,
+        residual,
+        weight,
+        eps,
+        m,
+        n,
+        ws,
+        norm_out,
+        residual_out,
+        fold,
+    ):
         """One-shot pull into the caller's *local* output (no copy-out). Barriers
         are folded into the kernel when ``self._inkernel`` (default), else issued
         as the legacy separate launches. Reads the symmetric input ``x``; writes
@@ -508,7 +593,7 @@ class TritonShmemAllReduceResidualRMSNorm:
                 eps,
                 weight,
                 self.my_pe,
-                self._input_bases,
+                input_bases,
                 residual,
                 residual_out,
                 norm_out,  # add_in placeholder (HAS_ADD=False)
@@ -523,6 +608,7 @@ class TritonShmemAllReduceResidualRMSNorm:
                 RANK=self.my_pe,
                 INKERNEL_BARRIER=inkernel,
                 FOLD_COPYIN=fold,
+                EXIT_BARRIER=not self._double_buffer_input,
                 WORKGROUP_SYNC=self._workgroup_sync,
                 num_warps=num_warps,
             )
@@ -534,7 +620,7 @@ class TritonShmemAllReduceResidualRMSNorm:
                 eps,
                 weight,
                 self.my_pe,
-                self._input_bases,
+                input_bases,
                 residual,
                 residual_out,
                 norm_out,  # add_in placeholder (HAS_ADD=False)
@@ -550,6 +636,7 @@ class TritonShmemAllReduceResidualRMSNorm:
                 RANK=self.my_pe,
                 INKERNEL_BARRIER=inkernel,
                 FOLD_COPYIN=fold,
+                EXIT_BARRIER=not self._double_buffer_input,
                 WORKGROUP_SYNC=self._workgroup_sync,
                 num_warps=num_warps,
             )
@@ -576,10 +663,27 @@ class TritonShmemAllReduceResidualRMSNorm:
         ws = self.world_size
         assert m <= self.max_token_num
 
-        if norm_out is None:
-            norm_out = torch.empty_like(input_tensor)
-        if residual_out is None:
-            residual_out = torch.empty_like(residual)
+        if (
+            norm_out is None
+            and residual_out is None
+            and self._output_ring_size
+            and m <= self._output_ring_max_m
+        ):
+            # Capture freezes each selected view's pointer. GPT-OSS executes 72
+            # unconditional fused sites per forward and configures 72 slots, so
+            # warmup/capture and every eager small-M forward return this host
+            # phase to zero before another graph or forward can use the ring.
+            output_slot = self._output_ring_index
+            self._output_ring_index = (
+                output_slot + 1
+            ) % self._output_ring_size
+            norm_out = self._norm_output_ring[output_slot, :m]
+            residual_out = self._residual_output_ring[output_slot, :m]
+        else:
+            if norm_out is None:
+                norm_out = torch.empty_like(input_tensor)
+            if residual_out is None:
+                residual_out = torch.empty_like(residual)
 
         # Dispatch: one-shot pull for ws<=2 (always) and small-M/decode at ws>=4
         # One-shot writes output locally (no two-shot copy-out)
@@ -594,13 +698,28 @@ class TritonShmemAllReduceResidualRMSNorm:
         # the in-kernel barrier; two-shot keeps the explicit copy_.
         fold = self._fold_copyin and self._inkernel and use_oneshot
 
-        x = self._x[:m]
+        input_slot = self._input_ring_index
+        x = self._input_ring[input_slot][:m]
+        input_bases = self._input_bases_ring[input_slot]
+        self._input_ring_index = (input_slot + 1) % len(self._input_ring)
         if not fold:
             x.copy_(input_tensor)
 
         if use_oneshot:
-            self._run_oneshot(x, input_tensor, residual, weight, eps, m, n, ws,
-                              norm_out, residual_out, fold)
+            self._run_oneshot(
+                x,
+                input_bases,
+                input_tensor,
+                residual,
+                weight,
+                eps,
+                m,
+                n,
+                ws,
+                norm_out,
+                residual_out,
+                fold,
+            )
             return norm_out, residual_out
 
         # Two-shot push (ws>=4, large M). In-kernel barriers are re-enabled here
@@ -626,7 +745,7 @@ class TritonShmemAllReduceResidualRMSNorm:
             eps,
             weight,
             self.my_pe,
-            self._input_bases,
+            input_bases,
             self._output_bases,
             self._residual_out_bases,
             residual,
@@ -705,6 +824,14 @@ def triton_shmem_allreduce_residual_rmsnorm(
         world_size=state.world_size,
         fold_copyin=int(
             state._fold_copyin and state._inkernel and use_oneshot
+        ),
+        input_ring=len(state._input_ring),
+        exit_barrier=int(
+            not (
+                state._double_buffer_input
+                and state._inkernel
+                and use_oneshot
+            )
         ),
     ):
         return state.fused(

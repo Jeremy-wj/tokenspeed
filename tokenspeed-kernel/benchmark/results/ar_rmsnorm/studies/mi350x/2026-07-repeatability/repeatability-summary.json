@@ -1,0 +1,138 @@
+{
+  "date": "2026-07-29",
+  "status": "historical_2026_07_27_campaign_superseded_by_profile_v4_final_qualification",
+  "profile": "gpt_oss_120b_mi350x",
+  "profile_identity": "Historical study label for the 2026-07-27 candidate campaign; the final qualified configuration is gpt-oss-120b-mi350x-qualified-v4.",
+  "runner": {
+    "path": "benchmark/run_ar_rmsnorm_repeatability.py",
+    "required_blocks": 3,
+    "required_pairs": 15,
+    "features": [
+      "randomized arm order",
+      "fresh decode server per seed",
+      "separate prefill server",
+      "detailed request timelines",
+      "per-rank signature proof",
+      "GPU PID isolation guard",
+      "hard command timeouts",
+      "checksums",
+      "hierarchical paired bootstrap",
+      "phase-level resume with serve-proof revalidation",
+      "single-arm fresh-container unfused stability mode",
+      "two-second nonintrusive KFD sysfs foreign-PID monitor",
+      "phase-boundary process and utilization diagnostics"
+    ]
+  },
+  "historical_candidate_path_safety": {
+    "status": "failed",
+    "events": [
+      {
+        "control": "M-dependent in-kernel barrier",
+        "result": "HSA_STATUS_ERROR_ILLEGAL_INSTRUCTION",
+        "trigger": "M=1 automatic health request after M=32 decode traffic",
+        "foreign_gpu_process_present": false
+      },
+      {
+        "control": "fixed in-kernel barrier grid 32",
+        "result": "five-minute serving stall",
+        "trigger": "gate arm after M=256 prefill",
+        "foreign_gpu_process_present": false
+      },
+      {
+        "control": "M-independent separate barrier kernels",
+        "result": "one full smoke block passed; next fresh candidate decode server timed out",
+        "trigger": "block 1 seed 1",
+        "foreign_gpu_process_present": false
+      }
+    ]
+  },
+  "external_interference_controls": {
+    "incidents_rejected": 3,
+    "note": "Runs with foreign PIDs on selected GPUs were stopped and excluded before campaign analysis."
+  },
+  "complete_paired_block": {
+    "synchronization": "separate barrier kernels",
+    "world_size": 4,
+    "hip_visible_devices": "2,5,6,7",
+    "physical_gpus": [
+      2,
+      4,
+      6,
+      5
+    ],
+    "blocks": 1,
+    "paired_seeds": 5,
+    "candidate_change_pct": {
+      "decode_median_tpot": {
+        "mean": 1.1472,
+        "bootstrap_ci95": [
+          -1.6012,
+          3.4032
+        ]
+      },
+      "decode_output_throughput": {
+        "mean": -0.964,
+        "bootstrap_ci95": [
+          -2.8626,
+          1.3116
+        ]
+      },
+      "prefill_m512_median_ttft": {
+        "mean": -1.4587,
+        "bootstrap_ci95": [
+          -2.9662,
+          0.0488
+        ]
+      },
+      "prefill_m1024_median_ttft": {
+        "mean": -2.4232,
+        "bootstrap_ci95": [
+          -5.1372,
+          -0.266
+        ]
+      },
+      "prefill_m2048_median_ttft": {
+        "mean": -4.0634,
+        "bootstrap_ci95": [
+          -4.9257,
+          -3.3305
+        ]
+      }
+    },
+    "interpretation": "The gate may improve large-prefill TTFT under the conservative barrier path, but decode direction regressed and the required restart sample could not complete reliably."
+  },
+  "input_ring_candidate": {
+    "source": "input-ring-summary.json",
+    "graph_saving_us_per_call": 5.3697,
+    "graph_change_pct": -15.19,
+    "shared_multigraph_result": "passed",
+    "serving_promotion": false,
+    "reason": "Subsequent canonical serving faulted with the no-exit ring; graph-stable slot identity is still required."
+  },
+  "rejected_experiment": {
+    "name": "minimum-M health bypass",
+    "result": "removed after two focused TP4 GPU faults"
+  },
+  "decision": {
+    "promote_m256_gate": false,
+    "promote_input_ring_to_gpt_oss_profile": false,
+    "required_barrier_grid": 0,
+    "required_deep_health_mode": "passive",
+    "required_disable_overlap_schedule": true,
+    "tp4_auto_enable": false,
+    "reason": "The base graph-padding fault and the later fused-output graph-lifetime fault are closed. The profile-v4 campaign completed three blocks and fifteen pairs safely but regressed decode TPOT and throughput. The input ring and M256 gate remain rejected.",
+    "final_profile": "gpt-oss-120b-mi350x-qualified-v4",
+    "final_campaign": "raw/current/gpt-oss-120b/mi350x/2026-07-29/2026-07-29-output-ring-v4-fused-vs-unfused/campaign-summary.json",
+    "followup_sources": [
+      "graph-padding-sentinel-root-cause.json",
+      "fused-output-lifetime-root-cause.json"
+    ]
+  },
+  "raw_roots": [
+    "raw/current/gpt-oss-120b/mi350x/2026-07-27/2026-07-27-cap-gate-repeatability",
+    "raw/current/gpt-oss-120b/mi350x/2026-07-27/2026-07-27-cap-gate-repeatability-isolated-alt2",
+    "raw/current/gpt-oss-120b/mi350x/2026-07-27/2026-07-27-fixedgrid32-smoke",
+    "raw/current/gpt-oss-120b/mi350x/2026-07-27/2026-07-27-separate-barrier-smoke",
+    "raw/current/gpt-oss-120b/mi350x/2026-07-27/2026-07-27-separate-barrier-per-seed"
+  ]
+}

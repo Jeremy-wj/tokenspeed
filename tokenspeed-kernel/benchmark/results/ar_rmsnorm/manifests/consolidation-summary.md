@@ -2,6 +2,13 @@
 
 Date: 2026-07-24
 
+Historical snapshot: this file records the 2026-07-24 migration only. It is
+not the current campaign index. See `../README.md`, the gpt-oss status page,
+and `../studies/mi350x/2026-07-repeatability/` for later evidence.
+Every count and inventory statement below is as of that migration date, not a
+description of the current tree. CSV checksums likewise describe the migration
+snapshot and are not current-file integrity values for later-edited studies.
+
 ## Counts
 
 - Pre-migration artifacts inventoried: 504
@@ -25,7 +32,7 @@ Date: 2026-07-24
 Every deleted source, checksum, and reason remains in
 `artifacts-pre-migration.csv` and `migration-map.csv`.
 
-## Current evidence
+## Evidence current at migration time
 
 ```text
 raw/current/gpt-oss-120b/mi350x/2026-07-24/
@@ -49,8 +56,10 @@ Verification:
 
 ## Review queue
 
-Non-obvious artifacts were not deleted. They are under
-`raw/review/delete_candidates/` and indexed in `deletion-review.md`.
+At migration time, 56 non-obvious artifacts were quarantined rather than
+deleted. The original set remains recorded in `artifacts-pre-migration.csv` and
+`migration-map.csv`. For the current on-disk queue, use
+`deletion-review.md`; do not derive current inventory from this snapshot.
 
 ## Removed legacy roots
 
