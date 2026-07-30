@@ -1,6 +1,6 @@
 # AR+RMSNorm benchmarking and promotion methodology
 
-Updated: 2026-07-29
+Updated: 2026-07-30
 
 ## Purpose
 
@@ -8,12 +8,17 @@ This document defines the evidence needed to promote an AR+RMSNorm integration
 change. Qualified environments, commands, implemented harness behavior, and
 artifact layout belong in the [profiling workflow](profiling-workflow.md).
 
-The upstream-main rebase at `3f88dcc2` is a mandatory baseline reset. It
-changed the default fused backend, the ordinary AMD all-reduce control, and
-the surrounding runtime. All campaigns described below are legacy examples of
-the evidence ladder. New work must first establish upstream-unfused and
-Iris-first controls, then compare explicit candidates on the same rebased
-code. See [upstream-main rebase impact](upstream-main-rebase-impact-2026-07.md).
+The upstream-main rebase at `3f88dcc2` required a baseline reset because it
+changed the default fused backend, the ordinary AMD all-reduce control, and the
+surrounding runtime. The 2026-07-30 GPT-OSS campaign completed that reset and
+validated this evidence ladder. Upstream-unfused with explicit fusion
+disablement is the current control; Iris and `triton_shmem` both failed
+performance promotion.
+
+Upstream auto-enables fusion on supported AMD TP mappings. Therefore an
+unfused arm is valid only when it records `--disable-allreduce-fusion` and
+resolved `enable_allreduce_fusion=False`; omission of the enable flag is not a
+control.
 
 > The candidate is the complete serving state machine, not only the fused
 > kernel.

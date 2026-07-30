@@ -62,39 +62,51 @@ def _kernel_breakdown(events: list[dict[str, Any]]) -> dict[str, Any]:
     def count(token: str) -> int:
         return sum(token in name for name in names)
 
-    def duration(token: str) -> float:
-        return sum(
-            float(event["dur"])
-            for event, name in zip(events, names)
-            if token in name
-        )
-
+    standalone_rmsnorm = sum(
+        "_rmsnorm_kernel" in name
+        and "iris_allreduce_residual_rmsnorm_kernel" not in name
+        for name in names
+    )
     counts = {
-        "fused_oneshot": count("fused_ar_rmsnorm_oneshot"),
-        "fused_twoshot": count("fused_ar_rmsnorm_twoshot"),
+        "triton_shmem_fused_oneshot": count("fused_ar_rmsnorm_oneshot"),
+        "triton_shmem_fused_twoshot": count("fused_ar_rmsnorm_twoshot"),
+        "iris_fused": count("iris_allreduce_residual_rmsnorm_kernel"),
+        "symm_mem_fused": count("amd_allreduce_residual_rmsnorm_kernel"),
+        "ordinary_iris": count("iris_stage_one_shot_allreduce_kernel"),
         "unfused_native_ar": count("amd_all_reduce_kernel"),
-        "rmsnorm": count("_rmsnorm_kernel"),
+        "standalone_rmsnorm": standalone_rmsnorm,
         "barrier": count("symm_grid_barrier_kernel"),
         "rccl_family": count("ncclDevKernel"),
     }
-    if counts["fused_oneshot"]:
-        primary = "fused_oneshot"
-    elif counts["fused_twoshot"]:
-        primary = "fused_twoshot"
-    elif counts["unfused_native_ar"] and counts["rmsnorm"]:
+    if counts["iris_fused"]:
+        primary = "iris_fused"
+    elif counts["triton_shmem_fused_oneshot"]:
+        primary = "triton_shmem_fused_oneshot"
+    elif counts["triton_shmem_fused_twoshot"]:
+        primary = "triton_shmem_fused_twoshot"
+    elif counts["symm_mem_fused"]:
+        primary = "symm_mem_fused"
+    elif counts["ordinary_iris"] and counts["standalone_rmsnorm"]:
+        primary = "unfused_iris"
+    elif counts["unfused_native_ar"] and counts["standalone_rmsnorm"]:
         primary = "unfused_native"
-    elif counts["rccl_family"] and counts["rmsnorm"]:
-        primary = "unfused_rccl_candidate"
+    elif counts["rccl_family"] and counts["standalone_rmsnorm"]:
+        primary = "unfused_rccl"
     else:
         primary = "unknown"
+    target_tokens = (
+        "fused_ar_rmsnorm_",
+        "iris_allreduce_residual_rmsnorm_kernel",
+        "amd_allreduce_residual_rmsnorm_kernel",
+        "iris_stage_one_shot_allreduce_kernel",
+        "amd_all_reduce_kernel",
+        "_rmsnorm_kernel",
+        "symm_grid_barrier_kernel",
+    )
     target_duration = sum(
-        duration(token)
-        for token in (
-            "fused_ar_rmsnorm_",
-            "amd_all_reduce_kernel",
-            "_rmsnorm_kernel",
-            "symm_grid_barrier_kernel",
-        )
+        float(event["dur"])
+        for event, name in zip(events, names)
+        if any(token in name for token in target_tokens)
     )
     return {
         "primary": primary,

@@ -1,31 +1,77 @@
 # GPT-OSS-120B fused AR+RMSNorm status
 
-Updated: 2026-07-29
+Updated: 2026-07-30
 
 This is the sole live deployment decision and priority page for GPT-OSS-120B,
 TP=4, on MI350X (gfx950).
 
 ## Deployment decision
 
-- There is no post-rebase project performance baseline or promotion decision.
-- Upstream `main` at `3f88dcc2` now makes AMD `auto` use Iris for fused
-  AR+RMSNorm and ordinary small all-reduce. Upstream may auto-enable fusion for
-  supported single-node AMD TP mappings.
-- `TS_ARNORM_BACKEND=triton_shmem` is an explicit experimental candidate; it
-  no longer replaces upstream `auto`.
+- **Deploy with all-reduce fusion explicitly disabled.** Upstream auto-enables
+  fusion on this topology, so the canonical control requires
+  `--disable-allreduce-fusion`.
+- The post-rebase upstream-unfused control is the current GPT-OSS-120B TP=4
+  policy on MI350X.
+- Iris `auto` completed 15/15 safe pairs but regressed median TPOT by **+2.55%**
+  (95% CI +1.00% to +5.43%) and output throughput by **-2.29%** (95% CI
+  -4.78% to -0.89%). It is rejected for GPT-OSS performance.
+- Explicit `triton_shmem` completed 15/15 safe pairs but regressed median TPOT
+  by **+10.47%** (95% CI +6.71% to +19.23%) and output throughput by
+  **-10.58%** (95% CI -23.21% to -4.49%). It remains experimental and rejected.
 - Profile `gpt-oss-120b-mi350x-qualified-v4` is legacy performance evidence.
   It qualified the old `triton_shmem` integration, not Iris or the rebased
   runtime.
 - The graph-padding and captured-output lifetime faults remain closed
   historical incidents. Their invariants still apply to captured buffers.
 
-The old final campaign completed three independent restart blocks and fifteen
-fused/unfused pairs without a safety failure, but is not a post-rebase
-baseline. Raw campaign:
-`../raw/current/gpt-oss-120b/mi350x/2026-07-29/2026-07-29-output-ring-v4-fused-vs-unfused/`.
+Canonical post-rebase raw campaigns:
+
+- `../raw/current/gpt-oss-120b/mi350x/2026-07-30/2026-07-30-post-rebase-iris-vs-unfused-v4/`
+- `../raw/current/gpt-oss-120b/mi350x/2026-07-30/2026-07-30-post-rebase-triton-shmem-vs-unfused-v3/`
+
+Curated study:
+[`2026-07-post-rebase-baseline`](../studies/mi350x/2026-07-post-rebase-baseline/README.md).
 
 See [upstream-main rebase impact](upstream-main-rebase-impact-2026-07.md) for
 the backend analysis and baseline reset.
+
+## Post-rebase qualified TP=4 profile
+
+Scope:
+
+- model: `/data/models/openai/gpt-oss-120b`, hidden size 2880 bf16 elements;
+- hardware: AMD Instinct MI350X (gfx950), canonical HIP set `1,2,3,5`;
+- code head: `eb69cf15`, upstream merge base `3f88dcc2`;
+- profile ID: `gpt-oss-120b-mi350x-post-rebase-v1`;
+- base image ID:
+  `sha256:ad3ea3f8cae8ca38cf12824b15c606d0630118c6e04b4087e191b04619a6c135`;
+- runtime corrections: repository-pinned Transformers/SMG/XGrammar, current
+  source-tree PYTHONPATH, and `tokenspeed-scheduler` rebuilt from current source.
+
+Required control:
+
+```text
+TS_ARNORM_BACKEND=auto
+--disable-allreduce-fusion
+--comm-fusion-max-num-tokens 2048
+```
+
+The server proof must contain both `ENABLE_FUSION=0` and resolved
+`enable_allreduce_fusion=False`. A missing enable flag is not an unfused
+control because upstream otherwise auto-enables fusion.
+
+Lower-level findings:
+
+- WS=2/4 correctness passed for Iris and `triton_shmem`; WS=8 is deferred while
+  physical GPU 3 remains occupied.
+- fixed M=32 graph p50: 33.12 us upstream-unfused, 46.06 us Iris fused,
+  44.52 us `triton_shmem`;
+- marker-aligned target-stage median: 4.779 ms upstream-unfused, 6.146 ms Iris,
+  5.943 ms `triton_shmem`;
+- `triton_shmem` retains an eager M<=256 screen advantage but crosses sharply
+  at M=257 and loses under graph replay and end-to-end serving;
+- synthetic mixed ordinary-Iris/RCCL captured transitions timed out; bounded
+  real serving passed and the hazard remains open.
 
 ## Legacy qualified TP=4 profile
 
@@ -96,18 +142,18 @@ Sources:
 
 ## Priorities
 
-1. Establish an upstream-unfused control on the rebased code and record the
-   ordinary AR backend and kernel signatures.
-2. Establish the upstream Iris-first fused baseline with correctness, decline,
-   graph, and transition evidence.
-3. Compare explicit `triton_shmem` against those controls on the identical
-   code, image, topology, and workload. Do not transfer old percentages.
-4. Evaluate `all_reduce_two` and the NVIDIA lane/latent-norm APIs as separate
-   primitives; they are not GPT-OSS AR+RMSNorm results.
-5. Only after operator, graph, transition, and marker-aligned profiling gates
-   pass, run the repeatability runner's three-block/fifteen-pair campaign with
-   fresh servers, GPU isolation, signature proof, checksums, and failure gates.
-6. Preserve graph-stable output lifetime, universal sink padding, complete
+1. Keep explicit fusion-off as the GPT-OSS-120B TP=4 deployment control.
+2. Investigate the mixed ordinary-Iris/RCCL captured-transition timeout without
+   weakening the production fallback or graph isolation.
+3. Explain the N=2880 Iris fused cost relative to ordinary Iris plus RMSNorm.
+   Require a clear graph critical-path win before another serving campaign.
+4. Deprioritize local `triton_shmem` tuning. Its eager small-M win did not
+   survive graph or serving qualification.
+5. Keep `all_reduce_two` separate. One initial WS=4 two-ordinary control
+   correctness event remains retained despite five clean reproductions.
+6. Requalify WS=8 only after physical GPU 3 is idle; do not transfer TP=4
+   thresholds or percentages.
+7. Preserve graph-stable output lifetime, universal sink padding, complete
    fallback, and explicit completion/barrier contracts in every candidate.
 
 Technical ownership:

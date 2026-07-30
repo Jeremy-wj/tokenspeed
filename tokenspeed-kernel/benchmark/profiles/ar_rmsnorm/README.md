@@ -3,25 +3,25 @@
 Profiles make model paths, hidden sizes, serving arguments, and validated
 performance policies explicit.
 
-All profiles here are pre-rebase regression profiles. They do not qualify the
-upstream Iris default introduced by the `3f88dcc2` baseline. Use them to
-reproduce legacy `triton_shmem` behavior only, with an explicit backend.
+The GPT-OSS profile was requalified after the `3f88dcc2` rebase. The model
+template remains unqualified until a model completes the evidence ladder.
 
-- `gpt_oss_120b_mi350x.env` is the legacy qualified gpt-oss-120B MI350X profile.
+- `gpt_oss_120b_mi350x.env` is the post-rebase GPT-OSS-120B MI350X profile.
 - `model_template.env` is a conservative starting point for another model.
 
-The legacy manual-serving profile emits
-`AR_NORM_PROFILE_ID=gpt-oss-120b-mi350x-qualified-v4` and
+The profile emits
+`AR_NORM_PROFILE_ID=gpt-oss-120b-mi350x-post-rebase-v1` and
 `TS_TRITON_SHMEM_OUTPUT_RING=72`. Campaign runs also validate the resolved
 server arguments; the profile ID alone does not hide command-line overrides.
-Its graph-lifetime safety gates passed, but TP4 fusion remains opt-in because
-the complete campaign rejected it on decode performance.
+The canonical deployment arm explicitly disables fusion; both Iris and
+`triton_shmem` failed post-rebase performance promotion.
 
 Usage:
 
 ```bash
 source benchmark/profiles/ar_rmsnorm/gpt_oss_120b_mi350x.env
-bash benchmark/e2e_arnorm_serve.sh 4 1,2,3,5 2048 triton_shmem
+ENABLE_ALLREDUCE_FUSION=0 \
+  bash benchmark/e2e_arnorm_serve.sh 4 1,2,3,5 2048 auto
 ```
 
 For a new hidden size:

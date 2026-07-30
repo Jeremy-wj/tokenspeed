@@ -107,7 +107,21 @@ def main() -> int:
     run_root = run_root.resolve()
     run_root.mkdir(parents=True, exist_ok=True)
     log = run_root / "orchestration.log"
-    arm = Arm("repro", args.fusion_max_m)
+    if not args.fusion:
+        signature_family = "production_unfused"
+    elif args.backend in ("auto", "iris"):
+        signature_family = "iris_fused"
+    elif args.backend == "triton_shmem":
+        signature_family = "triton_shmem_fused"
+    else:
+        signature_family = "symm_mem_fused"
+    arm = Arm(
+        "repro",
+        args.fusion_max_m,
+        fusion_enabled=args.fusion,
+        backend=args.backend,
+        signature_family=signature_family,
+    )
     engine_module = (
         "tokenspeed.runtime.entrypoints.safe_smg_server"
         if args.deep_health_mode != "generate"
@@ -127,6 +141,7 @@ def main() -> int:
             "TS_TRITON_SHMEM_BARRIER_GRID": str(args.barrier_grid),
             "TS_SERVE_ENGINE_MODULE": engine_module,
             "TOKENSPEED_DEEP_HEALTH_MODE": args.deep_health_mode,
+            "TOKENSPEED_PROFILE_FORWARD_MARKERS": "1",
         }
     )
     configuration = vars(args).copy()
@@ -154,6 +169,12 @@ def main() -> int:
     phase = "initial_teardown"
     _teardown(env=env, log=log, dry_run=False)
     try:
+        phase = "container_restart"
+        _run(
+            ["docker", "restart", args.container],
+            log=log,
+            timeout_seconds=60,
+        )
         phase = "preflight"
         _preflight(
             run_root,
@@ -268,20 +289,19 @@ def main() -> int:
                     "output_throughput": result.get("output_throughput"),
                 }
             )
-        if args.fusion and args.backend == "triton_shmem":
-            phase = "serve_proof"
-            summary["serve_proof"] = _serve_proof(
-                run_root / f"serve-{args.label}.log",
-                arm,
-                2048,
-                args.barrier_grid,
-                args.inkernel_barrier,
-                engine_module,
-                args.deep_health_mode,
-                int(os.environ.get("TS_TRITON_AR_DISABLE", "0")),
-                args.double_buffer_input,
-                "--disable-overlap-schedule" in args.serve_extra_args,
-            )
+        phase = "serve_proof"
+        summary["serve_proof"] = _serve_proof(
+            run_root / f"serve-{args.label}.log",
+            arm,
+            2048,
+            args.barrier_grid,
+            args.inkernel_barrier,
+            engine_module,
+            args.deep_health_mode,
+            int(os.environ.get("TS_TRITON_AR_DISABLE", "0")),
+            args.double_buffer_input,
+            "--disable-overlap-schedule" in args.serve_extra_args,
+        )
         summary["status"] = "passed"
         _write(run_root / "summary.json", summary)
         return 0

@@ -1,6 +1,6 @@
 # Upstream-main rebase and AR+RMSNorm baseline reset
 
-Updated: 2026-07-29
+Updated: 2026-07-30
 
 ## Executive decision
 
@@ -22,6 +22,10 @@ operator result in this project is **legacy performance evidence**. Profile v4
 remains valuable proof of the old `triton_shmem` lifetime and transition
 contracts, but it does not qualify the new upstream default or provide a
 current performance baseline.
+
+The 2026-07-30 reset now provides that baseline. Upstream-unfused with explicit
+fusion disablement is the GPT-OSS-120B TP=4 control; Iris and `triton_shmem`
+completed safety qualification but failed performance promotion.
 
 The rebased policy is:
 
@@ -293,30 +297,51 @@ This pair used an older serving profile and is legacy mechanism evidence.
 Raw artifacts remain immutable. Legacy labels are applied in indexes and
 curated summaries rather than rewriting captured logs and traces.
 
-## Required baseline reset
+## Completed baseline reset
 
-Do not run another promotion campaign until the lower levels identify exactly
-what changed:
+The 2026-07-30 GPT-OSS-120B TP=4 campaign completed the evidence ladder on
+WS=2/4; WS=8 remains deferred because physical GPU 3 is occupied.
 
-1. **Upstream unfused control:** pin fusion off and record whether ordinary AR
-   selects Iris or another backend for every target shape.
-2. **Upstream default fused control:** run Iris-first `auto`, record state,
-   dispatch, kernel signatures, correctness, and decline behavior.
-3. **Explicit local candidate:** run `TS_ARNORM_BACKEND=triton_shmem` on the
-   identical rebased code, image, topology, and workload.
-4. **Operator matrix:** repeat world-size, width, dtype, M-boundary,
-   one-/two-shot, fallback, and signal-zero tests. Include `all_reduce_two`
-   separately; it is not an AR+RMSNorm arm.
-5. **Graph/transition matrix:** fixed-shape replay, odd/even calls, interleaved
-   graphs, eager/graph transitions, M=1, prefill/decode, and restart behavior.
-6. **Authoritative profiling:** use forward markers and max-rank aligned
-   periods; treat pre-rebase scope names as a separate schema generation.
-7. **End-to-end qualification:** only after safety and aligned-forward evidence,
-   run three restart blocks and fifteen randomized pairs for each candidate
-   versus the new upstream-unfused control.
+The reset also exposed a policy gap: leaving `--enable-allreduce-fusion` absent
+does not pin fusion off because upstream auto-enables it on supported AMD TP
+topologies. The project added `--disable-allreduce-fusion`, and the canonical
+control now proves resolved `enable_allreduce_fusion=False`.
 
-Until these steps complete, no post-rebase backend has a TokenSpeed project
-performance baseline and no pre-rebase percentage supports a default decision.
+Completed actions:
+
+1. **Upstream unfused control:** ordinary eligible decode AR resolves to Iris,
+   followed by standalone RMSNorm; larger payloads fall back to RCCL.
+2. **Upstream default fused control:** Iris `auto` state, signatures,
+   correctness, fixed graph, transitions, and serving were captured.
+3. **Explicit local candidate:** `TS_ARNORM_BACKEND=triton_shmem` was run on
+   identical code, runtime, topology, and workloads with rank-side selected
+   backend proof.
+4. **Operator matrix:** WS=2/4, model widths, M=1/256/257/2048 boundaries,
+   one-/two-shot, fallback, and separate `all_reduce_two` evidence were
+   collected with two noise-opposed passes.
+5. **Graph/transition matrix:** 1,000-replay fixed graphs and bounded
+   interleaved graph/eager transitions passed for both fused candidates. A
+   synthetic mixed ordinary-Iris/RCCL captured transition timed out and remains
+   open; bounded real serving passed.
+6. **Authoritative profiling:** forward markers identified 73 ordinary
+   Iris+RMSNorm sites, 72 fused Iris sites, and 72 fused `triton_shmem` sites
+   per decode forward.
+7. **End-to-end qualification:** both candidates completed three restart
+   blocks and fifteen randomized pairs versus upstream-unfused.
+
+Final result:
+
+- Iris fused: **+2.55%** median TPOT (95% CI +1.00% to +5.43%) and
+  **-2.29%** output throughput (95% CI -4.78% to -0.89%);
+- explicit `triton_shmem`: **+10.47%** median TPOT (95% CI +6.71% to
+  +19.23%) and **-10.58%** output throughput (95% CI -23.21% to -4.49%);
+- both campaigns: 15/15 pairs completed without a safety failure;
+- deployment: upstream-unfused with explicit fusion disablement;
+- promotion: both fused candidates rejected.
+
+Sources:
+[post-rebase baseline study](../studies/mi350x/2026-07-post-rebase-baseline/README.md)
+and the live [GPT-OSS-120B status](gpt-oss-120b-status.md).
 
 ## Verification performed during rebase
 

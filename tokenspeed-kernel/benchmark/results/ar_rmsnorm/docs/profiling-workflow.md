@@ -1,10 +1,9 @@
 # AR+RMSNorm profiling workflow
 
-All existing traces and summaries produced by this workflow are legacy after
-the upstream-main rebase at `3f88dcc2`. The workflow remains the starting
-point for new captures, but post-rebase runs must record the resolved ordinary
-AR backend, fused backend, kernel signatures, and new scope schema. See
-[upstream-main rebase impact](upstream-main-rebase-impact-2026-07.md).
+Pre-rebase traces remain legacy. The 2026-07-30 campaign established the
+post-rebase workflow and baseline. New runs must record the resolved ordinary
+AR backend, fused backend, rank-side selected-backend log, kernel signatures,
+and scope schema.
 
 ## Qualified environment
 
@@ -23,6 +22,13 @@ the same Docker configuration and package sets, but `libtorch_hip.so` still
 resolved torch's bundled ROCm 7.2.0 `libroctracer64.so`; that mixed tracing stack
 is known to crash. Do not recreate or use the old tag as a supposedly leaner
 serving image.
+
+The upstream rebase outgrew the image's original Python packages. The qualified
+2026-07-30 writable layer uses source-tree `PYTHONPATH`, Transformers 5.12,
+SMG 1.8.0.post20260728, gRPC proto 0.4.14.post20260728, gRPC servicer
+0.7.0.post20260728, XGrammar 0.2.2, and a `tokenspeed-scheduler` 0.1.3 wheel
+built from current source. Incompatible optional torchaudio is absent. Record
+these package versions in addition to the immutable base image ID.
 
 Torch's bundled HIP/HSA/ROCTX/RCCL/roctracer libraries must not mix with the
 system 7.2.4 runtime family. Re-run:
@@ -102,9 +108,14 @@ transition-safe fallback redesign.
 TP=4 matched unfused:
 
 ```text
+TS_ARNORM_BACKEND=auto
 ENABLE_ALLREDUCE_FUSION=0
+--disable-allreduce-fusion
 --comm-fusion-max-num-tokens 2048
 ```
+
+The explicit disable flag is mandatory. Upstream auto-enables fusion when the
+flag is merely absent.
 
 Expected fused signatures:
 
@@ -117,8 +128,16 @@ fused_ar_rmsnorm_twoshot_blocked_kernel
 Expected unfused signatures:
 
 ```text
-amd_all_reduce_kernel or RCCL kernels
+iris_stage_one_shot_allreduce_kernel for eligible decode shapes
+RCCL kernels for larger fallback shapes
 _rmsnorm_kernel
+```
+
+Expected Iris fused signature:
+
+```text
+iris_allreduce_residual_rmsnorm_kernel
+AR+RMSNorm backend resolved: requested=auto selected=iris
 ```
 
 Restart between variants so graph capture and state caches are clean. Keep
@@ -240,15 +259,24 @@ BENCH_WS=4 BENCH_N=<hidden> BENCH_M=<tokens> \
 3. Shared-state graph transition gate:
 
 ```bash
-BENCH_WS=4 BENCH_N=<hidden> PROBE_MODE=multigraph \
-  PROBE_RNG_SHARED=1 python3 -m benchmark.probe_inkernel_barrier_graph
+BENCH_IMPL=<production_unfused|auto|triton_shmem> \
+  BENCH_WS=4 BENCH_N=<hidden> PROBE_REPLAYS=70 \
+  python3 -m benchmark.probe_ar_rmsnorm_transitions
 ```
+
+The legacy `probe_inkernel_barrier_graph` remains a `triton_shmem`-specific
+barrier diagnostic. The post-rebase transition probe compares production
+dispatch and retains failures across backend/path changes.
 
 4. Communication correctness:
 
 ```bash
 pytest -q test/ops/test_triton_shmem_communication.py
 ```
+
+Evaluate the separate paired-reduction primitive with
+`python3 -m benchmark.bench_all_reduce_two`; do not merge its result into the
+AR+RMSNorm arms.
 
 5. Full matched serving A/B and production trace.
 
@@ -275,7 +303,7 @@ Before paired qualification, require three fresh canonical unfused seeds:
 
 ```bash
 python3 benchmark/run_ar_rmsnorm_repeatability.py \
-  --stability-only --comparison unfused --decode-only \
+  --stability-only --comparison iris --decode-only \
   --blocks 1 --seeds 0,1,2 --devices 1,2,3,5 \
   --deep-health-mode passive --disable-overlap-schedule \
   --double-buffer-input 0 --barrier-grid 0 --skip-profiles
@@ -288,9 +316,13 @@ The required serving harness is:
 
 ```bash
 python3 benchmark/run_ar_rmsnorm_repeatability.py \
-  --blocks 3 --seeds 0,1,2,3,4 \
+  --comparison iris --blocks 3 --seeds 0,1,2,3,4 \
   --devices <qualified-HIP-indices>
 ```
+
+Run explicit `triton_shmem` separately with
+`--comparison triton_shmem`. Resume reuses a decode result only when result,
+serve proof, and the complete phase GPU-guard history all revalidate.
 
 The runner records HIP-to-physical mapping, restarts the dedicated container
 before every server, rejects foreign PIDs before measurement, and samples GPU
@@ -302,11 +334,11 @@ validates serve arguments/signatures, and computes paired hierarchical
 bootstrap intervals. It cannot report promotion eligibility below three
 complete blocks and fifteen paired observations.
 
-GPT-OSS MI350X profile v4 uses passive health, disabled overlap, the original
+GPT-OSS MI350X post-rebase profile v1 uses passive health, disabled overlap, the original
 one-slot exit barrier, 0.90 GPU-memory utilization, eager prefill, C32 decode
 capture, explicit copy-in, and `TS_TRITON_SHMEM_OUTPUT_RING=72`. Profile ID
-`gpt-oss-120b-mi350x-qualified-v4` and the output-ring value are mandatory proof
-fields.
+`gpt-oss-120b-mi350x-post-rebase-v1`, the output-ring value, the resolved
+fusion flag, and the rank-side backend selection are mandatory proof fields.
 
 Universal reserved-sink graph padding and persistent per-site fused outputs are
 required safety invariants. Rerun a full campaign only for a changed

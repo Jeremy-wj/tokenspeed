@@ -4,14 +4,16 @@ Curated studies answer dated questions; they do not override the current
 deployment decision in the
 [GPT-OSS-120B status](../docs/gpt-oss-120b-status.md).
 
-All studies indexed here predate the upstream-main rebase at `3f88dcc2` and
-are **legacy performance evidence**. This includes profile v4. Safety incidents
-and lifetime findings remain historical engineering evidence, but no latency,
-throughput, kernel, graph, or crossover number is a post-rebase baseline.
-See [upstream-main rebase impact](../docs/upstream-main-rebase-impact-2026-07.md).
+Except for the explicitly marked post-rebase study below, studies predate the
+upstream-main rebase at `3f88dcc2` and are **legacy performance evidence**.
+This includes profile v4. Safety incidents and lifetime findings remain
+historical engineering evidence.
 
 ## MI350X (gfx950)
 
+- [`2026-07-post-rebase-baseline/`](mi350x/2026-07-post-rebase-baseline/README.md)
+  — canonical GPT-OSS-120B TP=4 upstream-unfused, Iris, and `triton_shmem`
+  reset; current performance and deployment evidence.
 - `2026-07-serving-baseline/` — initial TP=2, TP=4, and TP=8 serving crossover.
 - `2026-07-grid-and-two-shot/` — grid and two-shot integration screens.
 - `2026-07-path-and-width-sweeps/` — operator path and width sweeps.

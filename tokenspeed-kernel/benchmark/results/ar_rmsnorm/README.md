@@ -6,10 +6,16 @@ residual-add + RMSNorm.
 ## Current outcome
 
 The 2026-07-29 rebase onto upstream `main` at `3f88dcc2` changed the default
-AMD fused and unfused communication backends. There is currently **no
-post-rebase TokenSpeed performance baseline**. All results in this directory,
-including the completed profile-v4 campaign, are legacy performance evidence.
-The old safety and incident findings remain historical technical evidence.
+AMD fused and unfused communication backends. The 2026-07-30 GPT-OSS-120B
+TP=4 campaign re-established the baseline: upstream-unfused with
+`--disable-allreduce-fusion` is the supported policy. Iris fused regressed TPOT
+by +2.55% and throughput by -2.29%; explicit `triton_shmem` regressed TPOT by
++10.47% and throughput by -10.58%. Both completed 15/15 safe pairs and both
+failed performance promotion.
+
+All pre-rebase results, including profile v4, remain legacy performance
+evidence. The old safety and incident findings remain historical technical
+evidence.
 
 The sole live deployment decision and priority list is the
 [GPT-OSS-120B status](docs/gpt-oss-120b-status.md). The durable technical
@@ -24,6 +30,11 @@ The rebase, backend analysis, conflict log, and baseline-reset plan are in
   chronology, artifact index, and final dispositions.
 - Final 2026-07-29 raw campaign:
   `raw/current/gpt-oss-120b/mi350x/2026-07-29/2026-07-29-output-ring-v4-fused-vs-unfused/`.
+- Canonical post-rebase campaigns:
+  `raw/current/gpt-oss-120b/mi350x/2026-07-30/2026-07-30-post-rebase-iris-vs-unfused-v4/`
+  and
+  `raw/current/gpt-oss-120b/mi350x/2026-07-30/2026-07-30-post-rebase-triton-shmem-vs-unfused-v3/`.
+- [Post-rebase baseline study](studies/mi350x/2026-07-post-rebase-baseline/README.md).
 - Large logs and traces under `raw/` are intentionally Git-ignored.
 
 ## Reference documents

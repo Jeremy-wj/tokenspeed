@@ -59,7 +59,7 @@ def _time(
     group: dist.ProcessGroup,
     setup: Callable[[], object] | None = None,
 ) -> float:
-    """Return max-rank p50 milliseconds; setup executes outside timing events."""
+    """Return p50 after taking the maximum rank for every iteration."""
     for _ in range(_WARM):
         if setup is not None:
             setup()
@@ -77,10 +77,13 @@ def _time(
         ends[i].record()
     torch.cuda.synchronize()
 
-    med = statistics.median(s.elapsed_time(e) for s, e in zip(starts, ends))
-    value = torch.tensor([med], device="cuda")
-    dist.all_reduce(value, op=dist.ReduceOp.MAX, group=group)
-    return value.item()
+    samples = torch.tensor(
+        [s.elapsed_time(e) for s, e in zip(starts, ends)],
+        dtype=torch.float64,
+        device="cuda",
+    )
+    dist.all_reduce(samples, op=dist.ReduceOp.MAX, group=group)
+    return statistics.median(samples.cpu().tolist())
 
 
 def _worker(rank: int, ws: int, port: int, out) -> None:

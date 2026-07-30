@@ -8,6 +8,10 @@ the [serving incident record](../../../docs/gpt-oss-120b-serving-root-cause.md)
 and the JSON summaries below. The live deployment decision is the
 [GPT-OSS-120B status](../../../docs/gpt-oss-120b-status.md).
 
+This directory is pre-rebase history. The current baseline and deployment
+decision are in
+[`2026-07-post-rebase-baseline`](../2026-07-post-rebase-baseline/README.md).
+
 ## Chronology
 
 - **2026-07-27:** The first repeatability root was contaminated by a foreign GPU

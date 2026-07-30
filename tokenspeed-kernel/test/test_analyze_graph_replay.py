@@ -6,7 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from benchmark.analyze_ar_rmsnorm_forwards import analyze as analyze_marked
+from benchmark.analyze_ar_rmsnorm_forwards import (
+    _kernel_breakdown,
+    analyze as analyze_marked,
+)
 from benchmark.analyze_graph_replay import _aligned_aggregate, _summarize
 
 
@@ -219,3 +222,20 @@ def test_marker_analyzer_rejects_legacy_trace(tmp_path):
     _write(path, [_event("amd_all_reduce_kernel", 1, 0)])
     with pytest.raises(ValueError, match="exact forward markers not found"):
         analyze_marked([path], expected_world_size=1, mode="all")
+
+
+def test_marker_analyzer_classifies_post_rebase_iris_paths():
+    fused = _kernel_breakdown(
+        [_event("iris_allreduce_residual_rmsnorm_kernel", 1, 0)]
+    )
+    assert fused["primary"] == "iris_fused"
+    assert fused["counts"]["standalone_rmsnorm"] == 0
+
+    unfused = _kernel_breakdown(
+        [
+            _event("iris_stage_one_shot_allreduce_kernel", 1, 0),
+            _event("_rmsnorm_kernel", 2, 10),
+        ]
+    )
+    assert unfused["primary"] == "unfused_iris"
+    assert unfused["target_kernel_sum_us"] == 2

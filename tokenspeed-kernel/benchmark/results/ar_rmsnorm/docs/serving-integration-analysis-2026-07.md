@@ -1,12 +1,13 @@
 # AR+RMSNorm serving integration analysis
 
-Updated: 2026-07-29
+Updated: 2026-07-30
 
 > **Legacy integration analysis:** this report describes the pre-rebase
 > `triton_shmem` serving path. The upstream-main rebase made Iris the default
 > fused AMD backend and changed ordinary all-reduce. Mechanisms and safety
-> contracts remain useful; performance conclusions require new baselines. See
-> [upstream-main rebase impact](upstream-main-rebase-impact-2026-07.md).
+> contracts remain useful. The new baseline is now complete: upstream-unfused
+> is the GPT-OSS control, while Iris and `triton_shmem` failed performance
+> promotion. See the [post-rebase study](../studies/mi350x/2026-07-post-rebase-baseline/README.md).
 
 ## Purpose and evidence boundary
 

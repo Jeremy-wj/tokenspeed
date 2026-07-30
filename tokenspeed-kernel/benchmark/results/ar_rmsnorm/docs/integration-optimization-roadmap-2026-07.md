@@ -1,6 +1,6 @@
 # AR+RMSNorm integration optimization roadmap
 
-Updated: 2026-07-29
+Updated: 2026-07-30
 
 ## Scope and ownership
 
@@ -9,12 +9,16 @@ TokenSpeed `triton_shmem` AR+residual+RMSNorm integration. It does not own
 deployment policy, execution order, or rejected-candidate priorities; those
 remain in [GPT-OSS-120B status](gpt-oss-120b-status.md).
 
-After the upstream-main rebase, `triton_shmem` is an explicit experimental
-backend and every measured opportunity in this document is legacy. The first
-priority is no longer another local optimization: establish upstream-unfused
-and upstream Iris baselines on the rebased runtime, then compare explicit
-`triton_shmem` under identical conditions. See
-[upstream-main rebase impact](upstream-main-rebase-impact-2026-07.md).
+After the upstream-main rebase, `triton_shmem` remains an explicit experimental
+backend. The 2026-07-30 reset now supersedes the legacy opportunity estimates:
+
+- upstream-unfused is the deployment control;
+- Iris fused regressed TPOT +2.55% and throughput -2.29%;
+- `triton_shmem` regressed TPOT +10.47% and throughput -10.58%;
+- both fused campaigns completed 15/15 safe pairs and failed promotion.
+
+The current evidence is in the
+[post-rebase baseline study](../studies/mi350x/2026-07-post-rebase-baseline/README.md).
 
 The profile-v4 graph-lifetime investigation is closed. Its evidence and
 chronology live in the
@@ -26,19 +30,39 @@ output lifetime contracts established there.
 
 ```text
 closed graph-lifetime contracts
-  -> new upstream-unfused and Iris baselines
+  -> explicit upstream-unfused deployment control
+     -> ordinary Iris/RCCL graph-transition investigation
+     -> Iris fused N=2880 critical-path investigation
      -> deterministic state initialization and observable identity
-     -> graph-stable ring epoch/slot ownership
-        -> optional two-slot reuse without a trailing barrier
-     -> unified model/topology/shape dispatch
-        -> producer-direct input and progress publication
+        -> only then reconsider a materially faster fused candidate
 ```
 
-State observability can proceed independently of baseline gathering. No old
-latency or crossover transfers to Iris. Two-slot reuse depends on graph-stable
-identity. Producer-direct input depends on both safe reuse semantics and an
-exact caller-owned output API. Qualification gates are defined in
-[benchmark methodology](benchmark-methodology-recommendations-2026-07.md).
+Local input-ring, producer-direct, and barrier-removal work is deprioritized.
+The completed serving campaign shows that improving an isolated
+`triton_shmem` phase is not the current bottleneck. Any reconsideration still
+depends on graph-stable identity and exact caller-owned output APIs, and must
+first project a graph critical-path win large enough to clear the campaign
+thresholds.
+
+## Post-rebase optimization order
+
+1. **Preserve the control.** Keep `--disable-allreduce-fusion` and require
+   resolved false-state proof. Do not benchmark against an auto-enabled arm
+   mislabeled unfused.
+2. **Resolve mixed transport transitions.** The synthetic transition matrix
+   passes Iris-only graphs but times out when ordinary Iris and RCCL-fallback
+   graphs share the captured sequence. Determine whether graph-pool sharing,
+   communicator epochs, or capture ordering is responsible.
+3. **Explain Iris fused cost.** At WS=4/N=2880, Iris fused is slower than
+   ordinary Iris plus RMSNorm in eager, fixed-graph, marker-aligned, and
+   end-to-end evidence. Profile staging, device-barrier, grid, and persistent
+   kernel choices before changing integration policy.
+4. **Keep `triton_shmem` diagnostic.** Its eager advantage ends at M=256; the
+   M=257 two-shot transition, graph replay, and serving campaign are
+   unfavorable. Do not tune grid caps or rings next.
+5. **Require a material pre-campaign projection.** A candidate must beat the
+   unfused M=32 graph path and aligned max-rank target stage before another
+   three-block campaign.
 
 ## Deterministic state initialization and identity
 

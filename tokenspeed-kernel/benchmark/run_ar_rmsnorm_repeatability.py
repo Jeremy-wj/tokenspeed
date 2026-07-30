@@ -10,10 +10,11 @@ The runner is deliberately model-profiled and conservative:
 * all generated artifacts receive SHA256 checksums;
 * paired hierarchical bootstrap intervals preserve restart-block structure.
 
-The default campaign compares the stable fused TP=4/N=2880 policy against the
-complete unfused path. ``--stability-only`` runs only the unfused arm and is the
-canonical gate for residual base-runtime qualification. Use ``--dry-run`` to
-inspect the complete schedule without touching a server or GPU.
+The default post-rebase campaign compares Iris-first ``auto`` against the
+upstream-unfused TP=4/N=2880 control. ``--comparison triton_shmem`` evaluates
+the explicit local candidate against the same control. ``--stability-only``
+runs only the control and is the canonical residual-runtime gate. Use
+``--dry-run`` to inspect the schedule without touching a server or GPU.
 """
 from __future__ import annotations
 
@@ -55,6 +56,8 @@ class Arm:
     name: str
     fusion_max_m: int
     fusion_enabled: int = 1
+    backend: str = "triton_shmem"
+    signature_family: str = "triton_shmem_fused"
     double_buffer_input: int | None = None
 
 
@@ -74,12 +77,52 @@ ARMS = (
 )
 
 
+def _upstream_unfused_arm() -> Arm:
+    return Arm(
+        "upstream_unfused",
+        0,
+        fusion_enabled=0,
+        backend="auto",
+        signature_family="production_unfused",
+        double_buffer_input=0,
+    )
+
+
 def comparison_arms(name: str) -> tuple[Arm, Arm]:
     if name == "gate256":
         return ARMS
+    if name == "iris":
+        return (
+            _upstream_unfused_arm(),
+            Arm(
+                "iris_auto",
+                0,
+                fusion_enabled=1,
+                backend="auto",
+                signature_family="iris_fused",
+            ),
+        )
+    if name == "triton_shmem":
+        return (
+            _upstream_unfused_arm(),
+            Arm(
+                "triton_shmem",
+                0,
+                fusion_enabled=1,
+                backend="triton_shmem",
+                signature_family="triton_shmem_fused",
+            ),
+        )
     if name == "unfused":
         return (
-            Arm("unfused", 0, fusion_enabled=0, double_buffer_input=0),
+            Arm(
+                "unfused",
+                0,
+                fusion_enabled=0,
+                backend="triton_shmem",
+                signature_family="production_unfused",
+                double_buffer_input=0,
+            ),
             Arm("fused_stable", 0, fusion_enabled=1),
         )
     if name == "input_ring":
@@ -95,8 +138,10 @@ def campaign_arms(name: str, *, stability_only: bool = False) -> tuple[Arm, ...]
     arms = comparison_arms(name)
     if not stability_only:
         return arms
-    if name != "unfused":
-        raise ValueError("--stability-only requires --comparison unfused")
+    if name not in ("unfused", "iris", "triton_shmem"):
+        raise ValueError(
+            "--stability-only requires an upstream-unfused comparison"
+        )
     return (arms[0],)
 
 
@@ -740,6 +785,8 @@ def _wait_for_health(
                 "Memory access fault by GPU node",
                 "HSA_STATUS_ERROR",
                 "Fatal Python error:",
+                "ModuleNotFoundError:",
+                "ImportError:",
             )
             fatal_line = next(
                 (
@@ -803,10 +850,31 @@ def _trace_counts(path: Path) -> dict[str, int]:
         for event in events
         if event.get("cat") == "kernel"
     ]
+    lowered = [name.lower() for name in names]
     return {
         "oneshot": sum("fused_ar_rmsnorm_oneshot" in name for name in names),
         "twoshot": sum("fused_ar_rmsnorm_twoshot" in name for name in names),
-        "all_reduce": sum("amd_all_reduce_kernel" in name for name in names),
+        "iris_fused": sum(
+            "iris_allreduce_residual_rmsnorm_kernel" in name for name in names
+        ),
+        "symm_mem_fused": sum(
+            "amd_allreduce_residual_rmsnorm_kernel" in name for name in names
+        ),
+        "iris_all_reduce": sum(
+            "iris_stage_one_shot_allreduce_kernel" in name for name in names
+        ),
+        "legacy_all_reduce": sum(
+            "amd_all_reduce_kernel" in name for name in names
+        ),
+        "rccl": sum(
+            (
+                "nccl" in name
+                or "rccl" in name
+                or "reduce_kernel" in name
+            )
+            and "rmsnorm" not in name
+            for name in lowered
+        ),
         "rmsnorm": sum("_rmsnorm_kernel" in name for name in names),
     }
 
@@ -816,6 +884,7 @@ def validate_trace_signatures(
     *,
     world_size: int,
     arm: Arm,
+    require_prefill_twoshot: bool = True,
 ) -> dict[str, Any]:
     traces = sorted(trace_dir.glob("*.trace.json*"))
     if len(traces) != world_size:
@@ -828,20 +897,55 @@ def validate_trace_signatures(
             raise RuntimeError(f"empty trace: {trace}")
         counts = _trace_counts(trace)
         if not arm.fusion_enabled:
-            if counts["oneshot"] or counts["twoshot"] or counts["rmsnorm"] < 73:
+            fused_count = (
+                counts["oneshot"]
+                + counts["twoshot"]
+                + counts["iris_fused"]
+                + counts["symm_mem_fused"]
+            )
+            ordinary_count = (
+                counts["iris_all_reduce"]
+                + counts["legacy_all_reduce"]
+                + counts["rccl"]
+            )
+            if fused_count or counts["rmsnorm"] < 73 or ordinary_count == 0:
                 raise RuntimeError(
                     f"unfused arm signature mismatch in {trace}: {counts}"
                 )
             ranks.append({"trace": trace.name, **counts})
             continue
-        if counts["oneshot"] == 0:
-            raise RuntimeError(f"missing fused decode signature in {trace}")
-        if arm.fusion_max_m:
+        if arm.signature_family == "iris_fused":
+            if counts["iris_fused"] == 0:
+                raise RuntimeError(
+                    f"missing Iris fused signature in {trace}: {counts}"
+                )
+            if counts["oneshot"] or counts["twoshot"]:
+                raise RuntimeError(
+                    f"Iris arm entered triton_shmem in {trace}: {counts}"
+                )
+        elif arm.signature_family == "triton_shmem_fused":
+            if counts["oneshot"] == 0:
+                raise RuntimeError(
+                    f"missing triton_shmem fused decode signature in {trace}"
+                )
+            if counts["iris_fused"]:
+                raise RuntimeError(
+                    f"triton_shmem arm entered Iris in {trace}: {counts}"
+                )
+        else:
+            raise RuntimeError(
+                f"unsupported fused signature family {arm.signature_family!r}"
+            )
+        if arm.signature_family == "triton_shmem_fused" and arm.fusion_max_m:
             if counts["twoshot"] != 0 or counts["rmsnorm"] < 73:
                 raise RuntimeError(
                     f"gate arm did not use unfused prefill in {trace}: {counts}"
                 )
-        elif counts["twoshot"] == 0:
+        elif (
+            arm.signature_family == "triton_shmem_fused"
+            and require_prefill_twoshot
+            and counts["twoshot"] == 0
+        ):
             raise RuntimeError(
                 f"baseline arm missing fused two-shot prefill in {trace}"
             )
@@ -870,8 +974,8 @@ def _serve_proof(
         raise RuntimeError(f"RUN_ENV missing from {serve_log}")
     required = (
         f"CAP={cap}",
-        "BACKEND=triton_shmem",
-        "ENABLE_FUSION=1",
+        f"BACKEND={arm.backend}",
+        f"ENABLE_FUSION={arm.fusion_enabled}",
         f"FUSION_MAX_M={arm.fusion_max_m}",
         f"DOUBLE_BUFFER_INPUT={double_buffer_input}",
         f"BARRIER_GRID={barrier_grid}",
@@ -883,21 +987,53 @@ def _serve_proof(
     missing = [token for token in required if token not in run_env]
     if missing:
         raise RuntimeError(f"serve proof missing {missing}: {run_env}")
-    if "enable_allreduce_fusion=True" not in text:
-        raise RuntimeError(f"resolved fusion flag missing from {serve_log}")
+    resolved_flag = bool(arm.fusion_enabled)
+    if f"enable_allreduce_fusion={resolved_flag}" not in text:
+        raise RuntimeError(
+            f"resolved fusion flag {resolved_flag} missing from {serve_log}"
+        )
     if disable_overlap_schedule and "disable_overlap_schedule=True" not in text:
         raise RuntimeError(f"overlap schedule remained enabled in {serve_log}")
-    state_lines = [
+    if arm.signature_family == "triton_shmem_fused":
+        state_lines = [
+            line
+            for line in text.splitlines()
+            if "triton_shmem AR+RMSNorm state:" in line
+        ]
+        if not state_lines or not all(
+            f"max_tokens={cap}" in line for line in state_lines
+        ):
+            raise RuntimeError(f"workspace state proof missing from {serve_log}")
+    elif arm.signature_family == "iris_fused":
+        state_lines = [
+            line
+            for line in text.splitlines()
+            if "Iris AR+RMSNorm symmetric-heap buffer allocated" in line
+        ]
+        if not state_lines:
+            raise RuntimeError(f"Iris state proof missing from {serve_log}")
+    else:
+        state_lines = []
+    resolved_backend_lines = [
         line
         for line in text.splitlines()
-        if "triton_shmem AR+RMSNorm state:" in line
+        if "AR+RMSNorm backend resolved:" in line
     ]
-    if not state_lines or not all(f"max_tokens={cap}" in line for line in state_lines):
-        raise RuntimeError(f"workspace state proof missing from {serve_log}")
+    if arm.signature_family == "triton_shmem_fused" and not any(
+        "selected=triton_shmem" in line for line in resolved_backend_lines
+    ):
+        raise RuntimeError(f"triton_shmem resolution proof missing from {serve_log}")
+    if arm.signature_family == "iris_fused" and not any(
+        "selected=iris" in line for line in resolved_backend_lines
+    ):
+        raise RuntimeError(f"Iris resolution proof missing from {serve_log}")
     return {
         "run_env": run_env,
         "state_lines": state_lines,
-        "resolved_enable_allreduce_fusion": True,
+        "backend": arm.backend,
+        "signature_family": arm.signature_family,
+        "resolved_enable_allreduce_fusion": resolved_flag,
+        "resolved_backend_lines": resolved_backend_lines,
     }
 
 
@@ -911,12 +1047,13 @@ def _qualified_profile_proof(serve_log: Path) -> dict[str, Any]:
     if run_env is None:
         raise RuntimeError(f"RUN_ENV missing from {serve_log}")
     required_run_env = (
-        "PROFILE_ID=gpt-oss-120b-mi350x-qualified-v4",
+        "PROFILE_ID=gpt-oss-120b-mi350x-post-rebase-v1",
         "DEEP_HEALTH_MODE=passive",
         "FOLD_COPYIN=0",
         "SHMEM_OUTPUT_RING=72",
         "DOUBLE_BUFFER_INPUT=0",
         "BARRIER_GRID=0",
+        "FORWARD_MARKERS=1",
     )
     required_server_args = {
         "gpu_memory_utilization=0.9": (
@@ -990,6 +1127,7 @@ def _arm_environment(
             "TS_SERVE_ENGINE_MODULE": args.engine_module,
             "TOKENSPEED_DEEP_HEALTH_MODE": args.deep_health_mode,
             "TOKENSPEED_PROFILE_WITH_STACK": "0",
+            "TOKENSPEED_PROFILE_FORWARD_MARKERS": "1",
         }
     )
     return env
@@ -1030,7 +1168,7 @@ def _start_phase(
         str(args.world_size),
         args.devices,
         str(args.cap),
-        "triton_shmem",
+        arm.backend,
     ]
     if args.disable_overlap_schedule:
         serve_command.append("--disable-overlap-schedule")
@@ -1051,7 +1189,7 @@ def _start_phase(
         serve_log=phase_dir / f"serve-{label}.log",
     )
     if not args.dry_run:
-        if args.comparison == "unfused":
+        if args.comparison in ("unfused", "iris", "triton_shmem"):
             profile_proof = _qualified_profile_proof(
                 phase_dir / f"serve-{label}.log"
             )
@@ -1077,6 +1215,31 @@ def _guard_phase(args: argparse.Namespace, phase_dir: Path) -> None:
             ignored_busy_gpus=args.ignored_busy_gpus,
             physical_to_kfd_id=args.physical_to_kfd_id,
         )
+
+
+def _gpu_guard_history_is_clean(phase_dir: Path) -> bool:
+    """Return whether the latest phase attempt has records and no contamination."""
+    path = phase_dir / "gpu-guard.jsonl"
+    if not path.exists():
+        return False
+    records = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            records.append(json.loads(line))
+    preflight_path = phase_dir / "preflight.json"
+    if preflight_path.exists():
+        attempt_start = json.loads(
+            preflight_path.read_text(encoding="utf-8")
+        ).get("time")
+        if attempt_start:
+            records = [
+                record
+                for record in records
+                if str(record.get("time", "")) >= str(attempt_start)
+            ]
+    return bool(records) and not any(
+        record.get("unexpected_active_processes") for record in records
+    )
 
 
 def _run_guarded_benchmark(
@@ -1195,20 +1358,23 @@ def _run_arm(
             serve_log = decode_dir / f"serve-{decode_label}.log"
             if args.resume and output_file.exists() and serve_log.exists():
                 result = json.loads(output_file.read_text(encoding="utf-8"))
-                if result.get("failed") == 0 and result.get("completed") == 128:
-                    if arm.fusion_enabled:
-                        serve_proofs[f"decode-seed{seed}"] = _serve_proof(
-                            serve_log,
-                            arm,
-                            args.cap,
-                            args.barrier_grid,
-                            args.inkernel_barrier,
-                            args.engine_module,
-                            args.deep_health_mode,
-                            args.triton_ar_disable,
-                            arm_double_buffer,
-                            args.disable_overlap_schedule,
-                        )
+                if (
+                    result.get("failed") == 0
+                    and result.get("completed") == 128
+                    and _gpu_guard_history_is_clean(decode_dir)
+                ):
+                    serve_proofs[f"decode-seed{seed}"] = _serve_proof(
+                        serve_log,
+                        arm,
+                        args.cap,
+                        args.barrier_grid,
+                        args.inkernel_barrier,
+                        args.engine_module,
+                        args.deep_health_mode,
+                        args.triton_ar_disable,
+                        arm_double_buffer,
+                        args.disable_overlap_schedule,
+                    )
                     produced_results.append(
                         str(output_file.relative_to(arm_dir))
                     )
@@ -1255,7 +1421,7 @@ def _run_arm(
                 log=active_log,
             )
             produced_results.append(str(output_file.relative_to(arm_dir)))
-            if not args.dry_run and arm.fusion_enabled:
+            if not args.dry_run:
                 serve_proofs[f"decode-seed{seed}"] = _serve_proof(
                     serve_log,
                     arm,
@@ -1399,8 +1565,13 @@ def _run_arm(
                     world_size=args.world_size,
                     arm=arm,
                 )
+                trace_proof["forward_analysis"] = None
+                trace_proof["forward_analysis_reason"] = (
+                    "m512 trace is signature-only; authoritative marker-aligned "
+                    "decode traces are captured by the Level-5 profile workflow"
+                )
 
-        if not args.dry_run and arm.fusion_enabled:
+        if not args.dry_run:
             serve_proofs["prefill"] = _serve_proof(
                 prefill_dir / f"serve-{prefill_label}.log",
                 arm,
@@ -1534,30 +1705,37 @@ def analyze_campaign(
                 + sum(ord(character) for character in workload + metric),
             )
 
-    required_prefill = ("prefill-m512", "prefill-m1024", "prefill-m2048")
     reasons = []
     decode_sample = analyses.get("decode", {}).get("median_tpot_ms")
-    if (
+    sample_sufficient = not (
         decode_sample is None
         or decode_sample["n_blocks"] < 3
         or decode_sample["n_pairs"] < 15
-    ):
+    )
+    if not sample_sufficient:
         reasons.append(
             "insufficient paired evidence: require >=3 blocks and >=15 pairs"
         )
-    for workload in required_prefill:
-        ttft = analyses.get(workload, {}).get("median_ttft_ms")
-        if ttft is None or ttft["ci95_high"] >= 0:
-            reasons.append(f"{workload} median TTFT CI does not exclude zero")
     decode_tpot = analyses.get("decode", {}).get("median_tpot_ms")
-    if decode_tpot is None or decode_tpot["ci95_high"] > 1.0:
-        reasons.append("decode median TPOT regression is not ruled out")
     decode_throughput = analyses.get("decode", {}).get("output_throughput")
-    if (
-        decode_throughput is None
-        or decode_throughput["ci95_low"] < -0.5
-    ):
-        reasons.append("decode output-throughput regression is not ruled out")
+    latency_gate = bool(
+        decode_tpot is not None
+        and decode_throughput is not None
+        and decode_tpot["mean"] <= -1.5
+        and decode_tpot["ci95_high"] < 0
+        and decode_throughput["ci95_low"] >= -0.5
+    )
+    capacity_gate = bool(
+        decode_tpot is not None
+        and decode_throughput is not None
+        and decode_throughput["mean"] >= 1.0
+        and decode_throughput["ci95_low"] > 0
+        and decode_tpot["ci95_high"] <= 1.0
+    )
+    if sample_sufficient and not (latency_gate or capacity_gate):
+        reasons.append(
+            "neither latency nor capacity promotion threshold was cleared"
+        )
 
     summary = {
         "generated_at": _utc_now(),
@@ -1573,12 +1751,21 @@ def analyze_campaign(
         },
         "workloads": analyses,
         "promotion": {
-            "eligible": not reasons,
+            "eligible": sample_sufficient and (latency_gate or capacity_gate),
             "reasons": reasons,
+            "objectives": {
+                "latency": {"eligible": latency_gate},
+                "capacity": {"eligible": capacity_gate},
+            },
             "criteria": {
-                "prefill": "M=512/1024/2048 median TTFT CI95 high < 0",
-                "decode_tpot": "CI95 high <= +1.0%",
-                "decode_throughput": "CI95 low >= -0.5%",
+                "latency": (
+                    "paired TPOT mean <= -1.5%, CI95 high < 0, and "
+                    "throughput CI95 low >= -0.5%"
+                ),
+                "capacity": (
+                    "paired throughput mean >= +1.0%, CI95 low > 0, and "
+                    "TPOT CI95 high <= +1.0%"
+                ),
                 "sample_size": ">=3 restart blocks and >=15 paired observations",
             },
         },
@@ -1751,8 +1938,14 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--blocks", type=int, default=3)
     parser.add_argument(
         "--comparison",
-        choices=("gate256", "unfused", "input_ring"),
-        default="unfused",
+        choices=(
+            "iris",
+            "triton_shmem",
+            "gate256",
+            "unfused",
+            "input_ring",
+        ),
+        default="iris",
     )
     parser.add_argument("--seeds", type=_parse_csv_ints, default=[0, 1, 2, 3, 4])
     parser.add_argument("--order-seed", type=int, default=20260727)
@@ -1855,10 +2048,12 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     if len(args.devices.split(",")) != args.world_size:
         parser.error("--devices count must equal --world-size")
     if args.stability_only and (
-        args.comparison != "unfused" or not args.decode_only
+        args.comparison not in ("unfused", "iris", "triton_shmem")
+        or not args.decode_only
     ):
         parser.error(
-            "--stability-only requires --comparison unfused --decode-only"
+            "--stability-only requires an upstream-unfused comparison "
+            "and --decode-only"
         )
     args.ignored_busy_gpus = set(args.ignored_busy_gpus)
     if args.engine_module is None:
@@ -1957,7 +2152,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 bootstrap_samples=args.bootstrap_samples,
                 bootstrap_seed=args.bootstrap_seed,
             )
-        _write_checksums(args.run_root)
         decision = (
             summary["stability"]
             if args.stability_only
@@ -1971,6 +2165,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             log=args.run_root / "final-teardown.log",
             dry_run=False,
         )
+        _write_checksums(args.run_root)
         gpu_lock.close()
 
 

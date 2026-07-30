@@ -1639,6 +1639,14 @@ def allreduce_residual_rmsnorm(
                 )
                 if ts_state is not None:
                     _ts_mod.TRITON_SHMEM_AR_RMSNORM_STATES[key] = ts_state
+                    logger.info(
+                        "AR+RMSNorm backend resolved: requested=%s selected=triton_shmem "
+                        "max_tokens=%s hidden=%s dtype=%s",
+                        backend,
+                        max_token_num,
+                        hidden_dim,
+                        input_tensor.dtype,
+                    )
             if ts_state is not None:
                 norm_out, residual_out = (
                     _ts_mod.triton_shmem_allreduce_residual_rmsnorm(
@@ -1673,6 +1681,14 @@ def allreduce_residual_rmsnorm(
                         dtype=input_tensor.dtype,
                     )
                     _iris_mod.IRIS_AR_RMSNORM_STATES[key] = iris_state
+                    logger.info(
+                        "AR+RMSNorm backend resolved: requested=%s selected=iris "
+                        "max_tokens=%s hidden=%s dtype=%s",
+                        backend,
+                        max_token_num,
+                        hidden_dim,
+                        input_tensor.dtype,
+                    )
                 norm_out, residual_out = _iris_mod.iris_allreduce_residual_rmsnorm(
                     iris_state,
                     input_tensor=input_tensor,

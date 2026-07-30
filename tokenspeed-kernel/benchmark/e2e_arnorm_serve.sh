@@ -81,7 +81,7 @@ fi
 if [[ "$ENABLE_FUSION" == "1" ]]; then
   FUSION_ARG="--enable-allreduce-fusion"
 else
-  FUSION_ARG=""
+  FUSION_ARG="--disable-allreduce-fusion"
 fi
 
 if [[ "$KERNEL_PROFILE_BACKEND" == "rocprofiler" || "$KERNEL_PROFILE_BACKEND" == "roctracer" ]]; then
@@ -106,6 +106,7 @@ docker exec "$CONTAINER" bash -lc "mkdir -p '${LOG_DIR}' '${PROFILER_DIR}' '${KE
     '${ONESHOT_MAX_M}' '${ONESHOT_BLOCK_N}' '${FUSION_MAX_M}' '${TRITON_AR_DISABLE}' '${TRITON_AR_WORKGROUP_SYNC}' \
     '${SERIALIZE_KERNEL}' '${SERIALIZE_COPY}' '${HIP_LAUNCH_BLOCKING_VALUE}' '${GPU_COREDUMP_ENABLED}' \
     '${PROFILE_FORWARD_MARKERS}' '${ENGINE_MODULE}' '${DEEP_HEALTH_MODE}' > '${LOG}'; \
+  umask 000; \
   ${GPU_COREDUMP_ENV} ${DEVICE_VISIBILITY} TS_ARNORM_BACKEND='${BK}' HSA_ENABLE_IPC_MODE_LEGACY=1 \
   TORCH_NCCL_BLOCKING_WAIT='${NCCL_BLOCKING_WAIT}' \
   TS_TRITON_SHMEM_COARSE='${COARSE_SHMEM}' \
@@ -141,7 +142,7 @@ docker exec "$CONTAINER" bash -lc "mkdir -p '${LOG_DIR}' '${PROFILER_DIR}' '${KE
   TOKENSPEED_KERNEL_PROFILE_BACKEND='${KERNEL_PROFILE_BACKEND}' \
   TOKENSPEED_KERNEL_PROFILE_HOOK='${KERNEL_PROFILE_HOOK}' \
   TOKENSPEED_KERNEL_PROFILE_OUTPUT_FORMAT='${KERNEL_PROFILE_OUTPUT_FORMAT}' \
-  PYTHONPATH=/home/jeremwan/tokenspeed/tokenspeed-kernel/benchmark:${PYTHONPATH:-} \
+  PYTHONPATH=/home/jeremwan/tokenspeed/tokenspeed-kernel-amd/python:/home/jeremwan/tokenspeed/tokenspeed-kernel/python:/home/jeremwan/tokenspeed/python:/home/jeremwan/tokenspeed/tokenspeed-kernel/benchmark:${PYTHONPATH:-} \
   nohup python -m tokenspeed.cli serve '${MODEL_PATH}' \
     --served-model-name '${SERVED_MODEL_NAME}' --host 127.0.0.1 --port '${PORT}' \
     --world-size '${WS}' --comm-fusion-max-num-tokens '${CAP}' \

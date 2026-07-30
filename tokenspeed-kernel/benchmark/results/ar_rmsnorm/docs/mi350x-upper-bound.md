@@ -1,6 +1,6 @@
 # MI350X fused AR+RMSNorm upper bound
 
-Updated: 2026-07-29
+Updated: 2026-07-30
 
 > **Legacy performance analysis:** the upstream-main rebase changed both fused
 > and unfused AMD communication backends. Every measured value and projected
@@ -8,6 +8,10 @@ Updated: 2026-07-29
 > Preserve the arithmetic as historical opportunity analysis; do not use it as
 > a post-rebase budget. See
 > [upstream-main rebase impact](upstream-main-rebase-impact-2026-07.md).
+>
+> The completed post-rebase campaign found +2.55% TPOT for Iris fused and
+> +10.47% for `triton_shmem`; both were rejected. Current evidence is in the
+> [post-rebase study](../studies/mi350x/2026-07-post-rebase-baseline/README.md).
 
 ## Decision-relevant evidence
 

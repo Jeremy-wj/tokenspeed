@@ -8,7 +8,9 @@ default. After rebasing onto upstream `3f88dcc2`:
 - `TS_ARNORM_BACKEND=auto` uses Iris first and native symmetric memory as
   fallback;
 - `TS_ARNORM_BACKEND=triton_shmem` is required to select this implementation;
-- all performance and qualification evidence below is legacy;
+- the 2026-07-30 post-rebase campaign completed 15/15 safe pairs but rejected
+  `triton_shmem` on +10.47% TPOT and -10.58% throughput;
+- all older performance and qualification evidence below is legacy;
 - the pointer, graph-lifetime, synchronization, and complete-fallback
   invariants remain requirements for future candidates.
 

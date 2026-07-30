@@ -15,6 +15,7 @@ from benchmark.run_ar_rmsnorm_repeatability import (
     _acquire_gpu_campaign_lock,
     _assert_gpu_isolation,
     _bench_command,
+    _gpu_guard_history_is_clean,
     _qualified_profile_proof,
     _run,
     _wait_for_health,
@@ -59,26 +60,38 @@ def test_comparison_arms_are_unconfounded():
     unfused, fused = comparison_arms("unfused")
     assert not unfused.fusion_enabled
     assert fused.fusion_enabled
+    control, iris = comparison_arms("iris")
+    assert (control.backend, control.signature_family) == (
+        "auto",
+        "production_unfused",
+    )
+    assert (iris.backend, iris.signature_family) == ("auto", "iris_fused")
+    control, candidate = comparison_arms("triton_shmem")
+    assert control.name == "upstream_unfused"
+    assert (candidate.backend, candidate.signature_family) == (
+        "triton_shmem",
+        "triton_shmem_fused",
+    )
     single, double = comparison_arms("input_ring")
     assert single.double_buffer_input == 0
     assert double.double_buffer_input == 1
 
 
 def test_stability_campaign_selects_only_unfused():
-    arms = campaign_arms("unfused", stability_only=True)
+    arms = campaign_arms("iris", stability_only=True)
     assert len(arms) == 1
-    assert arms[0].name == "unfused"
+    assert arms[0].name == "upstream_unfused"
     assert not arms[0].fusion_enabled
-    with pytest.raises(ValueError, match="requires --comparison unfused"):
+    with pytest.raises(ValueError, match="upstream-unfused comparison"):
         campaign_arms("input_ring", stability_only=True)
 
 
 def test_qualified_profile_proof_accepts_canonical_profile(tmp_path):
     serve_log = tmp_path / "serve.log"
     serve_log.write_text(
-        "RUN_ENV PROFILE_ID=gpt-oss-120b-mi350x-qualified-v4 "
+        "RUN_ENV PROFILE_ID=gpt-oss-120b-mi350x-post-rebase-v1 "
         "DEEP_HEALTH_MODE=passive FOLD_COPYIN=0 SHMEM_OUTPUT_RING=72 "
-        "DOUBLE_BUFFER_INPUT=0 BARRIER_GRID=0\n"
+        "DOUBLE_BUFFER_INPUT=0 BARRIER_GRID=0 FORWARD_MARKERS=1\n"
         "ServerArgs(gpu_memory_utilization=0.9, "
         "cudagraph_capture_sizes=[32], disable_prefill_graph=True, "
         "disable_overlap_schedule=True)\n",
@@ -90,9 +103,9 @@ def test_qualified_profile_proof_accepts_canonical_profile(tmp_path):
 def test_qualified_profile_proof_rejects_memory_override(tmp_path):
     serve_log = tmp_path / "serve.log"
     serve_log.write_text(
-        "RUN_ENV PROFILE_ID=gpt-oss-120b-mi350x-qualified-v4 "
+        "RUN_ENV PROFILE_ID=gpt-oss-120b-mi350x-post-rebase-v1 "
         "DEEP_HEALTH_MODE=passive FOLD_COPYIN=0 SHMEM_OUTPUT_RING=72 "
-        "DOUBLE_BUFFER_INPUT=0 BARRIER_GRID=0\n"
+        "DOUBLE_BUFFER_INPUT=0 BARRIER_GRID=0 FORWARD_MARKERS=1\n"
         "ServerArgs(gpu_memory_utilization=0.95, "
         "cudagraph_capture_sizes=[32], disable_prefill_graph=True, "
         "disable_overlap_schedule=True)\n",
@@ -307,6 +320,39 @@ def test_gpu_isolation_rejects_foreign_process(tmp_path, monkeypatch):
     )
 
 
+def test_resume_requires_clean_gpu_guard_history(tmp_path):
+    assert not _gpu_guard_history_is_clean(tmp_path)
+    guard = tmp_path / "gpu-guard.jsonl"
+    guard.write_text(
+        json.dumps({"unexpected_active_processes": {}}) + "\n",
+        encoding="utf-8",
+    )
+    assert _gpu_guard_history_is_clean(tmp_path)
+    with guard.open("a", encoding="utf-8") as handle:
+        handle.write(
+            json.dumps(
+                {"unexpected_active_processes": {"1": [{"pid": 123}]}}
+            )
+            + "\n"
+        )
+    assert not _gpu_guard_history_is_clean(tmp_path)
+    (tmp_path / "preflight.json").write_text(
+        json.dumps({"time": "2026-07-30T01:00:00+00:00"}),
+        encoding="utf-8",
+    )
+    with guard.open("a", encoding="utf-8") as handle:
+        handle.write(
+            json.dumps(
+                {
+                    "time": "2026-07-30T01:00:01+00:00",
+                    "unexpected_active_processes": {},
+                }
+            )
+            + "\n"
+        )
+    assert _gpu_guard_history_is_clean(tmp_path)
+
+
 def test_hierarchical_bootstrap_constant_sample():
     result = hierarchical_bootstrap(
         {0: [-2.0, -2.0], 1: [-2.0, -2.0], 2: [-2.0, -2.0]},
@@ -396,6 +442,29 @@ def test_trace_signature_validation_distinguishes_gate(tmp_path):
     assert result["status"] == "passed"
 
 
+def test_trace_signature_validation_distinguishes_post_rebase_backends(tmp_path):
+    unfused, iris = comparison_arms("iris")
+    unfused_dir = tmp_path / "unfused"
+    unfused_dir.mkdir()
+    iris_dir = tmp_path / "iris"
+    iris_dir.mkdir()
+    for rank in range(2):
+        _write_trace(
+            unfused_dir / f"unfused-TP{rank}.trace.json.gz",
+            ["iris_stage_one_shot_allreduce_kernel"] + ["_rmsnorm_kernel"] * 73,
+        )
+        _write_trace(
+            iris_dir / f"iris-TP{rank}.trace.json.gz",
+            ["iris_allreduce_residual_rmsnorm_kernel"],
+        )
+    assert validate_trace_signatures(
+        unfused_dir, world_size=2, arm=unfused
+    )["status"] == "passed"
+    assert validate_trace_signatures(
+        iris_dir, world_size=2, arm=iris
+    )["status"] == "passed"
+
+
 def _write_arm(
     root: Path,
     *,
@@ -465,7 +534,9 @@ def test_campaign_analysis_uses_paired_blocks(tmp_path):
     assert result["n_blocks"] == 3
     assert result["n_pairs"] == 6
     assert not summary["promotion"]["eligible"]
-    assert (
-        "decode output-throughput regression is not ruled out"
-        in summary["promotion"]["reasons"]
+    assert any(
+        "insufficient paired evidence" in reason
+        for reason in summary["promotion"]["reasons"]
     )
+    assert not summary["promotion"]["objectives"]["latency"]["eligible"]
+    assert not summary["promotion"]["objectives"]["capacity"]["eligible"]

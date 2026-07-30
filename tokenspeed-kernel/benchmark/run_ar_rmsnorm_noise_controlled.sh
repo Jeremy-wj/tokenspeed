@@ -20,10 +20,12 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-WORLD_SIZES="${WORLD_SIZES:-2 4 8}"
-export BENCH_BACKENDS="${BENCH_BACKENDS:-rccl_unfused,triton_shmem}"
+WORLD_SIZES="${WORLD_SIZES:-2 4}"
+export BENCH_BACKENDS="${BENCH_BACKENDS:-production_unfused,auto,triton_shmem}"
 export BENCH_N_WARMUP="${BENCH_N_WARMUP:-30}"
 export BENCH_N_REPEAT="${BENCH_N_REPEAT:-150}"
+export BENCH_CODE_ID="${BENCH_CODE_ID:-$(git rev-parse HEAD)}"
+export BENCH_IMAGE_ID="${BENCH_IMAGE_ID:-unknown}"
 COOLDOWN="${COOLDOWN:-20}"
 OUTDIR="${OUTDIR:-results/ar_rmsnorm_noise_controlled}"
 mkdir -p "$OUTDIR"
@@ -41,8 +43,9 @@ fi
 for pass in 1 2; do
   for ws in $WORLD_SIZES; do
     csv="$OUTDIR/pass${pass}_ws${ws}.csv"
+    samples="$OUTDIR/pass${pass}_ws${ws}-samples.json"
     echo "=== pass $pass  ws=$ws  -> $csv ==="
-    BENCH_WORLD_SIZES="$ws" BENCH_CSV="$csv" \
+    BENCH_WORLD_SIZES="$ws" BENCH_CSV="$csv" BENCH_SAMPLES_JSON="$samples" \
       python -m benchmark.bench_triton_shmem_ar_rmsnorm
     echo "cooldown ${COOLDOWN}s"; sleep "$COOLDOWN"
   done

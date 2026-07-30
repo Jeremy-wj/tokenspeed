@@ -95,6 +95,15 @@ class TestAttentionBackendChoices(unittest.TestCase):
         args = prepare_server_args(["--model-path", "x"])
         self.assertEqual(args.model, "x")
 
+    def test_allreduce_fusion_has_explicit_disable_control(self):
+        parser = self._build_parser()
+        disabled = parser.parse_args(["--model", "x", "--disable-allreduce-fusion"])
+        enabled = parser.parse_args(["--model", "x", "--enable-allreduce-fusion"])
+        self.assertTrue(disabled.disable_allreduce_fusion)
+        self.assertFalse(disabled.enable_allreduce_fusion)
+        self.assertTrue(enabled.enable_allreduce_fusion)
+        self.assertFalse(enabled.disable_allreduce_fusion)
+
     def test_defaults_to_mha_for_mha(self):
         self.assertEqual(registry._get_default_backend_name(AttentionArch.MHA), "mha")
 

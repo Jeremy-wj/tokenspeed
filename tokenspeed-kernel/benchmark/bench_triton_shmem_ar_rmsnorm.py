@@ -24,12 +24,13 @@ Self-contained (``torch.distributed`` + ``mp.spawn``, no new deps) latency
 microbench for the migrated ``triton_shmem`` backend. Times, per ``(world_size,
 M, N)``, the full production op (input copy-in -> barrier -> fused kernel ->
 barrier -> copy-out) for each backend selectable through the
-``TS_ARNORM_BACKEND`` dispatch, plus an RCCL ``all_reduce`` + residual +
-``F.rms_norm`` unfused baseline:
+``TS_ARNORM_BACKEND`` dispatch, plus production and explicit RCCL unfused
+controls:
 
+* ``production_unfused`` -- ordinary Iris all-reduce at or below the production
+  512-KiB gate and RCCL above it, followed by TokenSpeed residual RMSNorm.
 * ``rccl_unfused`` -- ``dist.all_reduce`` (native bf16 transport) + residual add
-  + eager ``F.rms_norm``. The baseline (the reference bench's
-  ``dist_unfused_ar_rmsnorm``).
+  + eager ``F.rms_norm`` diagnostic.
 * ``triton_ar_unfused`` -- TokenSpeed's 512-KiB-gated Triton all-reduce +
   the same eager residual/norm. Unsupported rows are reported as NaN. This is a
   standalone small-message reference, not the crossover baseline.
@@ -37,9 +38,9 @@ barrier -> copy-out) for each backend selectable through the
 * ``symm_mem``     -- the native TokenSpeed symm_mem fused kernel.
 * ``iris``         -- the Iris backend.
 
-For each config it CUDA-event-times every rank, reports the collective latency
-as the **max p50 across ranks** (a collective is bounded by its slowest rank)
-plus cross-rank skew, and prints the fused-vs-RCCL speedup. The default N axis
+For each config it CUDA-event-times every rank, takes the maximum rank for each
+iteration before computing p50/p95/p99, retains raw samples, and reports
+cross-rank skew. The default N axis
 is modeled after the row widths encountered by the fused AR+RMSNorm / comm+norm
 ops in the targeted large models (gpt-oss-120B, GLM-4.6, DeepSeek-V3/V4, Kimi-K2
 -- hidden and MLA-compressed shapes; see the axis note below), and M spans
@@ -58,10 +59,12 @@ Run (inside the ROCm container, from the tokenspeed repo root)::
 """
 from __future__ import annotations
 
+import json
 import os
 import socket
-import statistics
 import traceback
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import List, Tuple
 
 import torch
@@ -112,7 +115,11 @@ _M_VALUES: List[int] = _env_list(
     "BENCH_M_VALUES", [1, 8, 32, 128, 256, 512, 1024, 2048, 4096]
 )
 _N_VALUES: List[int] = _env_list("BENCH_N_VALUES", DEFAULT_N_VALUES)
-_DEFAULT_BACKENDS: List[str] = ["rccl_unfused", "triton_shmem"]
+_DEFAULT_BACKENDS: List[str] = [
+    "production_unfused",
+    "auto",
+    "triton_shmem",
+]
 
 # Noise control: high warmup/repeat (this box cannot pin GPU clocks -- sysfs is
 # read-only in the unprivileged container -- so we lean on sample count + a
@@ -158,7 +165,11 @@ def _make_inputs(tokens, hidden, rank, device):
 
 def _prepare_backend(backend, x, scratch):
     """Reset an in-place unfused transport outside the timed region."""
-    if backend in ("rccl_unfused", "triton_ar_unfused"):
+    if backend in (
+        "production_unfused",
+        "rccl_unfused",
+        "triton_ar_unfused",
+    ):
         scratch.copy_(x)
 
 
@@ -175,6 +186,15 @@ def _run_backend(
 ):
     """Run one fused op for ``backend``; return (norm_out, residual_out)."""
     hidden = x.shape[1]
+    if backend == "production_unfused":
+        from tokenspeed_kernel.ops.communication.triton import all_reduce
+        from tokenspeed_kernel.ops.layernorm.triton import rmsnorm
+
+        if x.numel() * x.element_size() <= _TRITON_AR_MAX_BYTES:
+            all_reduce(triton_ar_state, scratch)
+        else:
+            dist.all_reduce(scratch, group=group)
+        return rmsnorm(scratch, weight, _EPS, residual=residual)
     if backend == "rccl_unfused":
         dist.all_reduce(scratch, group=group)
         residual_out = scratch + residual
@@ -218,8 +238,8 @@ def _time_backend(
     max_token_num,
     scratch,
     triton_ar_state,
-) -> float:
-    """Return this rank's p50 latency (ms) for ``backend`` on the given inputs."""
+) -> list[float]:
+    """Return this rank's per-iteration latency samples in milliseconds."""
     for _ in range(_N_WARMUP):
         _prepare_backend(backend, x, scratch)
         _run_backend(
@@ -254,8 +274,7 @@ def _time_backend(
         )
         ends[i].record()
     torch.cuda.synchronize()
-    times = [s.elapsed_time(e) for s, e in zip(starts, ends)]
-    return statistics.median(times)
+    return [s.elapsed_time(e) for s, e in zip(starts, ends)]
 
 
 def _presize_iris_heap(max_token_num: int) -> None:
@@ -297,7 +316,10 @@ def _worker_main(rank, world_size, port, backends, result_dict):
         group = dist.group.WORLD
         max_token_num = max(_M_VALUES)
         triton_ar_state = None
-        if "triton_ar_unfused" in backends:
+        if any(
+            backend in backends
+            for backend in ("production_unfused", "triton_ar_unfused")
+        ):
             from tokenspeed_kernel.ops.communication.triton import create_state
 
             triton_ar_state = create_state(
@@ -307,7 +329,10 @@ def _worker_main(rank, world_size, port, backends, result_dict):
                 max_numel=_TRITON_AR_MAX_BYTES
                 // torch.empty((), dtype=torch.bfloat16).element_size(),
             )
-        if "iris" in backends:
+        if any(
+            backend in backends
+            for backend in ("production_unfused", "auto", "iris")
+        ):
             _presize_iris_heap(max_token_num)
         for n in _N_VALUES:
             weight = torch.linspace(0.5, 1.5, n, dtype=torch.bfloat16, device=device)
@@ -318,7 +343,11 @@ def _worker_main(rank, world_size, port, backends, result_dict):
                     x, residual, weight, world_size, n, device
                 )
                 for backend in backends:
-                    if backend not in ("rccl_unfused", "triton_ar_unfused"):
+                    if backend not in (
+                        "production_unfused",
+                        "rccl_unfused",
+                        "triton_ar_unfused",
+                    ):
                         os.environ["TS_ARNORM_BACKEND"] = backend
                     _prepare_backend(backend, x, scratch)
                     # Correctness gate before timing.
@@ -342,7 +371,7 @@ def _worker_main(rank, world_size, port, backends, result_dict):
                     torch.testing.assert_close(
                         norm_out.float(), ref_norm, atol=2e-2, rtol=2e-2
                     )
-                    p50 = _time_backend(
+                    samples = _time_backend(
                         backend,
                         x,
                         residual,
@@ -353,34 +382,81 @@ def _worker_main(rank, world_size, port, backends, result_dict):
                         scratch,
                         triton_ar_state,
                     )
-                    result_dict[(rank, backend, m, n)] = p50
+                    result_dict[(rank, backend, m, n)] = samples
     finally:
         os.environ.pop("TS_ARNORM_BACKEND", None)
         dist.destroy_process_group()
 
 
 def _aggregate(result_dict, world_size, backends) -> List[dict]:
-    """Collapse per-rank p50s into per-config collective latency + skew."""
+    """Collapse rank samples after taking each iteration's slowest rank."""
+    def percentile(samples: list[float], fraction: float) -> float:
+        ordered = sorted(samples)
+        return ordered[round((len(ordered) - 1) * fraction)]
+
     rows = []
     for n in _N_VALUES:
         for m in _M_VALUES:
             for backend in backends:
-                vals = [
+                rank_samples = [
                     result_dict.get((r, backend, m, n)) for r in range(world_size)
                 ]
-                vals = [v for v in vals if v is not None]
-                if not vals or any(v != v for v in vals):  # NaN -> unsupported
+                if (
+                    any(samples is None for samples in rank_samples)
+                    or any(
+                        not isinstance(samples, list)
+                        for samples in rank_samples
+                    )
+                ):
                     rows.append(
-                        {"backend": backend, "M": m, "N": n, "lat_ms": float("nan"),
-                         "skew_pct": float("nan")}
+                        {
+                            "backend": backend,
+                            "path": "unsupported",
+                            "M": m,
+                            "N": n,
+                            "lat_ms": float("nan"),
+                            "p95_ms": float("nan"),
+                            "p99_ms": float("nan"),
+                            "skew_pct": float("nan"),
+                            "max_rank_samples_ms": [],
+                            "rank_samples_ms": [],
+                        }
                     )
                     continue
-                lat = max(vals)  # collective bounded by slowest rank
-                lo = min(vals)
+                sample_count = min(len(samples) for samples in rank_samples)
+                max_rank_samples = [
+                    max(samples[index] for samples in rank_samples)
+                    for index in range(sample_count)
+                ]
+                rank_p50s = [
+                    percentile(samples, 0.5) for samples in rank_samples
+                ]
+                lat = percentile(max_rank_samples, 0.5)
+                lo = min(rank_p50s)
                 skew = (lat - lo) / lat * 100.0 if lat > 0 else 0.0
+                if backend == "production_unfused":
+                    path = (
+                        "iris"
+                        if m * n * 2 <= _TRITON_AR_MAX_BYTES
+                        else "rccl"
+                    )
+                elif backend == "auto":
+                    path = "iris_fused"
+                else:
+                    path = backend
                 rows.append(
-                    {"backend": backend, "M": m, "N": n, "lat_ms": lat,
-                     "skew_pct": skew}
+                    {
+                        "backend": backend,
+                        "path": path,
+                        "M": m,
+                        "N": n,
+                        "lat_ms": lat,
+                        "p95_ms": percentile(max_rank_samples, 0.95),
+                        "p99_ms": percentile(max_rank_samples, 0.99),
+                        "skew_pct": skew,
+                        "max_rank_samples_ms": max_rank_samples,
+                        "rank_samples_ms": rank_samples,
+                    }
                 )
     return rows
 
@@ -403,7 +479,7 @@ def _run_one_world(world_size: int, backends: List[str]) -> List[dict]:
 
 
 def _print_world(world_size: int, rows: List[dict], backends: List[str]) -> None:
-    baseline = "rccl_unfused"
+    baseline = "production_unfused"
     by_cfg = {}
     for r in rows:
         by_cfg.setdefault((r["M"], r["N"]), {})[r["backend"]] = r
@@ -431,12 +507,41 @@ def _print_world(world_size: int, rows: List[dict], backends: List[str]) -> None
 def _write_csv(path: str, all_rows: List[Tuple[int, dict]]) -> None:
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     with open(path, "w") as f:
-        f.write("world_size,backend,M,N,lat_ms,skew_pct\n")
+        f.write(
+            "world_size,backend,path,M,N,lat_ms,p95_ms,p99_ms,skew_pct\n"
+        )
         for ws, r in all_rows:
             f.write(
-                f"{ws},{r['backend']},{r['M']},{r['N']},"
-                f"{r['lat_ms']:.6f},{r['skew_pct']:.3f}\n"
+                f"{ws},{r['backend']},{r['path']},{r['M']},{r['N']},"
+                f"{r['lat_ms']:.6f},{r['p95_ms']:.6f},"
+                f"{r['p99_ms']:.6f},{r['skew_pct']:.3f}\n"
             )
+
+
+def _write_samples_json(path: str, all_rows: List[Tuple[int, dict]]) -> None:
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": 1,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "method": "per-iteration maximum rank before percentiles",
+        "warmup": _N_WARMUP,
+        "repeat": _N_REPEAT,
+        "world_sizes": sorted({world_size for world_size, _ in all_rows}),
+        "backends": sorted({row["backend"] for _, row in all_rows}),
+        "M_values": list(_M_VALUES),
+        "N_values": list(_N_VALUES),
+        "code_identity": os.environ.get("BENCH_CODE_ID"),
+        "image_identity": os.environ.get("BENCH_IMAGE_ID"),
+        "rows": [
+            {"world_size": world_size, **row}
+            for world_size, row in all_rows
+        ],
+    }
+    output.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def main() -> None:
@@ -446,6 +551,7 @@ def main() -> None:
     backends = _env_list("BENCH_BACKENDS", _DEFAULT_BACKENDS)
     ndev = torch.cuda.device_count()
     csv_path = os.environ.get("BENCH_CSV")
+    samples_json_path = os.environ.get("BENCH_SAMPLES_JSON")
 
     all_rows: List[Tuple[int, dict]] = []
     for ws in world_sizes:
@@ -459,6 +565,9 @@ def main() -> None:
     if csv_path:
         _write_csv(csv_path, all_rows)
         print(f"\nwrote {csv_path}")
+    if samples_json_path:
+        _write_samples_json(samples_json_path, all_rows)
+        print(f"wrote {samples_json_path}")
 
 
 if __name__ == "__main__":
