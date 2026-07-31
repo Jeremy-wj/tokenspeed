@@ -197,5 +197,6 @@ Testing/
 
 AGENTS.local.md
 
-# Local AR+RMSNorm traces and serving logs. Curated manifests/summaries remain tracked.
+# Local AR+RMSNorm traces and serving logs. Curated study summaries remain tracked.
 /tokenspeed-kernel/benchmark/results/ar_rmsnorm/raw/**
+/tokenspeed-kernel/benchmark/results/ar_rmsnorm/studies/**/raw/**

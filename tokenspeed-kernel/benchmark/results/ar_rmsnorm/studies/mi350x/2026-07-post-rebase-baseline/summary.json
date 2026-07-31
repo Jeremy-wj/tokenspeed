@@ -1,5 +1,6 @@
 {
   "campaign_date_utc": "2026-07-30",
+  "superseded_for_deployment_by": "2026-07-triton-shmem-core-tuning on qualified HIP 1,2,5,6; retained as the post-rebase baseline",
   "code": {
     "branch": "jeremwan/triton-shmem-experiments",
     "commit": "eb69cf1542942669f9d7686af5e55b1cd123c716",
@@ -173,10 +174,10 @@
     }
   },
   "decision": {
-    "deployment": "GPT-OSS-120B TP=4 should run the upstream ordinary-all-reduce plus RMSNorm path with fusion explicitly disabled",
-    "iris_auto": "safe in the completed campaign but rejected for performance",
-    "triton_shmem": "safe in the completed campaign but rejected for performance and remains experimental",
-    "optimization_priority": "do not tune triton_shmem integration next; first investigate ordinary Iris/RCCL graph transitions and upstream Iris fused kernel cost, using the unfused control as the canonical baseline"
+    "deployment": "Historical campaign decision: retain upstream ordinary all-reduce plus RMSNorm with fusion explicitly disabled",
+    "iris_auto": "safe in this campaign but rejected for performance",
+    "triton_shmem": "safe in this campaign but rejected for performance",
+    "optimization_priority": "Historical campaign priority: investigate ordinary Iris/RCCL graph transitions and upstream Iris fused kernel cost, using explicit fusion-off as the matched baseline"
   },
   "retained_incidents": [
     "initial 1000-replay transition harness timeout from exhaustive per-step validation",

@@ -1,0 +1,21 @@
+{
+  "change_definition": "(candidate / baseline - 1) * 100",
+  "aggregation": "Point estimates are arithmetic means of the 15 pair-level percentage changes; confidence intervals use paired hierarchical bootstrap over restart blocks and then pairs. 'median_tpot' names each run's TPOT statistic, not a median across pair-level changes.",
+  "pairs": [
+    {"block": 0, "seed": 0, "unfused_tpot_ms": 12.810933982330116, "triton_tpot_ms": 12.61638516264944, "unfused_throughput": 2366.2981218533037, "triton_throughput": 2402.0509104554417},
+    {"block": 0, "seed": 1, "unfused_tpot_ms": 12.833084599907764, "triton_tpot_ms": 12.666479169542368, "unfused_throughput": 2349.6585111723402, "triton_throughput": 2393.2833084915806},
+    {"block": 0, "seed": 2, "unfused_tpot_ms": 12.726713949267676, "triton_tpot_ms": 12.74201805100078, "unfused_throughput": 2386.589756823123, "triton_throughput": 2402.068312720944},
+    {"block": 0, "seed": 3, "unfused_tpot_ms": 12.671073391548777, "triton_tpot_ms": 12.62189184977088, "unfused_throughput": 2385.7757058583056, "triton_throughput": 2420.189493426164},
+    {"block": 0, "seed": 4, "unfused_tpot_ms": 12.65065026115954, "triton_tpot_ms": 12.565840499060057, "unfused_throughput": 2396.772336430985, "triton_throughput": 2419.9731620226034},
+    {"block": 1, "seed": 0, "unfused_tpot_ms": 12.93138739627416, "triton_tpot_ms": 12.576345693312748, "unfused_throughput": 2342.308108844051, "triton_throughput": 2419.1029975087017},
+    {"block": 1, "seed": 1, "unfused_tpot_ms": 12.59153833979132, "triton_tpot_ms": 12.641594968025379, "unfused_throughput": 2408.263974131932, "triton_throughput": 2396.908645969554},
+    {"block": 1, "seed": 2, "unfused_tpot_ms": 12.968425052112913, "triton_tpot_ms": 12.704892285849805, "unfused_throughput": 2326.358116866432, "triton_throughput": 2407.795514284878},
+    {"block": 1, "seed": 3, "unfused_tpot_ms": 12.673685486189687, "triton_tpot_ms": 12.647381080168715, "unfused_throughput": 2364.082858056465, "triton_throughput": 2400.7572502763737},
+    {"block": 1, "seed": 4, "unfused_tpot_ms": 12.672910104558573, "triton_tpot_ms": 12.496318325032199, "unfused_throughput": 2384.6827777393996, "triton_throughput": 2417.4686763886875},
+    {"block": 2, "seed": 0, "unfused_tpot_ms": 12.738051757293, "triton_tpot_ms": 12.529529353199113, "unfused_throughput": 2368.6622969496734, "triton_throughput": 2425.812781131726},
+    {"block": 2, "seed": 1, "unfused_tpot_ms": 12.683012989785253, "triton_tpot_ms": 12.733964160186789, "unfused_throughput": 2381.244769188985, "triton_throughput": 2371.7700850425267},
+    {"block": 2, "seed": 2, "unfused_tpot_ms": 12.716178272881795, "triton_tpot_ms": 12.675077885429424, "unfused_throughput": 2385.690872714473, "triton_throughput": 2387.750123691765},
+    {"block": 2, "seed": 3, "unfused_tpot_ms": 12.800821274019588, "triton_tpot_ms": 12.619101416425316, "unfused_throughput": 2361.1907356659754, "triton_throughput": 2414.450563761668},
+    {"block": 2, "seed": 4, "unfused_tpot_ms": 12.632219129972846, "triton_tpot_ms": 12.72177510874787, "unfused_throughput": 2391.930406520228, "triton_throughput": 2375.5057988248354}
+  ]
+}

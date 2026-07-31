@@ -11,6 +11,7 @@ from pathlib import Path
 _KERNELS = (
     "fused_ar_rmsnorm_oneshot_blocked_kernel",
     "fused_ar_rmsnorm_oneshot_wholerow_kernel",
+    "fused_ar_rmsnorm_oneshot_wholerow_padded_kernel",
     "fused_ar_rmsnorm_twoshot_blocked_kernel",
     "amd_all_reduce_kernel",
     "_rmsnorm_kernel",

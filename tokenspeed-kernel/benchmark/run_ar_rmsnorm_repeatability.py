@@ -1047,10 +1047,15 @@ def _qualified_profile_proof(serve_log: Path) -> dict[str, Any]:
     if run_env is None:
         raise RuntimeError(f"RUN_ENV missing from {serve_log}")
     required_run_env = (
-        "PROFILE_ID=gpt-oss-120b-mi350x-post-rebase-v1",
+        "PROFILE_ID=gpt-oss-120b-mi350x-triton-core-v3",
         "DEEP_HEALTH_MODE=passive",
         "FOLD_COPYIN=0",
         "SHMEM_OUTPUT_RING=72",
+        "INPUT_SITE_RING=72",
+        "BORROW_TWOSHOT_OUTPUT=1",
+        "ONESHOT_VARIANT=padded",
+        "PADDED_MAX_M=64",
+        "ONESHOT_NUM_WARPS=4",
         "DOUBLE_BUFFER_INPUT=0",
         "BARRIER_GRID=0",
         "FORWARD_MARKERS=1",
@@ -1520,16 +1525,19 @@ def _run_arm(
 
         trace_proof: dict[str, Any] | None = None
         if not args.skip_profiles:
-            trace_dir = prefill_dir / "traces" / "m512-proof"
+            # Aggregate-M workloads are split into smaller scheduler
+            # microbatches. Use sequential 512-token requests so every trace
+            # contains a direct M512 prefill and proves the two-shot path.
+            trace_dir = prefill_dir / "traces" / "direct-m512-proof"
             profile_workload = Workload(
-                "profile-m512",
-                16,
+                "profile-direct-m512",
+                512,
                 8,
-                32,
-                32,
+                8,
+                1,
                 "signature",
             )
-            profile_id = f"{prefill_label}-m512"
+            profile_id = f"{prefill_label}-direct-m512"
             _guard_phase(args, prefill_dir)
             _run_guarded_benchmark(
                 _bench_command(
@@ -1567,7 +1575,7 @@ def _run_arm(
                 )
                 trace_proof["forward_analysis"] = None
                 trace_proof["forward_analysis_reason"] = (
-                    "m512 trace is signature-only; authoritative marker-aligned "
+                    "direct-M512 trace is signature-only; authoritative marker-aligned "
                     "decode traces are captured by the Level-5 profile workflow"
                 )
 

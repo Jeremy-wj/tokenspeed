@@ -149,6 +149,26 @@ def _double_buffer_input_enabled() -> bool:
     ) not in ("0", "false", "False")
 
 
+def _borrow_twoshot_output_enabled() -> bool:
+    """Return state-owned symmetric two-shot outputs instead of copying them.
+
+    This is restricted to eager calls with backend-owned outputs. Two symmetric
+    output pairs are ping-ponged so the next fused site never overwrites the
+    residual tensor it is simultaneously reading.
+    """
+    return os.environ.get(
+        "TS_TRITON_SHMEM_BORROW_TWOSHOT_OUTPUT", "0"
+    ) not in ("0", "false", "False")
+
+
+def _input_site_ring_size() -> int:
+    """Number of graph-stable one-shot input sites reserved by the profile."""
+    value = int(os.environ.get("TS_TRITON_SHMEM_INPUT_SITE_RING", "0"))
+    if value < 0 or value == 1:
+        raise ValueError("TS_TRITON_SHMEM_INPUT_SITE_RING must be 0 or at least 2")
+    return value
+
+
 def _workgroup_sync_enabled() -> bool:
     """Bracket each scalar cross-rank signal barrier with a workgroup barrier.
 
@@ -185,6 +205,41 @@ def _oneshot_block_n() -> int:
     if value < 0 or (value and value & (value - 1)):
         raise ValueError(
             "TS_TRITON_SHMEM_ONESHOT_BLOCK_N must be 0 or a positive power of two"
+        )
+    return value
+
+
+def _oneshot_variant() -> str:
+    value = os.environ.get("TS_TRITON_SHMEM_ONESHOT_VARIANT", "auto")
+    if value not in ("auto", "blocked", "padded"):
+        raise ValueError(
+            "TS_TRITON_SHMEM_ONESHOT_VARIANT must be auto, blocked, or padded"
+        )
+    return value
+
+
+def _oneshot_num_warps() -> int:
+    value = int(os.environ.get("TS_TRITON_SHMEM_ONESHOT_NUM_WARPS", "0"))
+    if value not in (0, 1, 2, 4, 8):
+        raise ValueError(
+            "TS_TRITON_SHMEM_ONESHOT_NUM_WARPS must be 0, 1, 2, 4, or 8"
+        )
+    return value
+
+
+def _padded_max_m() -> int:
+    value = int(os.environ.get("TS_TRITON_SHMEM_PADDED_MAX_M", "64"))
+    if value < 0:
+        raise ValueError("TS_TRITON_SHMEM_PADDED_MAX_M must be non-negative")
+    return value
+
+
+def _twoshot_block_n() -> int:
+    """Optional diagnostic override for the blocked two-shot tile width."""
+    value = int(os.environ.get("TS_TRITON_SHMEM_TWOSHOT_BLOCK_N", "0"))
+    if value < 0 or (value and value & (value - 1)):
+        raise ValueError(
+            "TS_TRITON_SHMEM_TWOSHOT_BLOCK_N must be 0 or a positive power of two"
         )
     return value
 
@@ -319,6 +374,7 @@ class TritonShmemAllReduceResidualRMSNorm:
         # This recovers the ~30x local-bandwidth penalty of fine-grained symm_mem.
         self._coarse = _coarse_enabled()
         self._double_buffer_input = _double_buffer_input_enabled()
+        self._borrow_twoshot_output = _borrow_twoshot_output_enabled()
         self._coarse_buffers: list = []
         self._opened_cache: dict = {}
 
@@ -390,11 +446,41 @@ class TritonShmemAllReduceResidualRMSNorm:
                     r_hdl, shape, dtype, self.world_size, self.device
                 )
             n_symm += 2
+            self._twoshot_y_ring = [self._y]
+            self._twoshot_residual_ring = [self._residual_out]
+            self._twoshot_output_bases_ring = [self._output_bases]
+            self._twoshot_residual_bases_ring = [self._residual_out_bases]
+            if self._borrow_twoshot_output:
+                if self._coarse:
+                    yb_alt = self._alloc_data(shape, dtype, group)
+                    rb_alt = self._alloc_data(shape, dtype, group)
+                    y_alt, y_alt_bases = yb_alt.tensor, yb_alt.peer_ptrs_dev
+                    r_alt, r_alt_bases = rb_alt.tensor, rb_alt.peer_ptrs_dev
+                else:
+                    y_alt, y_alt_hdl = _alloc_symm(shape, dtype, self.device, group)
+                    r_alt, r_alt_hdl = _alloc_symm(shape, dtype, self.device, group)
+                    y_alt_bases = _peer_ptrs_dev(
+                        y_alt_hdl, shape, dtype, self.world_size, self.device
+                    )
+                    r_alt_bases = _peer_ptrs_dev(
+                        r_alt_hdl, shape, dtype, self.world_size, self.device
+                    )
+                self._twoshot_y_ring.append(y_alt)
+                self._twoshot_residual_ring.append(r_alt)
+                self._twoshot_output_bases_ring.append(y_alt_bases)
+                self._twoshot_residual_bases_ring.append(r_alt_bases)
+                n_symm += 2
+            self._twoshot_output_index = 0
         else:
             self._y = None
             self._residual_out = None
             self._output_bases = None
             self._residual_out_bases = None
+            self._twoshot_y_ring = []
+            self._twoshot_residual_ring = []
+            self._twoshot_output_bases_ring = []
+            self._twoshot_residual_bases_ring = []
+            self._twoshot_output_index = 0
 
         # Local fp32 scratch: two-shot owns cdiv(M, ws) shard rows; the one-shot
         # blocked kernel reuses one row-slot per persistent program (<= #CUs).
@@ -420,8 +506,14 @@ class TritonShmemAllReduceResidualRMSNorm:
         self._fold_copyin = _fold_copyin_enabled()
         self._workgroup_sync = _workgroup_sync_enabled()
         self._fold_num_warps = _fold_num_warps()
+        self._oneshot_variant = _oneshot_variant()
+        self._padded_max_m = _padded_max_m()
         configured_oneshot_block_n = _oneshot_block_n()
         self._oneshot_block_n = configured_oneshot_block_n or _k.recommended_block_n(
+            self.dtype, hidden_dim
+        )
+        configured_twoshot_block_n = _twoshot_block_n()
+        self._twoshot_block_n = configured_twoshot_block_n or _k.recommended_block_n(
             self.dtype, hidden_dim
         )
         configured_grid_cap = _dynamic_grid_cap()
@@ -439,18 +531,70 @@ class TritonShmemAllReduceResidualRMSNorm:
             self._dynamic_grid_cap_min_m = max(0, configured_grid_min_m)
         self._barrier_grid = _barrier_grid()
         self._oneshot_max_m = max(0, _oneshot_max_m())
+        self._input_site_ring_size = _input_site_ring_size()
+        if self._input_site_ring_size and self._double_buffer_input:
+            raise ValueError(
+                "TS_TRITON_SHMEM_INPUT_SITE_RING and "
+                "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT are mutually exclusive"
+            )
+        self._input_site_ring_index = 0
+        self._input_site_max_m = 0
+        self._input_site_tensor = None
+        self._input_site_bases = None
+        input_site_bytes = 0
+        if self._input_site_ring_size:
+            if not self._inkernel or self._oneshot_max_m <= 0:
+                raise ValueError(
+                    "TS_TRITON_SHMEM_INPUT_SITE_RING requires the in-kernel "
+                    "barrier and a positive TS_TRITON_SHMEM_ONESHOT_MAX_M"
+                )
+            self._input_site_max_m = min(max_token_num, self._oneshot_max_m)
+            site_shape = (
+                self._input_site_ring_size * self._input_site_max_m,
+                hidden_dim,
+            )
+            if self._coarse:
+                site_buffer = self._alloc_data(site_shape, dtype, group)
+                self._input_site_tensor = site_buffer.tensor
+                self._input_site_bases = site_buffer.peer_ptrs_dev
+            else:
+                self._input_site_tensor, site_hdl = _alloc_symm(
+                    site_shape, dtype, self.device, group
+                )
+                self._input_site_bases = _peer_ptrs_dev(
+                    site_hdl, site_shape, dtype, self.world_size, self.device
+                )
+            input_site_bytes = (
+                self._input_site_ring_size
+                * self._input_site_max_m
+                * hidden_dim
+                * itemsize
+            )
         if self._is_twoshot:
             self._oneshot_kernel = (
                 "oneshot_wholerow"
                 if (hidden_dim & (hidden_dim - 1)) == 0
                 else "oneshot_blocked"
             )
+            if self._oneshot_variant == "blocked":
+                self._oneshot_kernel = "oneshot_blocked"
+            elif self._oneshot_variant == "padded":
+                self._oneshot_kernel = "oneshot_wholerow_padded"
             self._oneshot_scratch = torch.empty(
                 (self._num_cus, hidden_dim), dtype=torch.float32, device=self.device
             )
         else:
             self._oneshot_kernel = self.kernel  # ws<=2 is already one-shot
             self._oneshot_scratch = self._scratch
+        configured_oneshot_num_warps = _oneshot_num_warps()
+        self._oneshot_num_warps = configured_oneshot_num_warps or (
+            8
+            if self._oneshot_kernel == "oneshot_wholerow"
+            else 4
+            if self._oneshot_kernel == "oneshot_wholerow_padded"
+            else _k.recommended_num_warps(self._oneshot_kernel)
+        )
+        self._oneshot_padded_block_n = triton.next_power_of_2(hidden_dim)
 
         # Optional model-profile lifetime contract for outputs referenced by a
         # captured custom kernel. Allocate before capture warmup so graph replay
@@ -488,27 +632,41 @@ class TritonShmemAllReduceResidualRMSNorm:
             "triton_shmem AR+RMSNorm state: kernel=%s ws=%d max_tokens=%d hidden=%d "
             "substrate=%s data=%.1f MiB/rank inkernel_barrier=%s fold_copyin=%s "
             "workgroup_sync=%s fold_num_warps=%d oneshot_block_n=%d "
+            "twoshot_block_n=%d oneshot_variant=%s padded_max_m=%d "
+            "oneshot_num_warps=%d "
             "grid_cap=%d grid_cap_min_m=%d "
-            "small_m_oneshot=%s(<=%d) input_ring=%d output_ring=%d "
+            "oneshot_default=%s oneshot_max_m=%d input_ring=%d output_ring=%d "
+            "input_site_ring=%d "
+            "borrow_twoshot_output=%s twoshot_output_ring=%d "
             "oneshot_exit_barrier=%s",
             self.kernel,
             self.world_size,
             max_token_num,
             hidden_dim,
             "coarse+ipc" if self._coarse else "symm_mem(fine)",
-            n_symm * buf_bytes / 1024**2,
+            (n_symm * buf_bytes + input_site_bytes) / 1024**2,
             self._inkernel,
             self._fold_copyin and self._inkernel,
             self._workgroup_sync,
             self._fold_num_warps,
             self._oneshot_block_n,
+            self._twoshot_block_n,
+            self._oneshot_variant,
+            self._padded_max_m,
+            self._oneshot_num_warps,
             self._dynamic_grid_cap,
             self._dynamic_grid_cap_min_m,
             self._oneshot_kernel if self._is_twoshot else "n/a",
             self._oneshot_max_m if self._is_twoshot else 0,
             len(self._input_ring),
             self._output_ring_size,
-            not self._double_buffer_input,
+            self._input_site_ring_size,
+            self._borrow_twoshot_output,
+            len(self._twoshot_y_ring),
+            not (
+                self._double_buffer_input
+                or self._input_site_ring_size > 0
+            ),
         )
 
     def _alloc_data(self, shape, dtype, group):
@@ -556,6 +714,15 @@ class TritonShmemAllReduceResidualRMSNorm:
             grid = min(grid, self._dynamic_grid_cap)
         return max(1, grid)
 
+    def _oneshot_kernel_for_m(self, m: int) -> str:
+        if (
+            self._oneshot_kernel == "oneshot_wholerow_padded"
+            and self._padded_max_m > 0
+            and m > self._padded_max_m
+        ):
+            return "oneshot_blocked"
+        return self._oneshot_kernel
+
     def _run_oneshot(
         self,
         x,
@@ -570,6 +737,7 @@ class TritonShmemAllReduceResidualRMSNorm:
         norm_out,
         residual_out,
         fold,
+        exit_barrier,
     ):
         """One-shot pull into the caller's *local* output (no copy-out). Barriers
         are folded into the kernel when ``self._inkernel`` (default), else issued
@@ -577,11 +745,11 @@ class TritonShmemAllReduceResidualRMSNorm:
         ``norm_out``/``residual_out`` directly. When ``fold`` (lever A), the kernel
         also writes ``local_src`` into ``x`` (symmetric) in a phase-0 pass before
         the leading barrier, so the caller skipped the separate ``copy_``."""
-        kern = self._oneshot_kernel
+        kern = self._oneshot_kernel_for_m(m)
         inkernel = self._inkernel
         grid_sms = self._grid_width(kern, ws, m, inkernel)
         grid = (grid_sms,)
-        num_warps = _k.recommended_num_warps(kern)
+        num_warps = self._oneshot_num_warps
         if fold:
             num_warps = self._fold_num_warps
         if not inkernel:
@@ -608,7 +776,34 @@ class TritonShmemAllReduceResidualRMSNorm:
                 RANK=self.my_pe,
                 INKERNEL_BARRIER=inkernel,
                 FOLD_COPYIN=fold,
-                EXIT_BARRIER=not self._double_buffer_input,
+                EXIT_BARRIER=exit_barrier,
+                WORKGROUP_SYNC=self._workgroup_sync,
+                num_warps=num_warps,
+            )
+        elif kern == "oneshot_wholerow_padded":
+            _k.fused_ar_rmsnorm_oneshot_wholerow_padded_kernel[grid](
+                x,
+                norm_out,
+                eps,
+                weight,
+                self.my_pe,
+                input_bases,
+                residual,
+                residual_out,
+                norm_out,  # add_in placeholder (HAS_ADD=False)
+                m,
+                n,
+                self._signal_pad,
+                local_src,
+                BLOCK_N=self._oneshot_padded_block_n,
+                ws=ws,
+                NUM_SMS=grid_sms,
+                HAS_RESIDUAL=True,
+                HAS_ADD=False,
+                RANK=self.my_pe,
+                INKERNEL_BARRIER=inkernel,
+                FOLD_COPYIN=fold,
+                EXIT_BARRIER=exit_barrier,
                 WORKGROUP_SYNC=self._workgroup_sync,
                 num_warps=num_warps,
             )
@@ -636,12 +831,26 @@ class TritonShmemAllReduceResidualRMSNorm:
                 RANK=self.my_pe,
                 INKERNEL_BARRIER=inkernel,
                 FOLD_COPYIN=fold,
-                EXIT_BARRIER=not self._double_buffer_input,
+                EXIT_BARRIER=exit_barrier,
                 WORKGROUP_SYNC=self._workgroup_sync,
                 num_warps=num_warps,
             )
         if not inkernel:
             self._barrier()  # trailing
+
+    def _should_borrow_twoshot_output(
+        self,
+        use_oneshot: bool,
+        norm_out: torch.Tensor | None,
+        residual_out: torch.Tensor | None,
+    ) -> bool:
+        return (
+            self._borrow_twoshot_output
+            and not use_oneshot
+            and norm_out is None
+            and residual_out is None
+            and not torch.cuda.is_current_stream_capturing()
+        )
 
     def fused(
         self,
@@ -663,8 +872,19 @@ class TritonShmemAllReduceResidualRMSNorm:
         ws = self.world_size
         assert m <= self.max_token_num
 
+        # Dispatch is resolved before output allocation because the eager
+        # two-shot borrowed-output path returns its symmetric destination views
+        # directly and therefore must not allocate throw-away local outputs.
+        use_oneshot = (not self._is_twoshot) or (
+            self._oneshot_max_m > 0 and m <= self._oneshot_max_m
+        )
+        borrow_twoshot_output = self._should_borrow_twoshot_output(
+            use_oneshot, norm_out, residual_out
+        )
+
         if (
-            norm_out is None
+            not borrow_twoshot_output
+            and norm_out is None
             and residual_out is None
             and self._output_ring_size
             and m <= self._output_ring_max_m
@@ -680,28 +900,35 @@ class TritonShmemAllReduceResidualRMSNorm:
             norm_out = self._norm_output_ring[output_slot, :m]
             residual_out = self._residual_output_ring[output_slot, :m]
         else:
-            if norm_out is None:
-                norm_out = torch.empty_like(input_tensor)
-            if residual_out is None:
-                residual_out = torch.empty_like(residual)
-
-        # Dispatch: one-shot pull for ws<=2 (always) and small-M/decode at ws>=4
-        # One-shot writes output locally (no two-shot copy-out)
-        # and folds its barriers in-kernel; two-shot stays bandwidth-optimal for
-        # large M at ws>=4 (separate barriers + copy-out, unchanged).
-        use_oneshot = (not self._is_twoshot) or (
-            self._oneshot_max_m > 0 and m <= self._oneshot_max_m
-        )
+            if not borrow_twoshot_output:
+                if norm_out is None:
+                    norm_out = torch.empty_like(input_tensor)
+                if residual_out is None:
+                    residual_out = torch.empty_like(residual)
 
         # Fold the input copy-in into the one-shot
         # kernel (phase-0 write ordered by the in-kernel leading barrier). Requires
         # the in-kernel barrier; two-shot keeps the explicit copy_.
         fold = self._fold_copyin and self._inkernel and use_oneshot
 
-        input_slot = self._input_ring_index
-        x = self._input_ring[input_slot][:m]
-        input_bases = self._input_bases_ring[input_slot]
-        self._input_ring_index = (input_slot + 1) % len(self._input_ring)
+        use_input_site = (
+            use_oneshot
+            and self._input_site_ring_size > 0
+            and m <= self._input_site_max_m
+        )
+        if use_input_site:
+            input_slot = self._input_site_ring_index
+            self._input_site_ring_index = (
+                input_slot + 1
+            ) % self._input_site_ring_size
+            row_start = input_slot * self._input_site_max_m
+            x = self._input_site_tensor[row_start : row_start + m]
+            input_bases = self._input_site_bases
+        else:
+            input_slot = self._input_ring_index
+            x = self._input_ring[input_slot][:m]
+            input_bases = self._input_bases_ring[input_slot]
+            self._input_ring_index = (input_slot + 1) % len(self._input_ring)
         if not fold:
             x.copy_(input_tensor)
 
@@ -719,6 +946,7 @@ class TritonShmemAllReduceResidualRMSNorm:
                 norm_out,
                 residual_out,
                 fold,
+                not (self._double_buffer_input or use_input_site),
             )
             return norm_out, residual_out
 
@@ -734,8 +962,22 @@ class TritonShmemAllReduceResidualRMSNorm:
         grid_sms = self._grid_width("twoshot_blocked", ws, work_rows, inkernel)
         num_warps = _k.recommended_num_warps("twoshot_blocked")
         grid = (grid_sms,)
-        y = self._y[:m]
-        res_out = self._residual_out[:m]
+        if borrow_twoshot_output:
+            output_slot = self._twoshot_output_index
+            self._twoshot_output_index = (
+                output_slot + 1
+            ) % len(self._twoshot_y_ring)
+            y = self._twoshot_y_ring[output_slot][:m]
+            res_out = self._twoshot_residual_ring[output_slot][:m]
+            output_bases = self._twoshot_output_bases_ring[output_slot]
+            residual_out_bases = self._twoshot_residual_bases_ring[output_slot]
+            norm_out = y
+            residual_out = res_out
+        else:
+            y = self._y[:m]
+            res_out = self._residual_out[:m]
+            output_bases = self._output_bases
+            residual_out_bases = self._residual_out_bases
         if not inkernel:
             self._barrier()  # leading: peers' copy-in visible before any pull
         _k.fused_ar_rmsnorm_twoshot_blocked_kernel[grid](
@@ -746,15 +988,15 @@ class TritonShmemAllReduceResidualRMSNorm:
             weight,
             self.my_pe,
             input_bases,
-            self._output_bases,
-            self._residual_out_bases,
+            output_bases,
+            residual_out_bases,
             residual,
             res_out,
             y,  # add_in placeholder (HAS_ADD=False)
             m,
             n,
             self._signal_pad,
-            BLOCK_N=_k.recommended_block_n(self.dtype, n),
+            BLOCK_N=self._twoshot_block_n,
             ws=ws,
             NUM_SMS=grid_sms,
             HAS_RESIDUAL=True,
@@ -766,8 +1008,9 @@ class TritonShmemAllReduceResidualRMSNorm:
         )
         if not inkernel:
             self._barrier()  # trailing: peers' pushes into our output/residual_out visible
-        norm_out.copy_(y)
-        residual_out.copy_(res_out)
+        if not borrow_twoshot_output:
+            norm_out.copy_(y)
+            residual_out.copy_(res_out)
         return norm_out, residual_out
 
 
@@ -813,7 +1056,19 @@ def triton_shmem_allreduce_residual_rmsnorm(
     use_oneshot = (not state._is_twoshot) or (
         state._oneshot_max_m > 0 and m <= state._oneshot_max_m
     )
-    path = state._oneshot_kernel if use_oneshot else "twoshot_blocked"
+    use_input_site = (
+        use_oneshot
+        and state._input_site_ring_size > 0
+        and m <= state._input_site_max_m
+    )
+    path = (
+        state._oneshot_kernel_for_m(m)
+        if use_oneshot
+        else "twoshot_blocked"
+    )
+    borrow_twoshot_output = state._should_borrow_twoshot_output(
+        use_oneshot, norm_out, residual_out
+    )
     with kernel_scope(
         "communication",
         "allreduce_residual_rmsnorm",
@@ -826,9 +1081,17 @@ def triton_shmem_allreduce_residual_rmsnorm(
             state._fold_copyin and state._inkernel and use_oneshot
         ),
         input_ring=len(state._input_ring),
+        input_site_ring=state._input_site_ring_size,
+        input_site_slot=(
+            state._input_site_ring_index if use_input_site else -1
+        ),
+        borrow_twoshot_output=int(borrow_twoshot_output),
+        twoshot_output_slot=(
+            state._twoshot_output_index if borrow_twoshot_output else -1
+        ),
         exit_barrier=int(
             not (
-                state._double_buffer_input
+                (state._double_buffer_input or use_input_site)
                 and state._inkernel
                 and use_oneshot
             )

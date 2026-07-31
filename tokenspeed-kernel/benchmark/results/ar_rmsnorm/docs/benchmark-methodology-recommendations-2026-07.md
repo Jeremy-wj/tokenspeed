@@ -1,19 +1,12 @@
 # AR+RMSNorm benchmarking and promotion methodology
 
-Updated: 2026-07-30
+Updated: 2026-07-31
 
 ## Purpose
 
 This document defines the evidence needed to promote an AR+RMSNorm integration
 change. Qualified environments, commands, implemented harness behavior, and
 artifact layout belong in the [profiling workflow](profiling-workflow.md).
-
-The upstream-main rebase at `3f88dcc2` required a baseline reset because it
-changed the default fused backend, the ordinary AMD all-reduce control, and the
-surrounding runtime. The 2026-07-30 GPT-OSS campaign completed that reset and
-validated this evidence ladder. Upstream-unfused with explicit fusion
-disablement is the current control; Iris and `triton_shmem` both failed
-performance promotion.
 
 Upstream auto-enables fusion on supported AMD TP mappings. Therefore an
 unfused arm is valid only when it records `--disable-allreduce-fusion` and
@@ -27,21 +20,12 @@ Allocation, rendezvous, graph capture, health transitions, prefill/decode,
 buffer lifetime, fallback, topology, scheduling, and restart behavior are part
 of the measured object. Fixed-shape timing is screening evidence only.
 
-The legacy GPT-OSS-120B profile-v4 campaign demonstrates the distinction.
-After the request-padding and output-lifetime fixes, all three restart blocks
-and fifteen pairs completed without a safety failure, yet fused median TPOT
-changed **+1.44%** and output throughput changed **-1.46%**. Both intervals
-excluded zero in the unfavorable direction. Safety qualification succeeded;
-performance promotion failed.
-
-Earlier isolated improvements, fresh-start reversals, and transition faults
-remain useful motivation, but they do not supersede the completed v4 result.
-Sources:
-
-- [Current status](gpt-oss-120b-status.md)
-- [Serving root cause](gpt-oss-120b-serving-root-cause.md)
-- `../studies/mi350x/2026-07-repeatability/repeatability-summary.json`
-- `../studies/mi350x/2026-07-repeatability/e2e-stability-resolution-summary.json`
+The qualification history demonstrates why safety and performance are separate:
+profile v4 and the post-rebase fused baselines passed safety but failed
+performance, while core-v3 later passed both the safety/evidence gates and the
+capacity objective. Dated results belong in the
+[study index](../studies/README.md); the live decision belongs in
+[GPT-OSS-120B status](gpt-oss-120b-status.md).
 
 The methodology must answer, independently:
 
@@ -219,6 +203,34 @@ Performance and reliability are joint outcomes:
 If a candidate fails safety, failed qualification is the primary result even if
 its completed requests are faster.
 
+## Decomposition-to-serving transfer rules
+
+Use cumulative stage prefixes for additive critical-path decomposition. Sums of
+independently timed copies, barriers, and kernels can over-count launch overlap.
+
+An operator trend can explain serving only when all of these match:
+
+- executed M and one-/two-shot dispatch;
+- eager versus captured execution;
+- rank set and max-rank aggregation;
+- output ownership and copy-out policy;
+- graph site count and barrier/lifetime contract;
+- ordinary Iris versus RCCL transport selection.
+
+In particular:
+
+- eager M32 is not decode evidence; capture amortizes Iris launch/barrier costs
+  enough to reverse the backend ordering;
+- aggregate prefill bucket names are not executed M proof;
+- prefill TTFT improvements do not satisfy decode TPOT guardrails;
+- probe reset copies for in-place unfused transport must be labeled and removed
+  from serving-stage accounting;
+- graph and marker target sums explain direction, while only paired campaign
+  TPOT/throughput can promote deployment.
+
+The reference implementation and current measurements are in the
+[three-backend decomposition study](../studies/mi350x/2026-07-triton-shmem-decomposition/README.md).
+
 ## Promotion gates
 
 ### Universal safety gate
@@ -226,6 +238,9 @@ its completed requests are faster.
 Require eager correctness, 1,000+ fixed-graph replays, the relevant transition
 matrix, interleaved shared-state graph coverage, explicit M=1 transition, a
 bounded full serve, complete fallback, and no signal/channel/epoch disagreement.
+Model-profile site rings additionally require a full-site graph (72 calls for
+GPT-OSS), wraparound, interleaved graph variants, and proof that every unknown
+site-count path retains its exit barrier.
 
 ### Evidence gate
 
@@ -252,6 +267,11 @@ include graph-stable ring epochs, complete large-M fallback, disjoint channels
 for concurrent graph/stream roles, and overwrite-safe caller-owned producer
 output. Mechanism details belong in the
 [integration roadmap](integration-optimization-roadmap-2026-07.md).
+
+Prefill signature workloads must prove executed dispatch, not an aggregate
+token label. With the post-rebase scheduler, aggregate “M512” can execute near
+M144. The realigned profile therefore uses sequential direct 512-token requests
+to require two-shot.
 
 ## Minimal decision record
 

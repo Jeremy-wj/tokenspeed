@@ -1,4 +1,5 @@
 {
+  "status": "legacy_pre_upstream_main_rebase",
   "profile": "gpt_oss_120b_mi350x",
   "profile_identity": "Historical 2026-07-24 serving profile; not gpt-oss-120b-mi350x-qualified-v4.",
   "hardware": "MI350X gfx950",
@@ -39,6 +40,6 @@
     "fused_vs_unfused_tpot_change_pct": -1.5,
     "block_2048_vs_generic_fused_tpot_change_pct": -0.1,
     "promote_block_override": false,
-    "reason": "The block override has no measurable incremental TPOT benefit. Keep the generic launch policy and TP=4 opt-in deployment."
+    "reason": "Historical decision: the block override had no measurable incremental TPOT benefit under the 2026-07-24 profile."
   }
 }

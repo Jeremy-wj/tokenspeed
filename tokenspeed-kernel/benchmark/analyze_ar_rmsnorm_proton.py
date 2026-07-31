@@ -14,6 +14,7 @@ COMM_KERNELS = {
     "amd_all_reduce_kernel",
     "_rmsnorm_kernel",
     "fused_ar_rmsnorm_oneshot_wholerow_kernel",
+    "fused_ar_rmsnorm_oneshot_wholerow_padded_kernel",
     "fused_ar_rmsnorm_oneshot_blocked_kernel",
     "fused_ar_rmsnorm_twoshot_blocked_kernel",
     "symm_grid_barrier_kernel",

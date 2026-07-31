@@ -1,11 +1,9 @@
 # GPT-OSS-120B AR+RMSNorm producer and buffer lifetime contract
 
-Updated: 2026-07-29
+Updated: 2026-07-31
 
-This contract was derived from the pre-rebase `triton_shmem` implementation.
-It remains a safety requirement for explicit `triton_shmem` and useful prior
-art for any captured backend; its performance assumptions are legacy after
-upstream `3f88dcc2`.
+This is the normative ownership contract for explicit `triton_shmem` and any
+captured backend that borrows persistent inputs or outputs.
 
 ## Scope
 
@@ -85,6 +83,18 @@ residual output never alias. Any borrowed `norm_out` must also prove that the
 next producer has completed before its slot is reused. Returning a mutable
 state-owned tensor without this contract is unsafe under graph replay.
 
+Profile `gpt-oss-120b-mi350x-triton-realigned-v2` now implements the eager
+two-shot case with two coarse symmetric `norm_out`/`residual_out` pairs and
+independent peer-pointer tables. Consecutive two-shot sites alternate pairs;
+the completion barrier remains, so peer pushes are visible before return.
+Captured two-shot calls and calls with explicit caller outputs retain the copied
+compatibility path. A 72-site chained correctness test covers M257 and repeated
+M512/1024/2048 calls with residual outputs fed into the next site.
+
+Core-v3 inherits these lifetime contracts unchanged; it replaces only the
+M<=64 decode core and has independently passed graph, transition, bounded-serve,
+and 15-pair campaign qualification.
+
 The earlier assumption that `torch.empty_like` inside capture gave each fused
 site stable storage was disproven in full serving. Those tensors were transient
 allocations in the HIP graph private pool; captured custom kernels retained raw
@@ -99,79 +109,37 @@ remain dynamically allocated because no graph retains their pointers. This
 contract is model-specific and must not be inferred for a model with a
 different site count or conditional execution.
 
-## One-barrier input-ring proof
+## Rejected two-slot prototype
 
-The backend-only lifetime prototype is a two-slot symmetric input ring, used by
-every one-shot and two-shot call:
+The former host-alternated two-slot input ring saved 5.37 us/site but faulted in
+serving. Even site-count parity was insufficient because mutable capture-time
+host phase did not establish graph/call-site slot identity. It remains disabled.
+Any future generic ring requires capture-frozen position plus an explicit
+graph/forward epoch and must retain the exit barrier on every unmatched path.
 
-```text
-call k writes/pulls slot k mod 2
-call k+1 writes/pulls the other slot
-the leading rendezvous of call k+1 proves every rank completed call k
-call k+2 may then reuse call k's slot
-```
+## Qualified per-site input ownership
 
-For one-shot pull kernels, this permits the trailing reuse barrier to be
-omitted: the next call's leading rendezvous supplies the required cross-rank
-completion proof before the old slot is reused. Two-shot must retain its
-completion barrier because peer output pushes must be visible before local
-copy-out, but it must still participate in input-slot alternation so a
-one-shot-to-two-shot transition cannot overwrite the preceding slot.
+The realigned profile does not enable the rejected two-slot ring. It reserves
+72 one-shot input sites with
+`TS_TRITON_SHMEM_INPUT_SITE_RING=72`. During capture, each unconditional
+GPT-OSS fused call selects a distinct view; the graph freezes that pointer.
+A site is not reused until a complete 72-call forward has executed.
 
-This proof depends on:
+Because every later site has a leading rendezvous before the old site can be
+reused, peers have completed the prior pull. The one-shot exit barrier is
+therefore omitted only for this explicit model-profile ring. Generic states,
+unknown site counts, two-shot completion, and profiles without the ring retain
+their original barriers.
 
-- one ordered stream per TP rank for these calls;
-- every rank executing the same call sequence and ring slot;
-- no out-of-band writer to either input slot;
-- a graph replay containing an even number of ring advances, or an explicit
-  graph-level ring epoch. GPT-OSS-120B has 72 eligible sites, so its qualified
-  decode graph has even parity; profile-v4 prefill is eager and does not extend
-  that graph proof;
-- retaining the existing fixed-participant safeguards for M-divergent
-  execution.
-
-An odd-site captured graph that always restarts from the same captured slot can
-reuse the previous replay's final slot immediately and is not covered by this
-proof. Even GPT-OSS's even call count was insufficient because mutable
-host-side phase during capture is not explicit graph/call-site slot identity.
-The no-exit ring remains disabled.
-
-## Prototype backend stage
-
-The diagnostic implementation:
-
-1. Allocate two symmetric input buffers and two independent peer-pointer
-   tables.
-2. Alternate the selected input slot for all fused paths.
-3. Adds a one-shot kernel constexpr that retains the leading barrier but omits
-   the trailing barrier only when the double-buffer ring is active.
-4. Keep two-shot's trailing completion barrier.
-5. Exposes one opt-in environment flag.
-6. Leaves the ring disabled by default.
-
-Required validation:
-
-- eager correctness with changing inputs;
-- 100+ repeated graph replays;
-- even and odd synthetic call chains;
-- one-shot/two-shot and M-shape graph transitions;
-- shared-state interleaved multigraph execution;
-- the complete GPT-OSS multi-arm serve;
-- max-rank M=32 graph latency and per-forward production traces.
-
-The ring saved 5.37 us/site in graph replay but later faulted in canonical
-serving. Before producer APIs are extended, replace host alternation with
-capture-frozen positional slots `(forward_epoch + call_index) mod 2` plus an
-explicit graph/forward epoch. Retain the exit barrier on any path without that
-complete identity contract:
-
-- add caller-owned output support to the active dense GEMM;
-- add a fused/caller-owned MoE final output path;
-- reserve symmetric ring slots through an explicit compiler/runtime interface;
-- add ping-pong caller-owned fused outputs.
+Validation includes eager wraparound, two interleaved 72-call graph variants,
+100 replays in the focused test, 1000 M-boundary transition replays, bounded
+serving, and the 15-pair campaign. The 72-call graph improved by 19.8%.
 
 ## Decision boundary
 
-The input ring cleared the 5 us/site performance threshold but failed the
-serving safety gate. Producer-direct plumbing remains blocked until graph-stable
-slot identity makes the no-exit lifetime proof valid in serving.
+The original two-slot input ring cleared the 5 us/site performance threshold
+but failed the serving safety gate. The per-site replacement now has
+graph-stable identity and passed serving. Producer-direct plumbing remains
+blocked independently: active `tokenspeed_kernel.mm` and MXFP4 `moe_apply`
+still cannot honor exact caller-owned output views, and fallback must preserve a
+rank-local partial tensor.

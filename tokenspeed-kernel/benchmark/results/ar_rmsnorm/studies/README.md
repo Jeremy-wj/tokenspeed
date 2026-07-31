@@ -1,34 +1,47 @@
 # AR+RMSNorm study index
 
-Curated studies answer dated questions; they do not override the current
-deployment decision in the
-[GPT-OSS-120B status](../docs/gpt-oss-120b-status.md).
+Studies are dated evidence. The
+[GPT-OSS-120B status](../docs/gpt-oss-120b-status.md) is the only live
+deployment and priority record.
 
-Except for the explicitly marked post-rebase study below, studies predate the
-upstream-main rebase at `3f88dcc2` and are **legacy performance evidence**.
-This includes profile v4. Safety incidents and lifetime findings remain
-historical engineering evidence.
+## MI350X: current checkpoint chain
 
-## MI350X (gfx950)
+Read these newest-to-oldest:
 
-- [`2026-07-post-rebase-baseline/`](mi350x/2026-07-post-rebase-baseline/README.md)
-  — canonical GPT-OSS-120B TP=4 upstream-unfused, Iris, and `triton_shmem`
-  reset; current performance and deployment evidence.
-- `2026-07-serving-baseline/` — initial TP=2, TP=4, and TP=8 serving crossover.
-- `2026-07-grid-and-two-shot/` — grid and two-shot integration screens.
-- `2026-07-path-and-width-sweeps/` — operator path and width sweeps.
-- `2026-07-profile-guided-followup/` — corrected 2026-07-24 trace and e2e
-  comparison; historical TP=4 evidence from the older serving profile.
-- `2026-07-profiling-summary/` — Proton summaries.
-- `2026-07-upper-bound/` — token-cap crossover and opportunity bounds.
-- `2026-07-cap-gate/` — rejected M=256 performance-gate implementation.
-- [`2026-07-repeatability/`](mi350x/2026-07-repeatability/README.md) —
-  GPT-OSS-120B TP=4 incident chronology, root-cause evidence, and final
-  profile-v4 qualification.
+1. [Core-v3 tuning](mi350x/2026-07-triton-shmem-core-tuning/README.md) —
+   scratch-free padded decode core and capacity promotion on qualified HIP
+   `1,2,5,6`.
+2. [Backend decomposition](mi350x/2026-07-triton-shmem-decomposition/README.md)
+   — captured/eager stage accounting and closed optimization paths.
+3. [Profile-v2 realignment](mi350x/2026-07-triton-shmem-realignment/README.md) —
+   graph-stable input sites, borrowed two-shot outputs, and the lifetime
+   baseline inherited by core-v3.
+4. [Post-rebase baseline](mi350x/2026-07-post-rebase-baseline/README.md) —
+   explicit upstream-unfused control and initial Iris/triton reset.
+
+## MI350X: legacy performance and durable safety evidence
+
+Everything below predates upstream `3f88dcc2`; numeric performance conclusions
+are legacy. Safety, incident, and methodology findings remain engineering
+evidence.
+
+- [Repeatability and incidents](mi350x/2026-07-repeatability/README.md) —
+  graph-padding and captured-output root causes, chronology, and profile-v4
+  qualification.
+- [Upper bound and token cap](mi350x/2026-07-upper-bound/README.md) —
+  old-runtime crossover and planning arithmetic.
+- [Rejected M=256 gate](mi350x/2026-07-cap-gate/README.md)
+- [Profile-guided follow-up](mi350x/2026-07-profile-guided-followup/README.md) —
+  corrected 2026-07-24 trace and end-to-end comparison.
+- [Serving baseline](mi350x/2026-07-serving-baseline/README.md)
+- [Grid and two-shot screens](mi350x/2026-07-grid-and-two-shot/README.md)
+- [Path and width sweeps](mi350x/2026-07-path-and-width-sweeps/README.md)
+- [Profiling summaries](mi350x/2026-07-profiling-summary/README.md)
 
 ## MI300X
 
-- `mi300x/migration-baseline/` — migration-era regression evidence.
+- [Migration baseline](mi300x/migration-baseline/README.md) — migration-era regression
+  evidence, legacy across hardware and runtime generations.
 
-Prefer machine-readable JSON summaries inside each study. Raw logs and traces
-remain under `../raw/` and are intentionally Git-ignored.
+Prefer each study's machine-readable summary for exact values. Raw logs, traces,
+and campaign trees under `raw/` are local and Git-ignored.

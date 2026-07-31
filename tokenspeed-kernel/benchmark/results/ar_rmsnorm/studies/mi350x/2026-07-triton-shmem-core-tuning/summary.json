@@ -1,0 +1,105 @@
+{
+  "date": "2026-07-31",
+  "scope": {
+    "model": "gpt-oss-120b",
+    "hardware": "MI350X gfx950",
+    "world_size": 4,
+    "hidden_size": 2880,
+    "dtype": "bfloat16",
+    "devices": "1,2,5,6",
+    "physical_gpus": "0,2,4,6",
+    "profile": "gpt-oss-120b-mi350x-triton-core-v3"
+  },
+  "candidate": {
+    "kernel": "fused_ar_rmsnorm_oneshot_wholerow_padded_kernel",
+    "algorithm": "scratch-free one-program-per-token pull reduction with 4096 padded lanes",
+    "dispatch": "padded for M<=64; blocked one-shot for M=65..384; two-shot for M>384",
+    "num_warps": 4,
+    "grid_m32": 32,
+    "lifetime_contract": "72-site input/output rings; no one-shot exit barrier"
+  },
+  "graph_m32_us_per_site": {
+    "padded_triton": 16.34986822803815,
+    "blocked_triton_v2": 25.22855583164427,
+    "iris_fused": 19.05850072701772,
+    "production_unfused_probe_with_reset": 16.974454952610864,
+    "production_unfused_serving_op_without_reset": 14.917496591806412,
+    "padded_vs_blocked_pct": -35.19,
+    "padded_vs_iris_pct": -14.21,
+    "padded_vs_unfused_probe_pct": -3.68,
+    "padded_vs_unfused_serving_op_pct": 9.6
+  },
+  "graph_m32_stage_us_per_site": {
+    "copy_in": 2.0539027949174247,
+    "entry_rendezvous": 4.407680489950708,
+    "scratch_free_core": 9.929114538762305,
+    "exit_sync": 0.0,
+    "lifetime_remainder": -0.04082959559228527,
+    "blocked_v2_core": 17.85543436805407,
+    "iris_core": 8.800919685098862,
+    "core_improvement_vs_blocked_pct": -44.39,
+    "core_gap_vs_iris_us": 1.128194853663443
+  },
+  "launch_sweep_us_per_site": {
+    "warps_1": 18.69710369242562,
+    "warps_2": 17.307374212476944,
+    "warps_4": 16.331805123223198,
+    "warps_8": 17.653486794895596,
+    "grid_16_warps_4": 17.96376374032762,
+    "grid_24_warps_4": 18.570722805129158,
+    "grid_32_warps_4": 16.331805123223198
+  },
+  "marker_aligned_decode": {
+    "padded_target_kernel_sum_us": 1492.383,
+    "blocked_v2_target_kernel_sum_us": 2122.301,
+    "unfused_target_kernel_sum_us": 1865.669,
+    "padded_vs_blocked_target_pct": -29.68,
+    "padded_vs_unfused_target_pct": -20.01,
+    "padded_gpu_period_us": 13071.3603515625,
+    "blocked_v2_gpu_period_us": 13702.831298828125,
+    "unfused_gpu_period_us": 13108.26513671875
+  },
+  "validation": {
+    "padded_random_correctness": "pass",
+    "padded_interleaved_72_call_graphs": "pass",
+    "communication_suite": "18 passed, 3 WS8 deselected",
+    "transition_replays": 1000,
+    "transition_ops_checked": 1649,
+    "transition_status": "pass",
+    "bounded_serve_128": "128 completed, 0 failed",
+    "bounded_profile_512": "128 completed, 0 failed",
+    "full_campaign_safe_pairs": 15,
+    "contention_incident": "final unfused arm interrupted by an external all-GPU Python context; contaminated work rejected and rerun with --resume"
+  },
+  "campaign": {
+    "raw_root": "raw/full-campaign",
+    "method": "3 restart blocks x 5 paired seeds; hierarchical bootstrap; direct-M512 signature trace",
+    "point_estimate_aggregation": "arithmetic mean of pair-level percentage changes; median_tpot names the per-run TPOT statistic",
+    "promotion_eligible": true,
+    "promotion_objective": "capacity",
+    "median_tpot_change_pct": -0.800363181687711,
+    "median_tpot_ci95_pct": [
+      -1.415235910188734,
+      -0.2466311944844272
+    ],
+    "mean_tpot_change_pct": -1.208470835105746,
+    "output_throughput_change_pct": 1.2887097944196853,
+    "output_throughput_ci95_pct": [
+      0.5165282091376219,
+      2.0756438852783043
+    ],
+    "absolute_medians": {
+      "unfused_tpot_ms": 12.716178272881795,
+      "padded_triton_tpot_ms": 12.641594968025379,
+      "unfused_output_throughput": 2381.244769188985,
+      "padded_triton_output_throughput": 2402.068312720944
+    }
+  },
+  "decision": {
+    "qualified_rank_set": "HIP 1,2,5,6 / physical 0,2,4,6",
+    "status": "promote for capacity on the qualified rank set",
+    "fallback": "keep explicit upstream-unfused for unqualified rank sets or profile mismatch",
+    "world_size_8": "deferred while physical GPU 3 is occupied",
+    "remaining_gap": "about 1.13 us/site core versus Iris and 1.43 us/site total versus serving-faithful unfused; no further local parameter sweep justified"
+  }
+}

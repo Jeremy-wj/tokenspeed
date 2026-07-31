@@ -403,6 +403,104 @@ def fused_ar_rmsnorm_twoshot_blocked_kernel(
 
 
 @triton.jit
+def fused_ar_rmsnorm_oneshot_wholerow_padded_kernel(
+    input,
+    output,
+    epsilon,
+    gamma,
+    my_pe,
+    heap_bases,
+    residual,
+    residual_out,
+    add_in,
+    M,
+    N: tl.constexpr,
+    signal_pad,
+    local_src,
+    BLOCK_N: tl.constexpr,
+    ws: tl.constexpr,
+    NUM_SMS: tl.constexpr,
+    HAS_RESIDUAL: tl.constexpr,
+    HAS_ADD: tl.constexpr,
+    RANK: tl.constexpr = 0,
+    INKERNEL_BARRIER: tl.constexpr = False,
+    FOLD_COPYIN: tl.constexpr = False,
+    EXIT_BARRIER: tl.constexpr = True,
+    WORKGROUP_SYNC: tl.constexpr = True,
+):
+    """Scratch-free whole-row one-shot for arbitrary hidden widths.
+
+    ``BLOCK_N`` is the next power of two at least as large as ``N``. Masked
+    lanes contribute zero to the RMS reduction, matching Iris's fused decode
+    structure while retaining the triton_shmem pointer/barrier substrate.
+    """
+    tl.static_assert(
+        (BLOCK_N & (BLOCK_N - 1)) == 0,
+        "BLOCK_N must be a power of two",
+    )
+    pid = tl.program_id(0)
+    cols = tl.max_contiguous(
+        tl.multiple_of(tl.arange(0, BLOCK_N), BLOCK_N),
+        BLOCK_N,
+    )
+    mask = cols < N
+
+    if FOLD_COPYIN:
+        for row_id in range(pid, M, NUM_SMS):
+            offsets = row_id * N + cols
+            tl.store(
+                input + offsets,
+                tl.load(local_src + offsets, mask=mask, other=0.0),
+                mask=mask,
+            )
+
+    if INKERNEL_BARRIER:
+        if WORKGROUP_SYNC:
+            tl.debug_barrier()
+        symm_mem_barrier(signal_pad, pid, RANK, ws)
+        if WORKGROUP_SYNC:
+            tl.debug_barrier()
+
+    gamma_row = tl.load(gamma + cols, mask=mask, other=0.0).to(tl.float32)
+    for row_id in range(pid, M, NUM_SMS):
+        offsets = row_id * N + cols
+        acc = tl.zeros((BLOCK_N,), tl.float32)
+        for peer in tl.static_range(0, ws):
+            peer_ptr = symmetric_ptr(input, my_pe, peer, heap_bases)
+            acc += tl.load(
+                peer_ptr + offsets,
+                mask=mask,
+                other=0.0,
+            ).to(tl.float32)
+
+        if HAS_ADD:
+            acc += tl.load(add_in + offsets, mask=mask, other=0.0).to(
+                tl.float32
+            )
+        if HAS_RESIDUAL:
+            acc += tl.load(residual + offsets, mask=mask, other=0.0).to(
+                tl.float32
+            )
+            tl.store(
+                residual_out + offsets,
+                acc.to(residual_out.dtype.element_ty),
+                mask=mask,
+            )
+
+        sum_squares = tl.sum(acc * acc)
+        norm_factor = tl.rsqrt((sum_squares / N) + epsilon)
+        rms_norm = (acc * norm_factor * gamma_row).to(output.dtype.element_ty)
+        tl.store(output + offsets, rms_norm, mask=mask)
+
+    if INKERNEL_BARRIER and EXIT_BARRIER:
+        if WORKGROUP_SYNC:
+            tl.debug_barrier()
+        symm_mem_barrier(signal_pad, pid, RANK, ws)
+        if WORKGROUP_SYNC:
+            tl.debug_barrier()
+
+
+@triton.jit
 def fused_ar_rmsnorm_oneshot_blocked_kernel(
     input,
     output,

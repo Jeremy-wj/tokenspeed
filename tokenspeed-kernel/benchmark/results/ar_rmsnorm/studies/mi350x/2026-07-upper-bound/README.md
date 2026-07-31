@@ -38,9 +38,9 @@ Representative two-pass means:
 - M=8192: 728.21 us fused versus 486.16 us unfused.
 
 Conclusion: the crossover is between 256 and 512 tokens. Raising 2048 is not
-useful; the fused disadvantage increases above the cap. See
-`../../../docs/mi350x-upper-bound.md` for the roofline and reusable e2e bounds.
-The live deployment decision remains in
+useful; the fused disadvantage increases above the cap. The detailed arithmetic
+is retained in `upper-bound-summary.json`; it is legacy planning evidence, not a
+post-rebase budget. The live deployment decision remains in
 `../../../docs/gpt-oss-120b-status.md`.
 
 The 2026-07-26 audit keeps all absolute calculations but corrects their labels:

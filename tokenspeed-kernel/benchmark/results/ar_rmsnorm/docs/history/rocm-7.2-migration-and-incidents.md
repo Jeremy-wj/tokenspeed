@@ -25,55 +25,17 @@ HSA, ROCTX, RCCL, and roctracer from `/opt/rocm/lib` at runtime.
 
 ## Image supersession audit and retirement
 
-The two local images were audited on 2026-07-24. The profiler image completely
-supersedes the retired image for both serving and profiling:
+The two images were audited on 2026-07-24. Their package inventories and parent
+layers matched; the functional difference was runtime library resolution. The
+retired image loaded torch's bundled ROCm 7.2.0 roctracer and crashed in
+activity-buffer handling. The profiler image loads the coherent system ROCm
+7.2.4 stack and passed both torch/Kineto graph traces and eager Proton traces.
 
-- Docker records the retired image as the profiler image's direct parent. All
-  13 parent filesystem layers are identical, and the image environment,
-  command, working directory, labels, architecture, and OS are unchanged.
-- Complete `dpkg-query` and `pip freeze --all` inventories produced identical
-  SHA256 fingerprints in both images: package inventory
-  `38e0bcaf7c59f764feedb2421dc889aa9882c3a701082e0761160085376b2cb5`
-  and Python inventory
-  `cc95990a87c95d7ce557da6605e5ac9db0da3d6b45fdd54b5f3a95f41d64d05c`.
-  Both report torch `2.11.0+rocm7.2`, system HIP runtime `70253211`,
-  roctracer `4.1.70204`, rocprofiler-sdk `1.1.0`, and ROCm `7.2.4`.
-- In the retired image, `libtorch_hip.so` resolved
-  `libroctracer64.so` from `torch/lib`, SHA256
-  `b4ccab93373c3dc339da0d7739c4e937b9f6f38dd069315b7c8ae319ffeeba82`.
-  In the profiler image that exact file is preserved under
-  `torch/lib/_bundled_rocm_backup/`, but normal loading resolves system
-  `/opt/rocm-7.2.4/lib/libroctracer64.so.4.1.70204`, SHA256
-  `a7dfe8c26885648c7636b856ee71a426224f167b1b9a4b1f595c92205f03e8a5`.
-  HIP, HSA, RCCL, ROCTX, COMGR, rocprofiler-register, and rocm-core already
-  resolved to system ROCm in both images.
-- Historical qualification established the behavioral boundary: the retired
-  mixed tracing stack crashed in activity-buffer handling, while the coherent
-  profiler image passed torch/Kineto graph traces and eager Proton traces. No
-  workload or compatibility case was found where the retired image is safer or
-  more capable.
-
-The profiler image was committed from the successful system-roctracer
-qualification container. Its 1.108 GB top layer contains the roctracer
-relocation plus generated COMGR/Triton/Inductor caches and temporary test
-output; it does not contain a package-set change. Those caches explain why the
-layer is much larger than the 516,681-byte bundled roctracer library. A future
-reproducible rebuild should apply `fix_torch_hip_bundling.sh` in a clean layer
-and exclude generated caches, but this does not affect the supersession
-decision.
-
-The historical tag and its three obsolete containers were removed on
-2026-07-24. Their reported writable layers were 2.54 GB, 1.11 GB, and 970 MB;
-these consisted of generated caches, temporary benchmark output, and the two
-documented tracing experiments. The project and model/data directories were
-bind mounts and were not deleted.
-
-Removing the tag does not reclaim the retired image's reported 77.2 GB. Docker
-reported zero unique bytes for it because every layer is still required by the
-profiler child image. The old image ID therefore remains in Docker's internal
-parent chain without a repository tag; it is not a separately selectable
-runtime. The cleanup removes the confusing tag and reclaims obsolete container
-writable data, not shared parent layers.
+The retired tag and obsolete containers were removed. Its layers remain as the
+profiler image's Docker parent, so tag removal did not reclaim shared image
+bytes. A future reproducible rebuild should apply
+`benchmark/fix_torch_hip_bundling.sh` in a clean layer and exclude generated
+compiler/profiler caches.
 
 ## HIP graph-capture failure
 

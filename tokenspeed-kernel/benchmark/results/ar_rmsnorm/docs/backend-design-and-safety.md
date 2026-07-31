@@ -1,20 +1,15 @@
 # `triton_shmem` backend design and safety
 
-## Post-rebase status
+Updated: 2026-07-31
 
-This document describes the local experimental backend, not the upstream
-default. After rebasing onto upstream `3f88dcc2`:
+## Scope
 
-- `TS_ARNORM_BACKEND=auto` uses Iris first and native symmetric memory as
-  fallback;
-- `TS_ARNORM_BACKEND=triton_shmem` is required to select this implementation;
-- the 2026-07-30 post-rebase campaign completed 15/15 safe pairs but rejected
-  `triton_shmem` on +10.47% TPOT and -10.58% throughput;
-- all older performance and qualification evidence below is legacy;
-- the pointer, graph-lifetime, synchronization, and complete-fallback
-  invariants remain requirements for future candidates.
+This is the implementation and safety reference for the explicit local
+`triton_shmem` backend. It is not the upstream `auto` backend and does not own
+deployment policy. Selection requires `TS_ARNORM_BACKEND=triton_shmem`; every
+decline returns to the caller's complete unfused path.
 
-See [upstream-main rebase impact](upstream-main-rebase-impact-2026-07.md).
+Current model policy is in [GPT-OSS-120B status](gpt-oss-120b-status.md).
 
 ## Contract
 
@@ -50,20 +45,21 @@ State cache key:
 
 A different model hidden size creates a distinct state and symmetric allocation.
 
-`TS_TRITON_SHMEM_FUSION_MAX_M` is an optional performance eligibility gate
-independent of `max_token_num`. With workspace cap 2048 and gate 256, M<=256
-uses the fused backend while larger valid calls decline to the complete
-unfused fallback; the allocated state remains 2048 rows. Zero disables this
-additional gate.
+`TS_TRITON_SHMEM_FUSION_MAX_M` is a diagnostic performance eligibility gate
+independent of `max_token_num`; zero disables it. The former M=256 deployment
+gate is rejected and no qualified profile enables it.
 
 Kernel variants:
 
 - `oneshot_wholerow`: power-of-two hidden size, pull reduction, local output;
+- `oneshot_wholerow_padded`: arbitrary hidden size padded to a power-of-two
+  register row; scratch-free, masked, decode-specialized;
 - `oneshot_blocked`: arbitrary hidden size, blocked reduction with fp32 scratch;
 - `twoshot_blocked`: row-sharded reduction with symmetric output pushes.
 
 At TP=4 or TP=8, the state is normally two-shot, while the call-level
-one-shot overlay handles small token counts.
+one-shot overlay handles small token counts. GPT-OSS core-v3 uses padded
+whole-row for M<=64, blocked one-shot through M384, and two-shot above M384.
 
 ## Symmetric pointer translation
 
@@ -100,13 +96,20 @@ Every operation requires:
 1. a leading cross-rank barrier so peer input writes are visible;
 2. a trailing barrier so peers finish reading persistent input before reuse.
 
-Generic behavior retains both. The two-slot input ring delays input reuse by one
-call, allowing one-shot to omit its exit barrier because the next call's
-leading rendezvous proves all peers completed the older slot. That proof also
-requires graph-stable slot identity; even GPT-OSS's 72-call parity did not make
-mutable host capture phase serving-safe. The ring is disabled after canonical
-serving faults. Two-shot retains its output-completion barrier. See the
+Generic behavior retains both. The rejected two-slot input ring delays reuse by
+one call but depends on mutable host phase and remains disabled.
+
+Profile v2 instead reserves 72 input sites. Capture freezes one distinct
+symmetric view per unconditional GPT-OSS fused call; reuse is delayed for a
+complete forward, so intervening leading rendezvous prove peer reads complete.
+Only this explicit profile omits the one-shot exit barrier. Unknown site counts
+retain it. Two-shot always retains its output-completion barrier. See the
 [lifetime contract](producer-lifetime-contract.md).
+
+Eager two-shot may return state-owned outputs only when two symmetric
+norm/residual pairs are available. Calls alternate pairs to prevent the current
+residual input aliasing the next residual output. Captured and caller-owned
+output paths retain copy-out.
 
 The scalar signal-pad CAS uses system-scope release/acquire semantics.
 Multi-wave programs require workgroup barriers around that scalar operation.
@@ -138,8 +141,7 @@ must sweep their own widths and token ranges before treating it as optimal.
 
 1. Per-allocation peer-pointer tables.
 2. Leading and trailing ordering around persistent-buffer reuse, or a
-   graph-stable two-slot/epoch contract that replaces one-shot trailing
-   ordering.
+   graph-stable site/epoch contract that replaces one-shot trailing ordering.
 3. Coarse data buffers and fine-grained signal pad.
 4. Explicit stream-ordered copy-in; folded copy-in remains diagnostic because
    serving invalidated the narrower single-wave synthetic proof.
@@ -149,10 +151,10 @@ must sweep their own widths and token ranges before treating it as optimal.
 8. Persistent caller-owned storage for outputs referenced by captured custom
    kernels; transient capture-time allocations are not a lifetime contract.
 
-## Legacy validation evidence
+## Validation evidence
 
-- MI300X correctness: ws=1/2/4/8; graph capture at ws=2/8.
-- MI350X correctness and serving: ws=2/4/8.
+- Legacy base-path correctness: MI300X ws=1/2/4/8 with graph capture at ws=2/8;
+  MI350X ws=2/4/8.
 - Captured RCCL: ws=2/4/8 with blocking wait disabled.
 - TP=4 default shared-state multigraph transitions: pass.
 - The model-specific persistent-output lifetime contract was validated for
@@ -160,11 +162,15 @@ must sweep their own widths and token ranges before treating it as optimal.
   [lifetime contract](producer-lifetime-contract.md).
 - Two-slot/no-exit ring: even-call graph and shared multigraph tests pass, but
   later canonical serving faults; keep disabled pending graph-stable slot phase.
+- Profile-v2 site ring: eager wraparound, two interleaved 72-call graphs,
+  1000 transition replays, bounded serving, and 15/15 campaign pairs pass.
+- Eager two-shot borrowed output: 72-site chained correctness plus
+  M512/1024/2048 ping-pong and caller-output fallback pass.
+- Core-v3 padded whole-row: random correctness, two interleaved 72-call graphs,
+  18-test non-WS8 suite, 1000 transition replays, bounded serving, marker
+  profiles, and 15/15 campaign pairs pass. WS=8 is not core-v3-qualified.
 
-Current model policy is documented in
-[GPT-OSS-120B status](gpt-oss-120b-status.md), not in this implementation
-reference.
-
-Producer-direct inputs, borrowed outputs, and trailing-barrier removal require
-the separate [producer and buffer lifetime contract](producer-lifetime-contract.md).
+Producer-direct inputs and any genericization of borrowed outputs or
+trailing-barrier removal require the separate
+[producer and buffer lifetime contract](producer-lifetime-contract.md).
 

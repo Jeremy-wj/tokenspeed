@@ -286,7 +286,7 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
         )
         expected_backend = "triton_shmem"
         expected_path = (
-            triton_shmem_state._oneshot_kernel
+            triton_shmem_state._oneshot_kernel_for_m(m)
             if uses_oneshot
             else "twoshot_blocked"
         )

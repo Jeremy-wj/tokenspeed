@@ -4,8 +4,14 @@ Campaign date: 2026-07-30 UTC.
 
 This study re-establishes the GPT-OSS-120B, TP=4, MI350X baseline after the
 rebase onto upstream `3f88dcc2`. The measured code head was `eb69cf15`; each
-campaign manifest records the full dirty-tree hash and script hashes. Raw
-artifacts are immutable under:
+campaign manifest records the full dirty-tree hash and script hashes.
+
+Its fusion-off deployment conclusion was superseded by
+[core-v3 tuning](../2026-07-triton-shmem-core-tuning/README.md) on qualified HIP
+`1,2,5,6`. This study remains the post-rebase baseline and control-definition
+record.
+
+Raw artifacts are immutable under:
 
 - `../../../raw/current/gpt-oss-120b/mi350x/2026-07-30/2026-07-30-post-rebase-operator-baseline/`
 - `../../../raw/current/gpt-oss-120b/mi350x/2026-07-30/2026-07-30-post-rebase-graph-transition/`
@@ -16,7 +22,7 @@ artifacts are immutable under:
 The machine-readable decision record is [summary.json](summary.json); all
 paired decode changes are in [paired-decode.json](paired-decode.json).
 
-## Canonical decision
+## Campaign decision
 
 Use the upstream ordinary-all-reduce plus standalone RMSNorm path, with
 all-reduce fusion **explicitly disabled**, for GPT-OSS-120B TP=4 on the
@@ -115,19 +121,20 @@ contamination. None contributes to the final estimates.
 Checksums were regenerated after final teardown and verified for the operator,
 graph/transition, stability, Iris, and `triton_shmem` evidence roots.
 
-## Optimization realignment
+## Historical follow-up guidance
 
-Do not invest next in local `triton_shmem` launch tuning. Its M<=256 eager
-advantage does not survive graph replay or serving, and the completed campaign
-is decisively unfavorable.
+At this checkpoint, local `triton_shmem` launch tuning was deprioritized because
+its M<=256 eager advantage did not survive graph replay or serving.
 
-The next useful work is:
+The campaign recommended:
 
-1. keep explicit fusion-off as the GPT-OSS deployment control;
+1. keep explicit fusion-off as the matched control;
 2. isolate the ordinary Iris/RCCL captured-transition hazard;
 3. profile why Iris fused costs more than ordinary Iris plus RMSNorm at N=2880;
 4. only revisit a fused candidate after it beats the unfused graph critical
    path by enough to clear the 1.5% TPOT or 1% throughput campaign threshold.
 
-World-size 8 and other rank sets require independent qualification after
-physical GPU 3 becomes available.
+Realignment, decomposition, and core-v3 tuning subsequently executed this
+follow-up. Current priorities belong in
+[GPT-OSS-120B status](../../../docs/gpt-oss-120b-status.md). World-size 8 and
+other rank sets still require independent qualification.

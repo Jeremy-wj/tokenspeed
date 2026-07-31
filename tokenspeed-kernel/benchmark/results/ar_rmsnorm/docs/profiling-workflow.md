@@ -1,9 +1,10 @@
 # AR+RMSNorm profiling workflow
 
-Pre-rebase traces remain legacy. The 2026-07-30 campaign established the
-post-rebase workflow and baseline. New runs must record the resolved ordinary
-AR backend, fused backend, rank-side selected-backend log, kernel signatures,
-and scope schema.
+Updated: 2026-07-31
+
+Pre-rebase traces remain legacy. New runs must record the resolved ordinary AR
+backend, fused backend, rank-side selected-backend log, kernel signatures, and
+scope schema.
 
 ## Qualified environment
 
@@ -69,14 +70,16 @@ Before each GPU run:
 3. for TP<8, exclude physical GPU 3 / HIP index 0;
 4. launch TP=8 only from a verified idle snapshot.
 
-Canonical GPT-OSS MI350X TP=4 campaign rank set:
+Post-rebase baseline rank set:
 
 ```text
 HIP_VISIBLE_DEVICES=1,2,3,5 -> physical AMD-SMI GPUs 0,2,1,4
 ```
 
-Other rank sets in dated studies are exploratory or incident controls and must
-not be described as canonical.
+Core-v3 is qualified only on HIP `1,2,5,6` (physical `0,2,4,6`). The earlier
+`1,2,3,5` reset remains valid baseline evidence but is not the promoted
+deployment topology. Never merge percentages across rank sets; every topology
+needs its own matched control and qualification.
 
 ## A/B proof requirements
 
@@ -120,6 +123,7 @@ flag is merely absent.
 Expected fused signatures:
 
 ```text
+fused_ar_rmsnorm_oneshot_wholerow_padded_kernel
 fused_ar_rmsnorm_oneshot_wholerow_kernel
 fused_ar_rmsnorm_oneshot_blocked_kernel
 fused_ar_rmsnorm_twoshot_blocked_kernel
@@ -242,21 +246,33 @@ AMD Proton does not reliably map `HIP_VISIBLE_DEVICES`; set
 
 ## Focused tuning loop
 
-1. Serving-faithful eager decomposition:
+1. Serving-faithful three-backend eager decomposition:
 
 ```bash
 BENCH_WS=4 BENCH_N=<hidden> BENCH_M_VALUES=<tokens> \
-  python3 -m benchmark.probe_ar_rmsnorm_decomp
+  python3 -m benchmark.probe_ar_rmsnorm_backend_decomp
 ```
 
-2. Isolated graph replay:
+2. Captured full-site stage decomposition for GPT-OSS decode:
+
+```bash
+BENCH_WS=4 BENCH_N=2880 BENCH_M=32 BENCH_CALLS_PER_GRAPH=72 \
+  BENCH_GRAPH_N_REPEAT=1000 \
+  python3 -m benchmark.probe_ar_rmsnorm_backend_graph_decomp
+```
+
+Use cumulative-prefix marginal columns for additive accounting. The older
+`probe_ar_rmsnorm_decomp` remains useful for triton-specific
+separate/in-kernel/folded diagnostics.
+
+3. Isolated graph replay:
 
 ```bash
 BENCH_WS=4 BENCH_N=<hidden> BENCH_M=<tokens> \
   python3 -m benchmark.probe_ar_rmsnorm_graph_perf
 ```
 
-3. Shared-state graph transition gate:
+4. Shared-state graph transition gate:
 
 ```bash
 BENCH_IMPL=<production_unfused|auto|triton_shmem> \
@@ -268,7 +284,7 @@ The legacy `probe_inkernel_barrier_graph` remains a `triton_shmem`-specific
 barrier diagnostic. The post-rebase transition probe compares production
 dispatch and retains failures across backend/path changes.
 
-4. Communication correctness:
+5. Communication correctness:
 
 ```bash
 pytest -q test/ops/test_triton_shmem_communication.py
@@ -278,7 +294,7 @@ Evaluate the separate paired-reduction primitive with
 `python3 -m benchmark.bench_all_reduce_two`; do not merge its result into the
 AR+RMSNorm arms.
 
-5. Full matched serving A/B and production trace.
+6. Full matched serving A/B and production trace.
 
 Fixed-shape replay is not a sufficient promotion gate. A candidate must survive
 interleaved shared-state graph transitions and a complete multi-arm serve.
@@ -299,12 +315,13 @@ Use 128 output tokens for screening, then 512 and multiple repeats only after a
 case passes. Its repeats share one server and therefore do not satisfy a
 fresh-container-per-seed stability gate.
 
-Before paired qualification, require three fresh canonical unfused seeds:
+Before paired qualification, require three fresh unfused seeds on the target
+rank set:
 
 ```bash
 python3 benchmark/run_ar_rmsnorm_repeatability.py \
   --stability-only --comparison iris --decode-only \
-  --blocks 1 --seeds 0,1,2 --devices 1,2,3,5 \
+  --blocks 1 --seeds 0,1,2 --devices <qualified-HIP-indices> \
   --deep-health-mode passive --disable-overlap-schedule \
   --double-buffer-input 0 --barrier-grid 0 --skip-profiles
 ```
@@ -334,11 +351,21 @@ validates serve arguments/signatures, and computes paired hierarchical
 bootstrap intervals. It cannot report promotion eligibility below three
 complete blocks and fifteen paired observations.
 
-GPT-OSS MI350X post-rebase profile v1 uses passive health, disabled overlap, the original
-one-slot exit barrier, 0.90 GPU-memory utilization, eager prefill, C32 decode
-capture, explicit copy-in, and `TS_TRITON_SHMEM_OUTPUT_RING=72`. Profile ID
-`gpt-oss-120b-mi350x-post-rebase-v1`, the output-ring value, the resolved
-fusion flag, and the rank-side backend selection are mandatory proof fields.
+Qualified core-v3 proof requires:
+
+```text
+AR_NORM_PROFILE_ID=gpt-oss-120b-mi350x-triton-core-v3
+TS_TRITON_SHMEM_ONESHOT_VARIANT=padded
+TS_TRITON_SHMEM_PADDED_MAX_M=64
+TS_TRITON_SHMEM_ONESHOT_NUM_WARPS=4
+TS_TRITON_SHMEM_INPUT_SITE_RING=72
+TS_TRITON_SHMEM_OUTPUT_RING=72
+TS_TRITON_SHMEM_BORROW_TWOSHOT_OUTPUT=1
+```
+
+Decode proof must contain
+`fused_ar_rmsnorm_oneshot_wholerow_padded_kernel`; direct-M512 proof must still
+contain two-shot. The qualified campaign rank set is HIP `1,2,5,6`.
 
 Universal reserved-sink graph padding and persistent per-site fused outputs are
 required safety invariants. Rerun a full campaign only for a changed
@@ -371,18 +398,6 @@ Required metadata:
 - runtime/image identifiers.
 
 Do not use `final`, `latest`, `ON`, or `OFF` in new artifact names.
-
-## Reference performance traces
-
-```text
-raw/current/gpt-oss-120b/mi350x/2026-07-24/traces/torch/
-  tp4-fused-generic-block512/
-  tp4-unfused/
-```
-
-These are the matched 2026-07-24 performance traces, not the current stability
-profile. Current stability and root-cause artifacts are indexed by the status
-page and `studies/mi350x/2026-07-repeatability/`.
 
 The historical environment and incident record is kept in
 [ROCm 7.2 migration and incidents](history/rocm-7.2-migration-and-incidents.md).

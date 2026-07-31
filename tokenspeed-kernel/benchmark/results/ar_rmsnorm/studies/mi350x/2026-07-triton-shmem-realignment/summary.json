@@ -1,0 +1,171 @@
+{
+  "date": "2026-07-30",
+  "superseded_for_deployment_by": "2026-07-triton-shmem-core-tuning; profile-v2 remains the lifetime-integration baseline",
+  "scope": {
+    "model": "gpt-oss-120b",
+    "hardware": "MI350X gfx950",
+    "world_size": 4,
+    "hidden_size": 2880,
+    "dtype": "bfloat16",
+    "canonical_devices": "1,2,3,5",
+    "campaign_devices": "1,2,5,6",
+    "world_size_8": "deferred: physical GPU 3 occupied"
+  },
+  "profile": {
+    "id": "gpt-oss-120b-mi350x-triton-realigned-v2",
+    "backend": "triton_shmem",
+    "oneshot_max_m": 384,
+    "input_site_ring": 72,
+    "borrow_twoshot_output": true,
+    "output_ring": 72,
+    "fold_copyin": false,
+    "double_buffer_input": false,
+    "barrier_grid": 0,
+    "twoshot_block_n_override": 0
+  },
+  "implementation": {
+    "twoshot_output": "two coarse symmetric ping-pong pairs; direct eager return; copied capture/caller-output fallback",
+    "twoshot_completion_barrier": "retained",
+    "oneshot_input": "72 graph-stable per-site coarse symmetric slots",
+    "oneshot_exit_barrier": "omitted only for the explicit site-ring profile",
+    "generic_defaults": "new lifetime mechanisms remain opt-in"
+  },
+  "operator_improvement_vs_post_rebase_triton_shmem": {
+    "method": "two order-opposed passes; mean of max-rank p50s; WS4 N2880",
+    "rows": [
+      {
+        "M": 257,
+        "baseline_us": 117.2,
+        "candidate_us": 73.6,
+        "change_pct": -37.2
+      },
+      {
+        "M": 384,
+        "baseline_us": 111.9,
+        "candidate_us": 78.7,
+        "change_pct": -29.7
+      },
+      {
+        "M": 512,
+        "baseline_us": 117.4,
+        "candidate_us": 91.4,
+        "change_pct": -22.2
+      },
+      {
+        "M": 1024,
+        "baseline_us": 118.2,
+        "candidate_us": 103.3,
+        "change_pct": -12.5
+      },
+      {
+        "M": 2048,
+        "baseline_us": 195.1,
+        "candidate_us": 185.6,
+        "change_pct": -4.9
+      }
+    ],
+    "direct_twoshot_copyout_us": "18-19 at M257-1024"
+  },
+  "graph": {
+    "M": 32,
+    "calls_per_graph": 72,
+    "site_ring_two_pass": {
+      "baseline_us_per_site": 30.35,
+      "candidate_us_per_site": 24.36,
+      "change_pct": -19.8
+    },
+    "matched_alternate_topology_us_per_site": {
+      "production_unfused": 16.96,
+      "iris_fused": 18.97,
+      "triton_shmem_realign": 25.45
+    }
+  },
+  "marker_aligned_decode": {
+    "production_unfused_target_kernel_sum_us": 1865.669,
+    "triton_shmem_target_kernel_sum_us": 2122.301,
+    "target_change_pct": 13.8,
+    "production_unfused_gpu_period_us": 13108.265,
+    "triton_shmem_gpu_period_us": 13702.831,
+    "gpu_period_change_pct": 4.5
+  },
+  "campaign": {
+    "raw_root": "raw/full-campaign-alt-v3",
+    "method": "3 restart blocks x 5 paired seeds; hierarchical bootstrap; direct-M512 signature trace",
+    "safe_pairs": 15,
+    "median_tpot_change_pct": 3.746674218481461,
+    "median_tpot_ci95_pct": [
+      0.19736456316856252,
+      7.3374496267367935
+    ],
+    "output_throughput_change_pct": -2.7315370588837373,
+    "output_throughput_ci95_pct": [
+      -5.799696032438825,
+      0.34161945282455763
+    ],
+    "promotion_eligible": false,
+    "decision": "historical profile-v2 decision: retain upstream-unfused deployment control"
+  },
+  "prefill_median_ttft_change_pct": {
+    "m128": {
+      "mean": -4.1618657465482,
+      "ci95": [
+        -6.104538436027695,
+        -2.3361300943196164
+      ]
+    },
+    "m256": {
+      "mean": -4.151633758480242,
+      "ci95": [
+        -10.284659607458252,
+        -0.2494312704715496
+      ]
+    },
+    "m512": {
+      "mean": -0.3635257959563832,
+      "ci95": [
+        -2.6950635540810715,
+        1.5463235486764522
+      ]
+    },
+    "m1024": {
+      "mean": -2.804342273073576,
+      "ci95": [
+        -4.524479607372979,
+        -0.7246340934027911
+      ]
+    },
+    "m2048": {
+      "mean": -3.8121822720252987,
+      "ci95": [
+        -6.187193750939633,
+        -1.9884814797501018
+      ]
+    },
+    "m4096": {
+      "mean": -0.09413475789981827,
+      "ci95": [
+        -6.247451557087834,
+        9.323574604011487
+      ]
+    }
+  },
+  "validation": {
+    "communication_tests": "16 passed, 3 WS8 deselected",
+    "repeatability_unit_tests": "21 passed",
+    "transition_replays": 1000,
+    "transition_status": "pass",
+    "bounded_serves": "128 and 512 output tokens passed",
+    "direct_m512_twoshot_calls_per_rank": 72,
+    "contention": "two canonical-set campaign attempts rejected after foreign Python processes appeared on physical GPU 1; no contaminated pairs used"
+  },
+  "exhausted": [
+    "one-shot caps above M384",
+    "fixed barrier grids 8-256",
+    "one-shot block widths 128-4096",
+    "two-shot block widths 128-2048",
+    "decode grid caps below 32",
+    "folded copy-in with site ring",
+    "separate one-block leading barrier",
+    "producer-direct input blocked on exact-output producer APIs"
+  ]
+}

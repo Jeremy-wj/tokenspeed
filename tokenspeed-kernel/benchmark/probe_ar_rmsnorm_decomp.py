@@ -6,8 +6,9 @@ The serving baseline follows TokenSpeed's production transport gate:
 * larger payload: RCCL
 * both paths then run TokenSpeed's Triton residual-add RMSNorm
 
-Input resets needed by in-place transports happen before timing events. Directly
-timed and subtraction-derived columns are labeled separately.
+Input resets needed by in-place transports happen before timing events. Copy,
+barrier, and complete-path columns are directly timed. Kernel and in-kernel
+barrier columns are subtraction-derived and labeled separately.
 
 Examples:
     HIP_VISIBLE_DEVICES=1,2 BENCH_WS=2 \
@@ -137,11 +138,14 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
         path = (
             "twoshot"
             if uses_twoshot
-            else f"oneshot:{fused_state._oneshot_kernel.split('_')[-1]}"
+            else f"oneshot:{fused_state._oneshot_kernel_for_m(m).split('_')[-1]}"
         )
 
         # Directly timed fused phases and complete variants.
         t_copyin = _time(lambda: fused_state._x[:m].copy_(x), group)
+        # Entry and completion use the same one-block rendezvous kernel. Time it
+        # directly once and report it under both semantic roles; do not hide the
+        # fact that two-shot pays it twice in a combined "sync" subtraction.
         t_barrier = _time(lambda: fused_state._barrier(), group)
         if uses_twoshot:
             t_copyout = _time(
@@ -245,6 +249,8 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
                 "path": path,
                 "baseline_transport": transport,
                 "copyin_ms": t_copyin,
+                "entry_barrier_ms": t_barrier,
+                "completion_barrier_ms": t_barrier,
                 "barrier_ms": t_barrier,
                 "kernel_derived_ms": t_kernel_derived,
                 "inkbarrier_derived_ms": t_inkbarrier_derived,
@@ -282,20 +288,23 @@ def main() -> None:
 
     print(f"\n===== ws={ws} N={_N} (ms, max-rank p50) =====")
     print(
-        f"{'M':>5} {'path':>18} {'base':>10} {'copy':>8} {'kern*':>8} "
-        f"{'inkbar*':>8} {'full':>8} {'unfused':>8} {'speedup':>8}"
+        f"{'M':>5} {'path':>18} {'base':>10} {'copyin':>8} {'entry':>8} "
+        f"{'kern*':>8} {'finish':>8} {'copyout':>8} {'full':>8} "
+        f"{'unfused':>8} {'speedup':>8}"
     )
     for row in rows:
         print(
             f"{row['M']:5d} {row['path']:>18} "
             f"{row['baseline_transport']:>10} {row['copyin_ms']:8.4f} "
+            f"{row['entry_barrier_ms']:8.4f} "
             f"{row['kernel_derived_ms']:8.4f} "
-            f"{row['inkbarrier_derived_ms']:8.4f} "
+            f"{row['completion_barrier_ms']:8.4f} "
+            f"{row['copyout_ms']:8.4f} "
             f"{row['full_default_ms']:8.4f} "
             f"{row['serve_unfused_ms']:8.4f} "
             f"{row['serve_speedup']:8.2f}"
         )
-    print("* subtraction-derived estimate")
+    print("* kernel is subtraction-derived; copy/barrier/full columns are direct")
 
     csv_path = os.environ.get("BENCH_CSV")
     if csv_path:

@@ -159,25 +159,19 @@ returns to the same slot epoch only after prior consumers have completed.
 Source:
 `../studies/mi350x/2026-07-repeatability/fused-output-lifetime-root-cause.json`.
 
-## Final qualification result
+## Disposition
 
-Profile ID: `gpt-oss-120b-mi350x-qualified-v4`.
+Profile `gpt-oss-120b-mi350x-qualified-v4` completed three restart blocks and
+fifteen pairs without a safety failure. The underlying serving faults are
+closed; its performance result is legacy after the upstream rebase.
 
-The complete campaign finished without a safety failure:
-
-- three independent restart blocks;
-- fifteen paired fused/unfused observations;
-- fresh decode servers and separate prefill servers;
-- all required signature/profile proofs.
-
-Fusion is nevertheless **not promoted**:
-
-- median decode TPOT regressed 1.44% (95% CI 1.20% to 1.65%);
-- output throughput regressed 1.46% (95% CI -1.91% to -1.02%);
-- required prefill confidence intervals did not all exclude zero.
-
-The underlying serving faults are closed; the remaining result is a measured
-performance rejection, not an unresolved stability workaround.
+Profile v2 and core-v3 preserve the reserved sink and 72 persistent captured
+output sites. Their 72-site input ring and eager two-shot output ping-pong add
+separate lifetime contracts without reopening either incident. See the
+[realignment](../studies/mi350x/2026-07-triton-shmem-realignment/README.md) and
+[core tuning](../studies/mi350x/2026-07-triton-shmem-core-tuning/README.md)
+studies. Current deployment policy belongs in
+[GPT-OSS-120B status](gpt-oss-120b-status.md).
 
 ## Harness findings
 

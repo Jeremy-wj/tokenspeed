@@ -89,8 +89,10 @@ def test_stability_campaign_selects_only_unfused():
 def test_qualified_profile_proof_accepts_canonical_profile(tmp_path):
     serve_log = tmp_path / "serve.log"
     serve_log.write_text(
-        "RUN_ENV PROFILE_ID=gpt-oss-120b-mi350x-post-rebase-v1 "
+        "RUN_ENV PROFILE_ID=gpt-oss-120b-mi350x-triton-core-v3 "
         "DEEP_HEALTH_MODE=passive FOLD_COPYIN=0 SHMEM_OUTPUT_RING=72 "
+        "INPUT_SITE_RING=72 BORROW_TWOSHOT_OUTPUT=1 "
+        "ONESHOT_VARIANT=padded PADDED_MAX_M=64 ONESHOT_NUM_WARPS=4 "
         "DOUBLE_BUFFER_INPUT=0 BARRIER_GRID=0 FORWARD_MARKERS=1\n"
         "ServerArgs(gpu_memory_utilization=0.9, "
         "cudagraph_capture_sizes=[32], disable_prefill_graph=True, "
@@ -103,8 +105,10 @@ def test_qualified_profile_proof_accepts_canonical_profile(tmp_path):
 def test_qualified_profile_proof_rejects_memory_override(tmp_path):
     serve_log = tmp_path / "serve.log"
     serve_log.write_text(
-        "RUN_ENV PROFILE_ID=gpt-oss-120b-mi350x-post-rebase-v1 "
+        "RUN_ENV PROFILE_ID=gpt-oss-120b-mi350x-triton-core-v3 "
         "DEEP_HEALTH_MODE=passive FOLD_COPYIN=0 SHMEM_OUTPUT_RING=72 "
+        "INPUT_SITE_RING=72 BORROW_TWOSHOT_OUTPUT=1 "
+        "ONESHOT_VARIANT=padded PADDED_MAX_M=64 ONESHOT_NUM_WARPS=4 "
         "DOUBLE_BUFFER_INPUT=0 BARRIER_GRID=0 FORWARD_MARKERS=1\n"
         "ServerArgs(gpu_memory_utilization=0.95, "
         "cudagraph_capture_sizes=[32], disable_prefill_graph=True, "

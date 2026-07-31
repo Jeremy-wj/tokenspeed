@@ -1,0 +1,186 @@
+{
+  "date": "2026-07-30",
+  "superseded_by": "2026-07-triton-shmem-core-tuning for deployment; decomposition remains the profile-v2 baseline",
+  "scope": {
+    "model": "gpt-oss-120b",
+    "hardware": "MI350X gfx950",
+    "world_size": 4,
+    "hidden_size": 2880,
+    "dtype": "bfloat16",
+    "devices": "1,2,5,6",
+    "physical_gpus": "0,2,4,6",
+    "profile": "gpt-oss-120b-mi350x-triton-realigned-v2"
+  },
+  "method": {
+    "eager": "two M-order-opposed passes, 30 warmups, 150 samples, per-iteration max-rank then p50",
+    "graph": "two independent 72-call M32 passes, 50 warmups, 1000 replays, max-rank p50 per call",
+    "stage_accounting": "direct isolated timings plus additive marginal differences from cumulative captured/eager prefixes",
+    "correctness": "all three backends compared to fp32 all-reduce plus residual RMSNorm reference"
+  },
+  "graph_m32_us_per_site": {
+    "production_unfused": {
+      "harness_reset_copy": 2.0530694681737156,
+      "ordinary_iris_transport": 12.747201344205275,
+      "triton_rmsnorm_residual": 2.1576566828621733,
+      "full_with_harness_reset": 16.957927495241165,
+      "serving_op_excluding_harness_reset": 14.90485802706745
+    },
+    "iris_fused": {
+      "copy_in": 2.052236141430007,
+      "entry_device_barrier": 4.175315921505291,
+      "fused_peer_pull_residual_rmsnorm": 8.800919685098862,
+      "exit_device_barrier": 4.025024672349294,
+      "full": 19.053496420383453
+    },
+    "triton_shmem_realigned": {
+      "copy_in": 2.0508472290303974,
+      "entry_in_kernel_rendezvous": 5.28990932636791,
+      "blocked_peer_pull_residual_rmsnorm": 17.85543436805407,
+      "exit_sync": 0.0,
+      "lifetime_wrapper_remainder": 0.03236490819189086,
+      "full": 25.22855583164427
+    },
+    "comparisons": {
+      "triton_vs_iris_full_pct": 32.41,
+      "triton_vs_unfused_serving_op_pct": 69.27,
+      "triton_minus_iris_us_per_site": 6.175059411260817,
+      "triton_minus_unfused_serving_op_us_per_site": 10.32369780457682,
+      "triton_minus_iris_ms_per_72_sites": 0.4446042776107788,
+      "triton_minus_unfused_ms_per_72_sites": 0.7433062419299311,
+      "triton_core_minus_iris_core_us_per_site": 9.054514682955209,
+      "triton_entry_minus_iris_entry_us_per_site": 1.114593404862619,
+      "triton_exit_saving_vs_iris_us_per_site": 4.025024672349294
+    }
+  },
+  "eager_public_total_us": [
+    {
+      "M": 32,
+      "production_unfused": 68.00075061619282,
+      "iris_fused": 67.01025180518627,
+      "triton_shmem_realigned": 50.23049935698509
+    },
+    {
+      "M": 91,
+      "production_unfused": 68.7205009162426,
+      "iris_fused": 67.22049973905087,
+      "triton_shmem_realigned": 51.12050101161003
+    },
+    {
+      "M": 92,
+      "production_unfused": 64.36074897646904,
+      "iris_fused": 66.31024926900864,
+      "triton_shmem_realigned": 50.5209993571043
+    },
+    {
+      "M": 256,
+      "production_unfused": 66.11100025475025,
+      "iris_fused": 73.73075000941753,
+      "triton_shmem_realigned": 55.610500276088715
+    },
+    {
+      "M": 384,
+      "production_unfused": 66.33074954152107,
+      "iris_fused": 85.73075197637081,
+      "triton_shmem_realigned": 71.91025093197823
+    },
+    {
+      "M": 512,
+      "production_unfused": 65.64074940979481,
+      "iris_fused": 112.2409999370575,
+      "triton_shmem_realigned": 73.54099862277508
+    },
+    {
+      "M": 1024,
+      "production_unfused": 90.32050147652626,
+      "iris_fused": 167.79175028204918,
+      "triton_shmem_realigned": 103.59099879860878
+    },
+    {
+      "M": 2048,
+      "production_unfused": 145.5412544310093,
+      "iris_fused": 280.11224418878555,
+      "triton_shmem_realigned": 184.42200124263763
+    }
+  ],
+  "triton_eager_stage_us": [
+    {
+      "M": 256,
+      "path": "oneshot",
+      "copy_in": 10.749999899417162,
+      "entry_sync_derived": 4.7202506102621555,
+      "core": 40.100499987602234,
+      "exit_sync": 0.0,
+      "public_total": 55.610500276088715
+    },
+    {
+      "M": 384,
+      "path": "oneshot",
+      "copy_in": 10.740249883383512,
+      "entry_sync_derived": 4.998999182134867,
+      "core": 56.18100054562092,
+      "exit_sync": 0.0,
+      "public_total": 71.91025093197823
+    },
+    {
+      "M": 512,
+      "path": "twoshot_borrowed_output",
+      "copy_in": 10.719999903813004,
+      "entry_sync": 10.199999203905463,
+      "core": 43.42050291597843,
+      "exit_sync": 9.200496599078178,
+      "copy_out": 0.0,
+      "public_total": 73.54099862277508,
+      "caller_output_compatibility_total": 82.0005014538765
+    },
+    {
+      "M": 1024,
+      "path": "twoshot_borrowed_output",
+      "copy_in": 10.660000145435333,
+      "entry_sync": 10.250499937683344,
+      "core": 78.28050060197711,
+      "exit_sync": 4.399998113512993,
+      "copy_out": 0.0,
+      "public_total": 103.59099879860878,
+      "caller_output_compatibility_total": 110.5710007250309
+    },
+    {
+      "M": 2048,
+      "path": "twoshot_borrowed_output",
+      "copy_in": 10.8902498614043,
+      "entry_sync": 9.750250494107604,
+      "core": 159.67100067064166,
+      "exit_sync": 4.11050021648407,
+      "copy_out": 0.0,
+      "public_total": 184.42200124263763,
+      "caller_output_compatibility_total": 195.85174694657326
+    }
+  ],
+  "end_to_end": {
+    "campaign": "2026-07-triton-shmem-realignment/raw/full-campaign-alt-v3",
+    "decode_median_tpot_change_pct": 3.746674218481461,
+    "decode_median_tpot_ci95_pct": [
+      0.19736456316856252,
+      7.3374496267367935
+    ],
+    "output_throughput_change_pct": -2.7315370588837373,
+    "marker_target_kernel_sum_us": {
+      "production_unfused": 1865.669,
+      "triton_shmem_realigned": 2122.301
+    },
+    "marker_gpu_period_us": {
+      "production_unfused": 13108.265,
+      "triton_shmem_realigned": 13702.831
+    }
+  },
+  "closure": {
+    "decode_copy_in": "not a differentiator versus Iris under graph replay; both are 2.05 us/site",
+    "decode_exit_barrier": "closed; triton pays zero and saves 4.03 us/site versus Iris",
+    "decode_entry_sync": "secondary; triton is 1.11 us/site slower than Iris and removing it entirely would not beat unfused",
+    "decode_core": "primary; triton blocked core is 9.05 us/site slower than Iris and accounts for more than the gross backend gap before exit-barrier savings",
+    "twoshot_copy_out": "closed for eager backend-owned outputs; borrowed ping-pong saves 7-11 us on the cumulative total at M512-2048",
+    "large_m_512_1024": "triton core is competitive, but copy plus entry/exit synchronization erase the advantage over RCCL",
+    "large_m_2048": "both core and integration overhead are slower than RCCL plus RMSNorm",
+    "remaining_local_knobs": "block width, grid, fixed barrier, folded copy, copy-out, and exit barrier are exhausted",
+    "next_complex_paths": "decode core algorithm redesign; producer-direct/progress publication only as a combined system change"
+  }
+}

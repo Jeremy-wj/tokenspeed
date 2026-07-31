@@ -10,18 +10,22 @@ template remains unqualified until a model completes the evidence ladder.
 - `model_template.env` is a conservative starting point for another model.
 
 The profile emits
-`AR_NORM_PROFILE_ID=gpt-oss-120b-mi350x-post-rebase-v1` and
-`TS_TRITON_SHMEM_OUTPUT_RING=72`. Campaign runs also validate the resolved
-server arguments; the profile ID alone does not hide command-line overrides.
-The canonical deployment arm explicitly disables fusion; both Iris and
-`triton_shmem` failed post-rebase performance promotion.
+`AR_NORM_PROFILE_ID=gpt-oss-120b-mi350x-triton-core-v3`,
+`TS_TRITON_SHMEM_OUTPUT_RING=72`,
+`TS_TRITON_SHMEM_INPUT_SITE_RING=72`, and
+`TS_TRITON_SHMEM_BORROW_TWOSHOT_OUTPUT=1`. It selects padded whole-row decode
+for M<=64 with four warps and retains blocked/two-shot fallback above that.
+Campaign runs also validate the
+resolved server arguments; the profile ID alone does not hide command-line
+overrides. Core-v3 is capacity-promoted on qualified HIP `1,2,5,6` at +1.29%
+throughput and -0.80% median TPOT. Unfused remains the control and fallback.
 
 Usage:
 
 ```bash
 source benchmark/profiles/ar_rmsnorm/gpt_oss_120b_mi350x.env
-ENABLE_ALLREDUCE_FUSION=0 \
-  bash benchmark/e2e_arnorm_serve.sh 4 1,2,3,5 2048 auto
+ENABLE_ALLREDUCE_FUSION=1 \
+  bash benchmark/e2e_arnorm_serve.sh 4 1,2,5,6 2048 triton_shmem
 ```
 
 For a new hidden size:

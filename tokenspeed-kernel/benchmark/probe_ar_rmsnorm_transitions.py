@@ -470,7 +470,7 @@ def _precreate_backend(
             state._oneshot_max_m > 0 and m <= state._oneshot_max_m
         )
         paths[str(m)] = (
-            state._oneshot_kernel if oneshot else "twoshot_blocked"
+            state._oneshot_kernel_for_m(m) if oneshot else "twoshot_blocked"
         )
     return None, paths
 
