@@ -72,7 +72,8 @@
     "contention_incident": "final unfused arm interrupted by an external all-GPU Python context; contaminated work rejected and rerun with --resume"
   },
   "campaign": {
-    "raw_root": "raw/full-campaign",
+    "raw_root": "studies/mi350x/2026-07-triton-shmem-core-tuning/raw/full-campaign",
+    "configuration": "historical restricted controls: eager prefill, C32-only decode capture, 0.90 HBM, overlap off, passive health",
     "method": "3 restart blocks x 5 paired seeds; hierarchical bootstrap; direct-M512 signature trace",
     "point_estimate_aggregation": "arithmetic mean of pair-level percentage changes; median_tpot names the per-run TPOT statistic",
     "promotion_eligible": true,
@@ -97,7 +98,8 @@
   },
   "decision": {
     "qualified_rank_set": "HIP 1,2,5,6 / physical 0,2,4,6",
-    "status": "promote for capacity on the qualified rank set",
+    "status": "historical: promoted for capacity under restricted controls; superseded by default-compatibility",
+    "superseded_by": "studies/mi350x/2026-07-default-compatibility",
     "fallback": "keep explicit upstream-unfused for unqualified rank sets or profile mismatch",
     "world_size_8": "deferred while physical GPU 3 is occupied",
     "remaining_gap": "about 1.13 us/site core versus Iris and 1.43 us/site total versus serving-faithful unfused; no further local parameter sweep justified"

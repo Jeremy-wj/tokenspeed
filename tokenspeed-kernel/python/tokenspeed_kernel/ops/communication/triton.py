@@ -44,7 +44,13 @@ _TRITON_SHMEM_FUSION_MAX_M_ENV = "TS_TRITON_SHMEM_FUSION_MAX_M"
 
 
 def _arnorm_backend() -> str:
-    return os.environ.get(_ARNORM_BACKEND_ENV, "auto").strip().lower()
+    backend = os.environ.get(_ARNORM_BACKEND_ENV, "auto").strip().lower()
+    if backend not in {"auto", "triton_shmem", "iris", "symm_mem"}:
+        raise ValueError(
+            f"{_ARNORM_BACKEND_ENV} must be auto, triton_shmem, iris, or "
+            f"symm_mem; got {backend!r}"
+        )
+    return backend
 
 
 def _triton_shmem_fusion_max_m() -> int:
@@ -617,9 +623,9 @@ def create_dp_sampling_state(
     predict[max_pad_bs, N], accept_index[max_pad_bs, N], and
     accept_length[max_pad_bs].
     """
-    assert isinstance(
-        group, dist.ProcessGroup
-    ), f"Expected ProcessGroup, got {type(group)}"
+    assert isinstance(group, dist.ProcessGroup), (
+        f"Expected ProcessGroup, got {type(group)}"
+    )
     assert rank_in_group == dist.get_rank(group), (
         f"rank_in_group={rank_in_group} does not match process-group rank "
         f"{dist.get_rank(group)}"
@@ -725,9 +731,9 @@ def dp_sampling_swap(
     reqs_per_rank = pad_bs // tp_size
     v_local = vocab_size // tp_size
     expected_shape = (pad_bs * n, v_local)
-    assert (
-        tuple(local_logits.shape) == expected_shape
-    ), f"local_logits shape {tuple(local_logits.shape)} != {expected_shape}"
+    assert tuple(local_logits.shape) == expected_shape, (
+        f"local_logits shape {tuple(local_logits.shape)} != {expected_shape}"
+    )
     assert state.recv_logits is not None
     assert state.recv_logits_peer_ptrs is not None
     assert state.flags_peer_ptrs is not None
@@ -860,9 +866,9 @@ def rsag_get_context(
     state: TritonCommState, token_list_in_group: list
 ) -> Tuple[int, int, int]:
     total_num_tokens = sum(token_list_in_group)
-    assert (
-        total_num_tokens <= state.max_token_num
-    ), f"The inner comm buffer is too small: {total_num_tokens=} is not <= {state.max_token_num=}"
+    assert total_num_tokens <= state.max_token_num, (
+        f"The inner comm buffer is too small: {total_num_tokens=} is not <= {state.max_token_num=}"
+    )
     local_num_tokens = token_list_in_group[state.rank_in_group]
     local_token_offset = sum(token_list_in_group[: state.rank_in_group])
     return total_num_tokens, local_num_tokens, local_token_offset
@@ -914,9 +920,9 @@ def nvidia_rsag_get_launch_config(
     max_block_size = _RSAG_BLOCK_THREADS
     bytes_per_thread = 16
     numel_per_thread = _RSAG_NUMEL_PER_THREAD
-    assert (
-        local_numel % numel_per_thread == 0
-    ), f"The number of elements must be {bytes_per_thread} bytes aligned"
+    assert local_numel % numel_per_thread == 0, (
+        f"The number of elements must be {bytes_per_thread} bytes aligned"
+    )
     block_size = max_block_size
     num_warps = max_block_size // warp_size
     # Reduce-scatter passes a payload-scaled count; the all-gather paths leave it
@@ -1042,9 +1048,9 @@ def nvidia_create_rsag_state(
     hidden_size: int,
     device: torch.device = None,
 ) -> TritonCommState:
-    assert (
-        type(group) == dist.ProcessGroup
-    ), f"Expected dist.ProcessGroup, got {type(group)}"
+    assert type(group) == dist.ProcessGroup, (
+        f"Expected dist.ProcessGroup, got {type(group)}"
+    )
     device = device or torch.device(f"cuda:{torch.cuda.current_device()}")
     # Reserve the symmetric-memory signal pad for the largest grid the
     # reduce-scatter launcher can pick. blockwise_barrier indexes the pad at
@@ -1139,9 +1145,9 @@ def nvidia_rsag_reduce_scatter(
     token_list_in_group: List[int] = None,
     safe=True,
 ) -> torch.Tensor:
-    assert (
-        tp_num_tokens is not None or token_list_in_group is not None
-    ), "Either tp_num_tokens or token_list_in_group must be provided"
+    assert tp_num_tokens is not None or token_list_in_group is not None, (
+        "Either tp_num_tokens or token_list_in_group must be provided"
+    )
     if token_list_in_group is None:
         token_list_in_group = rsag_get_token_dist(state, tp_num_tokens)
     assert hidden_states.dtype == torch.bfloat16, "Only bfloat16 is supported for now"
@@ -1150,7 +1156,9 @@ def nvidia_rsag_reduce_scatter(
     )
     assert (hidden_states.shape[0] == total_num_tokens) and (
         hidden_states.shape[-1] == state.hidden_dim
-    ), f"Mismatched shape, {hidden_states.shape[0]=} != {total_num_tokens=} or {hidden_states.shape[-1]=} != {state.hidden_dim=} {hidden_states.shape=}"
+    ), (
+        f"Mismatched shape, {hidden_states.shape[0]=} != {total_num_tokens=} or {hidden_states.shape[-1]=} != {state.hidden_dim=} {hidden_states.shape=}"
+    )
     state.comm_buff[:total_num_tokens, :].copy_(hidden_states)
     num_blocks = nvidia_rsag_reduce_scatter_num_blocks(
         token_list_in_group, state.hidden_dim
@@ -1171,9 +1179,9 @@ def nvidia_rsag_all_gather(
     token_list_in_group: List[int] = None,
     safe=True,
 ) -> torch.Tensor:
-    assert (
-        tp_num_tokens is not None or token_list_in_group is not None
-    ), "Either tp_num_tokens or token_list_in_group must be provided"
+    assert tp_num_tokens is not None or token_list_in_group is not None, (
+        "Either tp_num_tokens or token_list_in_group must be provided"
+    )
     if token_list_in_group is None:
         token_list_in_group = rsag_get_token_dist(state, tp_num_tokens)
     assert hidden_states.dtype == torch.bfloat16, "Only bfloat16 is supported for now"
@@ -1182,7 +1190,9 @@ def nvidia_rsag_all_gather(
     )
     assert (hidden_states.shape[0] == local_num_tokens) and (
         hidden_states.shape[-1] <= state.hidden_dim
-    ), f"{hidden_states.shape=}|{local_num_tokens=}|{hidden_states.device=} Mismatched shape"
+    ), (
+        f"{hidden_states.shape=}|{local_num_tokens=}|{hidden_states.device=} Mismatched shape"
+    )
     hidden_size_bak, comm_buff_bak = rsag_resize_hidden_if_needed(
         state, hidden_states.shape[-1]
     )
@@ -1223,9 +1233,7 @@ def amd_rsag_all_gather_kernel(
         peer_base = tl.load(buffer_ptrs + peer).to(tl.pointer_type(tl.bfloat16))
         tl.store(peer_base + GLOBAL_OFFSET + offsets, vals, mask=mask)
 
-    symm_mem_workgroup_barrier(
-        signal_pad_ptrs_dev, tl.program_id(0), RANK, WORLD_SIZE
-    )
+    symm_mem_workgroup_barrier(signal_pad_ptrs_dev, tl.program_id(0), RANK, WORLD_SIZE)
 
 
 @triton.jit
@@ -1240,9 +1248,7 @@ def amd_rsag_reduce_scatter_kernel(
     BLOCK_SIZE: tl.constexpr,
 ):
     block_id = tl.program_id(0)
-    symm_mem_workgroup_barrier(
-        signal_pad_ptrs_dev, block_id, RANK, WORLD_SIZE
-    )
+    symm_mem_workgroup_barrier(signal_pad_ptrs_dev, block_id, RANK, WORLD_SIZE)
 
     offsets = block_id * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
     mask = offsets < LOCAL_NUMEL
@@ -1256,9 +1262,7 @@ def amd_rsag_reduce_scatter_kernel(
         )
 
     tl.store(output_ptr + offsets, acc, mask=mask)
-    symm_mem_workgroup_barrier(
-        signal_pad_ptrs_dev, block_id, RANK, WORLD_SIZE
-    )
+    symm_mem_workgroup_barrier(signal_pad_ptrs_dev, block_id, RANK, WORLD_SIZE)
 
 
 def amd_rsag_num_blocks(token_list_in_group: list[int], hidden_size: int) -> int:
@@ -1273,9 +1277,9 @@ def amd_create_rsag_state(
     hidden_size: int,
     device: torch.device = None,
 ) -> TritonCommState:
-    assert (
-        type(group) == dist.ProcessGroup
-    ), f"Expected dist.ProcessGroup, got {type(group)}"
+    assert type(group) == dist.ProcessGroup, (
+        f"Expected dist.ProcessGroup, got {type(group)}"
+    )
     device = device or torch.device(f"cuda:{torch.cuda.current_device()}")
     world_size = group.size()
     max_blocks = max(1, triton.cdiv(max_tokens * hidden_size, 1024))
@@ -1313,9 +1317,9 @@ def amd_rsag_reduce_scatter(
     token_list_in_group: List[int] = None,
     safe=True,
 ) -> torch.Tensor:
-    assert (
-        tp_num_tokens is not None or token_list_in_group is not None
-    ), "Either tp_num_tokens or token_list_in_group must be provided"
+    assert tp_num_tokens is not None or token_list_in_group is not None, (
+        "Either tp_num_tokens or token_list_in_group must be provided"
+    )
     if token_list_in_group is None:
         token_list_in_group = rsag_get_token_dist(state, tp_num_tokens)
     assert hidden_states.dtype == torch.bfloat16, "Only bfloat16 is supported for now"
@@ -1324,7 +1328,9 @@ def amd_rsag_reduce_scatter(
     )
     assert (hidden_states.shape[0] == total_num_tokens) and (
         hidden_states.shape[-1] == state.hidden_dim
-    ), f"Mismatched shape, {hidden_states.shape[0]=} != {total_num_tokens=} or {hidden_states.shape[-1]=} != {state.hidden_dim=} {hidden_states.shape=}"
+    ), (
+        f"Mismatched shape, {hidden_states.shape[0]=} != {total_num_tokens=} or {hidden_states.shape[-1]=} != {state.hidden_dim=} {hidden_states.shape=}"
+    )
 
     local_numel = local_num_tokens * state.hidden_dim
     global_offset = local_token_offset * state.hidden_dim
@@ -1356,9 +1362,9 @@ def amd_rsag_all_gather(
     token_list_in_group: List[int] = None,
     safe=True,
 ) -> torch.Tensor:
-    assert (
-        tp_num_tokens is not None or token_list_in_group is not None
-    ), "Either tp_num_tokens or token_list_in_group must be provided"
+    assert tp_num_tokens is not None or token_list_in_group is not None, (
+        "Either tp_num_tokens or token_list_in_group must be provided"
+    )
     if token_list_in_group is None:
         token_list_in_group = rsag_get_token_dist(state, tp_num_tokens)
     assert hidden_states.dtype == torch.bfloat16, "Only bfloat16 is supported for now"
@@ -1372,7 +1378,9 @@ def amd_rsag_all_gather(
         )
         assert (hidden_states.shape[0] == local_num_tokens) and (
             hidden_states.shape[-1] <= state.hidden_dim
-        ), f"{hidden_states.shape=}|{local_num_tokens=}|{hidden_states.device=} Mismatched shape"
+        ), (
+            f"{hidden_states.shape=}|{local_num_tokens=}|{hidden_states.device=} Mismatched shape"
+        )
         local_numel = local_num_tokens * state.hidden_dim
         global_offset = local_token_offset * state.hidden_dim
         grid = (amd_rsag_num_blocks(token_list_in_group, state.hidden_dim),)
@@ -1445,9 +1453,7 @@ def amd_allreduce_residual_rmsnorm_kernel(
     BLOCK_SIZE: tl.constexpr,
 ):
     row = tl.program_id(0)
-    symm_mem_workgroup_barrier(
-        signal_pad_ptrs_dev, row, RANK, WORLD_SIZE
-    )
+    symm_mem_workgroup_barrier(signal_pad_ptrs_dev, row, RANK, WORLD_SIZE)
 
     offsets = tl.arange(0, BLOCK_SIZE)
     mask = offsets < HIDDEN_SIZE
@@ -1468,9 +1474,7 @@ def amd_allreduce_residual_rmsnorm_kernel(
     weight = tl.load(weight_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
     tl.store(norm_out_ptr + row_offsets, residual_out * scale * weight, mask=mask)
 
-    symm_mem_workgroup_barrier(
-        signal_pad_ptrs_dev, row, RANK, WORLD_SIZE
-    )
+    symm_mem_workgroup_barrier(signal_pad_ptrs_dev, row, RANK, WORLD_SIZE)
 
 
 def create_allreduce_residual_rmsnorm_state(
@@ -1480,9 +1484,9 @@ def create_allreduce_residual_rmsnorm_state(
     hidden_dim: int,
     device: torch.device = None,
 ) -> TritonCommState:
-    assert (
-        type(group) == dist.ProcessGroup
-    ), f"Expected dist.ProcessGroup, got {type(group)}"
+    assert type(group) == dist.ProcessGroup, (
+        f"Expected dist.ProcessGroup, got {type(group)}"
+    )
     device = device or torch.device(f"cuda:{torch.cuda.current_device()}")
     world_size = group.size()
     comm_buff = None
@@ -1620,15 +1624,19 @@ def allreduce_residual_rmsnorm(
         # local research implementation without overriding upstream behavior.
         triton_shmem_max_m = _triton_shmem_fusion_max_m()
         triton_shmem_gate_declined = (
-            eligible
-            and triton_shmem_max_m > 0
-            and token_num > triton_shmem_max_m
+            eligible and triton_shmem_max_m > 0 and token_num > triton_shmem_max_m
         )
         triton_shmem_eligible = eligible and not triton_shmem_gate_declined
         if backend == "triton_shmem" and triton_shmem_eligible:
             from . import triton_shmem as _ts_mod
 
-            ts_state = _ts_mod.TRITON_SHMEM_AR_RMSNORM_STATES.get(key)
+            ts_key = _ts_mod.triton_shmem_state_cache_key(
+                group,
+                max_token_num,
+                hidden_dim,
+                input_tensor.dtype,
+            )
+            ts_state = _ts_mod.TRITON_SHMEM_AR_RMSNORM_STATES.get(ts_key)
             if ts_state is None:
                 ts_state = _ts_mod.create_triton_shmem_ar_rmsnorm_state(
                     group=group,
@@ -1638,7 +1646,7 @@ def allreduce_residual_rmsnorm(
                     dtype=input_tensor.dtype,
                 )
                 if ts_state is not None:
-                    _ts_mod.TRITON_SHMEM_AR_RMSNORM_STATES[key] = ts_state
+                    _ts_mod.TRITON_SHMEM_AR_RMSNORM_STATES[ts_key] = ts_state
                     logger.info(
                         "AR+RMSNorm backend resolved: requested=%s selected=triton_shmem "
                         "max_tokens=%s hidden=%s dtype=%s",
@@ -1648,6 +1656,11 @@ def allreduce_residual_rmsnorm(
                         input_tensor.dtype,
                     )
             if ts_state is not None:
+                if not _ts_mod.triton_shmem_can_run(ts_state, input_tensor):
+                    # Captured custom-kernel outputs must be profile-owned.
+                    # Above the persistent ring cap, capture the complete
+                    # ordinary all-reduce + RMSNorm fallback instead.
+                    return None, None, None, None
                 norm_out, residual_out = (
                     _ts_mod.triton_shmem_allreduce_residual_rmsnorm(
                         ts_state,
@@ -1751,9 +1764,9 @@ def create_state(
     device: torch.device = None,
     max_numel: int = 0,
 ) -> TritonCommState:
-    assert (
-        type(group) == dist.ProcessGroup
-    ), f"Expected dist.ProcessGroup, got {type(group)}"
+    assert type(group) == dist.ProcessGroup, (
+        f"Expected dist.ProcessGroup, got {type(group)}"
+    )
     if max_numel:
         device = device or torch.device(f"cuda:{torch.cuda.current_device()}")
         world_size = group.size()
@@ -2043,9 +2056,9 @@ def nvidia_rsag_all_gather_inner(
     skip_entry_sync: bool = False,
     safe: bool = True,
 ) -> torch.Tensor:
-    assert (
-        tp_hidden_dim is not None or hidden_list_in_group is not None
-    ), "Either tp_hidden_dim or hidden_list_in_group must be provided"
+    assert tp_hidden_dim is not None or hidden_list_in_group is not None, (
+        "Either tp_hidden_dim or hidden_list_in_group must be provided"
+    )
     if hidden_list_in_group is None:
         # Strict even split: refuse to distribute remainder because 128-bit
         # multimem.st needs each per-rank slice to be a multiple of 8 bf16, and
@@ -2095,9 +2108,9 @@ def nvidia_rsag_all_gather_inner(
         f"input hidden ({in_hidden}) does not match this rank's "
         f"hidden_list_in_group[{state.rank_in_group}]={local_hidden}"
     )
-    assert (
-        total_tokens <= state.max_token_num
-    ), f"{total_tokens=} exceeds {state.max_token_num=}"
+    assert total_tokens <= state.max_token_num, (
+        f"{total_tokens=} exceeds {state.max_token_num=}"
+    )
 
     hidden_size_bak, comm_buff_bak = rsag_resize_hidden_if_needed(state, total_hidden)
     try:

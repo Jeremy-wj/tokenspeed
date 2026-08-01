@@ -83,12 +83,36 @@ from tokenspeed_kernel.platform import current_platform
 from tokenspeed_kernel.profiling import kernel_scope
 
 from . import _triton_shmem_kernels as _k
-from ._coarse_shmem import alloc_coarse_symm
+from ._coarse_shmem import CoarseSymmBuffer, alloc_coarse_symm
 from .triton import _alloc_symm, _peer_ptrs_dev
 
 logger = logging.getLogger(__file__)
 
 _platform = current_platform()
+_CORE_V3_PROFILE = "gpt-oss-120b-mi350x-triton-core-v3"
+_STATE_ENV_KEYS = (
+    "AR_NORM_PROFILE_ID",
+    "TS_TRITON_SHMEM_PROFILE_PURE_TP",
+    "TS_TRITON_SHMEM_VISIBLE_DEVICES",
+    "TS_TRITON_SHMEM_COARSE",
+    "TS_TRITON_SHMEM_INKERNEL_BARRIER",
+    "TS_TRITON_SHMEM_FOLD_COPYIN",
+    "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT",
+    "TS_TRITON_SHMEM_BORROW_TWOSHOT_OUTPUT",
+    "TS_TRITON_SHMEM_INPUT_SITE_RING",
+    "TS_TRITON_SHMEM_OUTPUT_RING",
+    "TS_TRITON_SHMEM_WORKGROUP_SYNC",
+    "TS_TRITON_SHMEM_FOLD_NUM_WARPS",
+    "TS_TRITON_SHMEM_ONESHOT_BLOCK_N",
+    "TS_TRITON_SHMEM_ONESHOT_VARIANT",
+    "TS_TRITON_SHMEM_ONESHOT_NUM_WARPS",
+    "TS_TRITON_SHMEM_PADDED_MAX_M",
+    "TS_TRITON_SHMEM_TWOSHOT_BLOCK_N",
+    "TS_TRITON_SHMEM_GRID_CAP",
+    "TS_TRITON_SHMEM_GRID_CAP_MIN_M",
+    "TS_TRITON_SHMEM_BARRIER_GRID",
+    "TS_TRITON_SHMEM_ONESHOT_MAX_M",
+)
 
 
 def _coarse_enabled() -> bool:
@@ -103,10 +127,9 @@ def _inkernel_barrier_enabled() -> bool:
     """Fold the leading+trailing signal-pad barriers into the fused kernels
     instead of launching two separate barrier kernels — removes the barrier-launch
     staging overhead that dominates small-M/decode latency.
-    **Default ON (Jul 2026):** validated correct + graph-safe + faster than the
-    separate-barrier path e2e (ws=4 pure-TP gpt-oss-120b serve, conc 8–128 + mixed;
-    companion §6). Set ``TS_TRITON_SHMEM_INKERNEL_BARRIER=0`` to force the legacy
-    separate-barrier path.
+    **Default OFF:** the generic backend must remain safe when ranks can diverge
+    in M. Qualified pure-TP profiles may set
+    ``TS_TRITON_SHMEM_INKERNEL_BARRIER=1`` after transition testing.
 
     CAVEAT — under configs that can diverge M across TP ranks (DP,
     ``overlap_schedule_depth>1``, speculative decode) the M-dependent in-kernel
@@ -116,8 +139,10 @@ def _inkernel_barrier_enabled() -> bool:
     barrier (``TS_TRITON_SHMEM_BARRIER_GRID>0``, lever B) -- divergence-safe and
     still faster than falling back to ``INKERNEL_BARRIER=0``. Repro:
     ``benchmark/probe_inkernel_barrier_graph.py`` (PROBE_MODE=multigraph)."""
-    return os.environ.get("TS_TRITON_SHMEM_INKERNEL_BARRIER", "1") not in (
-        "0", "false", "False"
+    return os.environ.get("TS_TRITON_SHMEM_INKERNEL_BARRIER", "0") not in (
+        "0",
+        "false",
+        "False",
     )
 
 
@@ -132,7 +157,9 @@ def _fold_copyin_enabled() -> bool:
     fault despite the narrower synthetic transition probe passing. Re-enable
     only after the producer-to-system-release publication contract is proven."""
     return os.environ.get("TS_TRITON_SHMEM_FOLD_COPYIN", "0") not in (
-        "0", "false", "False"
+        "0",
+        "false",
+        "False",
     )
 
 
@@ -144,9 +171,11 @@ def _double_buffer_input_enabled() -> bool:
     an even number of fused calls (GPT-OSS has 72); odd-call graph replay is not
     covered by this lifetime contract.
     """
-    return os.environ.get(
-        "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT", "0"
-    ) not in ("0", "false", "False")
+    return os.environ.get("TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT", "0") not in (
+        "0",
+        "false",
+        "False",
+    )
 
 
 def _borrow_twoshot_output_enabled() -> bool:
@@ -156,9 +185,11 @@ def _borrow_twoshot_output_enabled() -> bool:
     output pairs are ping-ponged so the next fused site never overwrites the
     residual tensor it is simultaneously reading.
     """
-    return os.environ.get(
-        "TS_TRITON_SHMEM_BORROW_TWOSHOT_OUTPUT", "0"
-    ) not in ("0", "false", "False")
+    return os.environ.get("TS_TRITON_SHMEM_BORROW_TWOSHOT_OUTPUT", "0") not in (
+        "0",
+        "false",
+        "False",
+    )
 
 
 def _input_site_ring_size() -> int:
@@ -221,9 +252,7 @@ def _oneshot_variant() -> str:
 def _oneshot_num_warps() -> int:
     value = int(os.environ.get("TS_TRITON_SHMEM_ONESHOT_NUM_WARPS", "0"))
     if value not in (0, 1, 2, 4, 8):
-        raise ValueError(
-            "TS_TRITON_SHMEM_ONESHOT_NUM_WARPS must be 0, 1, 2, 4, or 8"
-        )
+        raise ValueError("TS_TRITON_SHMEM_ONESHOT_NUM_WARPS must be 0, 1, 2, 4, or 8")
     return value
 
 
@@ -248,13 +277,13 @@ def _dynamic_grid_cap() -> int:
     """Optional cap on the normal M-dependent compute grid.
 
     Unlike ``BARRIER_GRID``, this does not add zero-row participants or change
-    divergence semantics; it only limits compute/barrier parallelism. ``-1``
-    selects the validated architecture/world-size policy."""
-    return int(os.environ.get("TS_TRITON_SHMEM_GRID_CAP", "-1"))
+    divergence semantics; it only limits compute/barrier parallelism. The
+    generic default is uncapped; model-specific profiles own tuned caps."""
+    return int(os.environ.get("TS_TRITON_SHMEM_GRID_CAP", "0"))
 
 
 def _dynamic_grid_cap_min_m() -> int:
-    return int(os.environ.get("TS_TRITON_SHMEM_GRID_CAP_MIN_M", "-1"))
+    return int(os.environ.get("TS_TRITON_SHMEM_GRID_CAP_MIN_M", "0"))
 
 
 def _barrier_grid() -> int:
@@ -291,17 +320,158 @@ def _oneshot_max_m() -> int:
     256; isolated width-specific crossovers require model-level serving gates."""
     return int(os.environ.get("TS_TRITON_SHMEM_ONESHOT_MAX_M", "256"))
 
+
+def _profile_validation_errors(
+    *,
+    profile_id: str,
+    arch: str,
+    world_size: int,
+    max_token_num: int,
+    hidden_dim: int,
+    dtype: torch.dtype,
+    visible_devices: str,
+) -> list[str]:
+    """Return profile mismatches without allocating communication state."""
+    if not profile_id or profile_id == "unqualified-manual":
+        return []
+    if profile_id != _CORE_V3_PROFILE:
+        return [f"unknown AR_NORM_PROFILE_ID={profile_id!r}"]
+
+    errors: list[str] = []
+    actual = {
+        "arch": arch,
+        "world_size": world_size,
+        "max_token_num": max_token_num,
+        "hidden_dim": hidden_dim,
+        "dtype": dtype,
+        "visible_devices": visible_devices,
+    }
+    expected = {
+        "arch": "gfx950",
+        "world_size": 4,
+        "max_token_num": 2048,
+        "hidden_dim": 2880,
+        "dtype": torch.bfloat16,
+        "visible_devices": "1,2,5,6",
+    }
+    for field, expected_value in expected.items():
+        if actual[field] != expected_value:
+            errors.append(f"{field}={actual[field]!r} expected {expected_value!r}")
+
+    expected_env = {
+        "TS_TRITON_SHMEM_COARSE": "1",
+        "TS_TRITON_SHMEM_INKERNEL_BARRIER": "1",
+        "TS_TRITON_SHMEM_FOLD_COPYIN": "0",
+        "TS_TRITON_SHMEM_WORKGROUP_SYNC": "1",
+        "TS_TRITON_SHMEM_OUTPUT_RING": "72",
+        "TS_TRITON_SHMEM_INPUT_SITE_RING": "72",
+        "TS_TRITON_SHMEM_BORROW_TWOSHOT_OUTPUT": "1",
+        "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT": "0",
+        "TS_TRITON_SHMEM_ONESHOT_MAX_M": "384",
+        "TS_TRITON_SHMEM_ONESHOT_BLOCK_N": "0",
+        "TS_TRITON_SHMEM_ONESHOT_VARIANT": "padded",
+        "TS_TRITON_SHMEM_PADDED_MAX_M": "64",
+        "TS_TRITON_SHMEM_ONESHOT_NUM_WARPS": "4",
+        "TS_TRITON_SHMEM_TWOSHOT_BLOCK_N": "0",
+        "TS_TRITON_SHMEM_GRID_CAP": "128",
+        "TS_TRITON_SHMEM_GRID_CAP_MIN_M": "256",
+        "TS_TRITON_SHMEM_BARRIER_GRID": "0",
+        "TS_TRITON_SHMEM_FUSION_MAX_M": "0",
+        "TS_TRITON_SHMEM_PROFILE_PURE_TP": "1",
+    }
+    for name, expected_value in expected_env.items():
+        actual_value = os.environ.get(name)
+        if actual_value != expected_value:
+            errors.append(f"{name}={actual_value!r} expected {expected_value!r}")
+    return errors
+
+
+def _profile_is_eligible(
+    *,
+    group: dist.ProcessGroup,
+    max_token_num: int,
+    hidden_dim: int,
+    dtype: torch.dtype,
+    device: torch.device,
+) -> bool:
+    """Validate profile identity on every rank before state construction."""
+    profile_id = os.environ.get("AR_NORM_PROFILE_ID", "").strip()
+    visible_devices = os.environ.get(
+        "TS_TRITON_SHMEM_VISIBLE_DEVICES",
+        os.environ.get(
+            "HIP_VISIBLE_DEVICES",
+            os.environ.get("ROCR_VISIBLE_DEVICES", ""),
+        ),
+    ).replace(" ", "")
+    local_errors = _profile_validation_errors(
+        profile_id=profile_id,
+        arch=_k.detect_arch(device.index),
+        world_size=group.size(),
+        max_token_num=max_token_num,
+        hidden_dim=hidden_dim,
+        dtype=dtype,
+        visible_devices=visible_devices,
+    )
+    reports: list = [None] * group.size()
+    dist.all_gather_object(reports, local_errors, group=group)
+    errors = [
+        f"rank {rank}: {error}"
+        for rank, rank_errors in enumerate(reports)
+        for error in rank_errors
+    ]
+    if errors:
+        logger.warning(
+            "triton_shmem profile %r declined before state creation: %s",
+            profile_id or "unqualified-manual",
+            "; ".join(errors),
+        )
+        return False
+    logger.info(
+        "triton_shmem profile resolved: id=%s arch=%s ws=%d hidden=%d "
+        "dtype=%s max_tokens=%d visible_devices=%s",
+        profile_id or "unqualified-manual",
+        _k.detect_arch(device.index),
+        group.size(),
+        hidden_dim,
+        dtype,
+        max_token_num,
+        visible_devices or "unspecified",
+    )
+    return True
+
+
+def triton_shmem_state_cache_key(
+    group: dist.ProcessGroup,
+    max_token_num: int,
+    hidden_dim: int,
+    dtype: torch.dtype,
+) -> tuple:
+    """Key state by allocation shape and every environment-owned policy."""
+    return (
+        id(group),
+        max_token_num,
+        hidden_dim,
+        dtype,
+        torch.cuda.current_device(),
+        tuple((name, os.environ.get(name)) for name in _STATE_ENV_KEYS),
+    )
+
+
 __all__ = [
     "TritonShmemAllReduceResidualRMSNorm",
     "create_triton_shmem_ar_rmsnorm_state",
     "triton_shmem_allreduce_residual_rmsnorm",
     "is_available",
     "TRITON_SHMEM_AR_RMSNORM_STATES",
+    "_profile_validation_errors",
+    "triton_shmem_can_run",
+    "triton_shmem_state_cache_key",
 ]
 
 
-# State cache keyed identically to the Iris shim so the two are drop-in
-# interchangeable: (id(group), max_token_num, hidden_dim, dtype).
+# State cache includes all policy that affects allocation, synchronization, or
+# graph lifetime. Diagnostic overrides therefore cannot reuse an incompatible
+# state created earlier in the process.
 TRITON_SHMEM_AR_RMSNORM_STATES: dict = {}
 
 
@@ -377,6 +547,7 @@ class TritonShmemAllReduceResidualRMSNorm:
         self._borrow_twoshot_output = _borrow_twoshot_output_enabled()
         self._coarse_buffers: list = []
         self._opened_cache: dict = {}
+        self._coarse_fallback = False
 
         if self._coarse:
             # Tiny dedicated symm_mem allocation carries the fine-grained signal
@@ -402,9 +573,7 @@ class TritonShmemAllReduceResidualRMSNorm:
                 x_hdl, shape, dtype, self.world_size, self.device
             )
             if self._double_buffer_input:
-                self._x_alt, x_alt_hdl = _alloc_symm(
-                    shape, dtype, self.device, group
-                )
+                self._x_alt, x_alt_hdl = _alloc_symm(shape, dtype, self.device, group)
                 self._input_bases_alt = _peer_ptrs_dev(
                     x_alt_hdl,
                     shape,
@@ -435,10 +604,15 @@ class TritonShmemAllReduceResidualRMSNorm:
                 yb = self._alloc_data(shape, dtype, group)
                 rb = self._alloc_data(shape, dtype, group)
                 self._y, self._output_bases = yb.tensor, yb.peer_ptrs_dev
-                self._residual_out, self._residual_out_bases = rb.tensor, rb.peer_ptrs_dev
+                self._residual_out, self._residual_out_bases = (
+                    rb.tensor,
+                    rb.peer_ptrs_dev,
+                )
             else:
                 self._y, y_hdl = _alloc_symm(shape, dtype, self.device, group)
-                self._residual_out, r_hdl = _alloc_symm(shape, dtype, self.device, group)
+                self._residual_out, r_hdl = _alloc_symm(
+                    shape, dtype, self.device, group
+                )
                 self._output_bases = _peer_ptrs_dev(
                     y_hdl, shape, dtype, self.world_size, self.device
                 )
@@ -516,19 +690,8 @@ class TritonShmemAllReduceResidualRMSNorm:
         self._twoshot_block_n = configured_twoshot_block_n or _k.recommended_block_n(
             self.dtype, hidden_dim
         )
-        configured_grid_cap = _dynamic_grid_cap()
-        configured_grid_min_m = _dynamic_grid_cap_min_m()
-        arch = _k.detect_arch(self.device.index)
-        if configured_grid_cap < 0:
-            if arch == "gfx950" and self.world_size == 4:
-                self._dynamic_grid_cap = 128
-                self._dynamic_grid_cap_min_m = 256
-            else:
-                self._dynamic_grid_cap = 0
-                self._dynamic_grid_cap_min_m = 0
-        else:
-            self._dynamic_grid_cap = configured_grid_cap
-            self._dynamic_grid_cap_min_m = max(0, configured_grid_min_m)
+        self._dynamic_grid_cap = max(0, _dynamic_grid_cap())
+        self._dynamic_grid_cap_min_m = max(0, _dynamic_grid_cap_min_m())
         self._barrier_grid = _barrier_grid()
         self._oneshot_max_m = max(0, _oneshot_max_m())
         self._input_site_ring_size = _input_site_ring_size()
@@ -601,9 +764,7 @@ class TritonShmemAllReduceResidualRMSNorm:
         # never depends on transient graph-pool output storage. The configured
         # size must cover every simultaneously live fused site; generic default
         # stays off because that count is model/control-flow specific.
-        self._output_ring_size = int(
-            os.environ.get("TS_TRITON_SHMEM_OUTPUT_RING", "0")
-        )
+        self._output_ring_size = int(os.environ.get("TS_TRITON_SHMEM_OUTPUT_RING", "0"))
         if self._output_ring_size < 0:
             raise ValueError("TS_TRITON_SHMEM_OUTPUT_RING must be non-negative")
         if self._output_ring_size:
@@ -643,7 +804,13 @@ class TritonShmemAllReduceResidualRMSNorm:
             self.world_size,
             max_token_num,
             hidden_dim,
-            "coarse+ipc" if self._coarse else "symm_mem(fine)",
+            (
+                "coarse+ipc"
+                if self._coarse
+                else "mixed/fine-fallback"
+                if self._coarse_fallback
+                else "symm_mem(fine)"
+            ),
             (n_symm * buf_bytes + input_site_bytes) / 1024**2,
             self._inkernel,
             self._fold_copyin and self._inkernel,
@@ -663,17 +830,48 @@ class TritonShmemAllReduceResidualRMSNorm:
             self._input_site_ring_size,
             self._borrow_twoshot_output,
             len(self._twoshot_y_ring),
-            not (
-                self._double_buffer_input
-                or self._input_site_ring_size > 0
-            ),
+            not (self._double_buffer_input or self._input_site_ring_size > 0),
         )
 
     def _alloc_data(self, shape, dtype, group):
-        """Allocate one coarse-grained peer-accessible data buffer (IPC-shared)."""
-        buf = alloc_coarse_symm(
-            shape, dtype, self.device, group, _opened_cache=self._opened_cache
-        )
+        """Allocate peer data, falling back collectively when HIP IPC declines."""
+        if not self._coarse:
+            tensor, handle = _alloc_symm(shape, dtype, self.device, group)
+            return CoarseSymmBuffer(
+                tensor=tensor,
+                peer_ptrs_dev=_peer_ptrs_dev(
+                    handle,
+                    shape,
+                    dtype,
+                    self.world_size,
+                    self.device,
+                ),
+            )
+        try:
+            buf = alloc_coarse_symm(
+                shape, dtype, self.device, group, _opened_cache=self._opened_cache
+            )
+        except RuntimeError as exc:
+            # alloc_coarse_symm exchanges export/open status before raising, so
+            # every rank enters this fallback together.
+            logger.warning(
+                "triton_shmem coarse HIP-IPC allocation declined; using "
+                "fine-grained symmetric memory for this state: %s",
+                exc,
+            )
+            self._coarse = False
+            self._coarse_fallback = True
+            tensor, handle = _alloc_symm(shape, dtype, self.device, group)
+            return CoarseSymmBuffer(
+                tensor=tensor,
+                peer_ptrs_dev=_peer_ptrs_dev(
+                    handle,
+                    shape,
+                    dtype,
+                    self.world_size,
+                    self.device,
+                ),
+            )
         self._coarse_buffers.append(buf)
         return buf
 
@@ -894,9 +1092,7 @@ class TritonShmemAllReduceResidualRMSNorm:
             # warmup/capture and every eager small-M forward return this host
             # phase to zero before another graph or forward can use the ring.
             output_slot = self._output_ring_index
-            self._output_ring_index = (
-                output_slot + 1
-            ) % self._output_ring_size
+            self._output_ring_index = (output_slot + 1) % self._output_ring_size
             norm_out = self._norm_output_ring[output_slot, :m]
             residual_out = self._residual_output_ring[output_slot, :m]
         else:
@@ -918,9 +1114,7 @@ class TritonShmemAllReduceResidualRMSNorm:
         )
         if use_input_site:
             input_slot = self._input_site_ring_index
-            self._input_site_ring_index = (
-                input_slot + 1
-            ) % self._input_site_ring_size
+            self._input_site_ring_index = (input_slot + 1) % self._input_site_ring_size
             row_start = input_slot * self._input_site_max_m
             x = self._input_site_tensor[row_start : row_start + m]
             input_bases = self._input_site_bases
@@ -964,9 +1158,7 @@ class TritonShmemAllReduceResidualRMSNorm:
         grid = (grid_sms,)
         if borrow_twoshot_output:
             output_slot = self._twoshot_output_index
-            self._twoshot_output_index = (
-                output_slot + 1
-            ) % len(self._twoshot_y_ring)
+            self._twoshot_output_index = (output_slot + 1) % len(self._twoshot_y_ring)
             y = self._twoshot_y_ring[output_slot][:m]
             res_out = self._twoshot_residual_ring[output_slot][:m]
             output_bases = self._twoshot_output_bases_ring[output_slot]
@@ -1029,6 +1221,15 @@ def create_triton_shmem_ar_rmsnorm_state(
     """
     if not is_available():
         return None
+    resolved_device = device or torch.device(f"cuda:{torch.cuda.current_device()}")
+    if not _profile_is_eligible(
+        group=group,
+        max_token_num=max_token_num,
+        hidden_dim=hidden_dim,
+        dtype=dtype,
+        device=resolved_device,
+    ):
+        return None
     try:
         return TritonShmemAllReduceResidualRMSNorm(
             group=group,
@@ -1036,11 +1237,37 @@ def create_triton_shmem_ar_rmsnorm_state(
             max_token_num=max_token_num,
             hidden_dim=hidden_dim,
             dtype=dtype,
-            device=device,
+            device=resolved_device,
         )
     except Exception as exc:  # noqa: BLE001 - decline rather than crash forward
         logger.warning("triton_shmem AR+RMSNorm state creation failed: %s", exc)
         return None
+
+
+def triton_shmem_can_run(
+    state: "TritonShmemAllReduceResidualRMSNorm",
+    input_tensor: torch.Tensor,
+) -> bool:
+    """Decline captured calls without persistent profile-owned outputs.
+
+    An input-site ring is optional: states without one retain the generic
+    one-shot exit barrier, so their single symmetric input remains safe.
+    """
+    if not torch.cuda.is_current_stream_capturing():
+        return True
+    eligible = (
+        state._output_ring_size > 0
+        and input_tensor.shape[0] <= state._output_ring_max_m
+    )
+    if not eligible and not getattr(state, "_captured_output_decline_logged", False):
+        logger.info(
+            "triton_shmem captured call declined: M=%d persistent_output_max_m=%d; "
+            "capturing complete ordinary fallback",
+            input_tensor.shape[0],
+            state._output_ring_max_m,
+        )
+        state._captured_output_decline_logged = True
+    return eligible
 
 
 def triton_shmem_allreduce_residual_rmsnorm(
@@ -1057,15 +1284,9 @@ def triton_shmem_allreduce_residual_rmsnorm(
         state._oneshot_max_m > 0 and m <= state._oneshot_max_m
     )
     use_input_site = (
-        use_oneshot
-        and state._input_site_ring_size > 0
-        and m <= state._input_site_max_m
+        use_oneshot and state._input_site_ring_size > 0 and m <= state._input_site_max_m
     )
-    path = (
-        state._oneshot_kernel_for_m(m)
-        if use_oneshot
-        else "twoshot_blocked"
-    )
+    path = state._oneshot_kernel_for_m(m) if use_oneshot else "twoshot_blocked"
     borrow_twoshot_output = state._should_borrow_twoshot_output(
         use_oneshot, norm_out, residual_out
     )
@@ -1077,14 +1298,10 @@ def triton_shmem_allreduce_residual_rmsnorm(
         M=m,
         N=n,
         world_size=state.world_size,
-        fold_copyin=int(
-            state._fold_copyin and state._inkernel and use_oneshot
-        ),
+        fold_copyin=int(state._fold_copyin and state._inkernel and use_oneshot),
         input_ring=len(state._input_ring),
         input_site_ring=state._input_site_ring_size,
-        input_site_slot=(
-            state._input_site_ring_index if use_input_site else -1
-        ),
+        input_site_slot=(state._input_site_ring_index if use_input_site else -1),
         borrow_twoshot_output=int(borrow_twoshot_output),
         twoshot_output_slot=(
             state._twoshot_output_index if borrow_twoshot_output else -1

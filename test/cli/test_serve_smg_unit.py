@@ -47,6 +47,7 @@ from tokenspeed.cli.serve_smg import (
     INKLING_TOOL_CALL_PARSER,
     KIMI_K3_REASONING_PARSER,
     KIMI_K3_TOOL_CALL_PARSER,
+    _add_rl_control_port,
     _args_with_default_model_parsers,
     _gateway_args_with_default_log_level,
     _gateway_args_with_default_policy,
@@ -215,6 +216,21 @@ def test_gateway_args_default_prometheus_port_is_free_port():
     assert gateway_args[:3] == ["--model", "/tmp/x", "--prometheus-port"]
     assert gateway_args[3].isdigit()
     assert 1 <= int(gateway_args[3]) <= 65535
+
+
+def test_gateway_args_use_supplied_cluster_port():
+    gateway_args = _gateway_args_with_default_prometheus_port(
+        ["--model", "/tmp/x"], default_port=30_002
+    )
+
+    assert gateway_args[-2:] == ["--prometheus-port", "30002"]
+
+
+def test_rl_control_args_use_supplied_cluster_port():
+    engine_args, url = _add_rl_control_port(["--model", "/tmp/x"], default_port=30_001)
+
+    assert engine_args[-2:] == ["--rl-control-port", "30001"]
+    assert url == "http://127.0.0.1:30001"
 
 
 def test_gateway_args_preserve_user_prometheus_port():
@@ -634,14 +650,14 @@ def test_prewarm_swallows_download_errors():
 async def test_engine_start_timeout_kills_engine_and_exits_nonzero():
     engine = _make_proc()
     opts = OrchestratorOpts(engine_startup_timeout=0)
-    with patch(
-        "tokenspeed.cli.serve_smg.spawn_engine", AsyncMock(return_value=engine)
-    ), patch(
-        "tokenspeed.cli.serve_smg.wait_grpc_serving",
-        AsyncMock(side_effect=TimeoutError("engine never reached SERVING")),
-    ), patch(
-        "tokenspeed.cli.serve_smg.terminate_then_kill", AsyncMock()
-    ) as tk:
+    with (
+        patch("tokenspeed.cli.serve_smg.spawn_engine", AsyncMock(return_value=engine)),
+        patch(
+            "tokenspeed.cli.serve_smg.wait_grpc_serving",
+            AsyncMock(side_effect=TimeoutError("engine never reached SERVING")),
+        ),
+        patch("tokenspeed.cli.serve_smg.terminate_then_kill", AsyncMock()) as tk,
+    ):
         rc = await run_smg(
             engine_args=[],
             gateway_args=[],
@@ -686,17 +702,17 @@ async def test_gateway_first_then_engine_on_clean_shutdown():
         loop.call_later(0.05, startup_done.set)
 
     opts = OrchestratorOpts(engine_startup_timeout=10, gateway_startup_timeout=10)
-    with patch(
-        "tokenspeed.cli.serve_smg.spawn_engine", AsyncMock(return_value=engine)
-    ), patch(
-        "tokenspeed.cli.serve_smg.spawn_gateway", AsyncMock(return_value=gateway)
-    ), patch(
-        "tokenspeed.cli.serve_smg.wait_grpc_serving", AsyncMock()
-    ), patch(
-        "tokenspeed.cli.serve_smg.wait_http_ready",
-        side_effect=probe_then_schedule_release,
-    ), patch(
-        "tokenspeed.cli.serve_smg.terminate_then_kill", side_effect=tracked_term
+    with (
+        patch("tokenspeed.cli.serve_smg.spawn_engine", AsyncMock(return_value=engine)),
+        patch(
+            "tokenspeed.cli.serve_smg.spawn_gateway", AsyncMock(return_value=gateway)
+        ),
+        patch("tokenspeed.cli.serve_smg.wait_grpc_serving", AsyncMock()),
+        patch(
+            "tokenspeed.cli.serve_smg.wait_http_ready",
+            side_effect=probe_then_schedule_release,
+        ),
+        patch("tokenspeed.cli.serve_smg.terminate_then_kill", side_effect=tracked_term),
     ):
         rc = await run_smg(
             engine_args=[],
@@ -726,10 +742,13 @@ async def test_signal_handlers_installed_before_spawning_engine():
         raise RuntimeError("simulated spawn failure")
 
     opts = OrchestratorOpts()
-    with patch.object(
-        real_loop, "add_signal_handler", side_effect=tracking_add_signal_handler
-    ), patch(
-        "tokenspeed.cli.serve_smg.spawn_engine", side_effect=tracking_spawn_engine
+    with (
+        patch.object(
+            real_loop, "add_signal_handler", side_effect=tracking_add_signal_handler
+        ),
+        patch(
+            "tokenspeed.cli.serve_smg.spawn_engine", side_effect=tracking_spawn_engine
+        ),
     ):
         with pytest.raises(RuntimeError, match="simulated spawn failure"):
             await run_smg(
@@ -746,10 +765,10 @@ async def test_signal_handlers_installed_before_spawning_engine():
     sigterm_idx = call_order.index(f"add_signal_handler:{signal.SIGTERM}")
     sigint_idx = call_order.index(f"add_signal_handler:{signal.SIGINT}")
     assert sigterm_idx < spawn_idx, (
-        f"SIGTERM handler installed after spawn_engine " f"(order: {call_order})"
+        f"SIGTERM handler installed after spawn_engine (order: {call_order})"
     )
     assert sigint_idx < spawn_idx, (
-        f"SIGINT handler installed after spawn_engine " f"(order: {call_order})"
+        f"SIGINT handler installed after spawn_engine (order: {call_order})"
     )
 
 
@@ -771,14 +790,11 @@ async def test_stop_during_engine_probe_exits_zero():
     loop = asyncio.get_running_loop()
     loop.call_later(0.05, stop.set)
 
-    with patch(
-        "tokenspeed.cli.serve_smg.spawn_engine", AsyncMock(return_value=engine)
-    ), patch(
-        "tokenspeed.cli.serve_smg.wait_grpc_serving", side_effect=slow_probe
-    ), patch(
-        "tokenspeed.cli.serve_smg.terminate_then_kill", AsyncMock()
-    ), patch(
-        "tokenspeed.cli.serve_smg.kill_process_tree", lambda *a, **kw: None
+    with (
+        patch("tokenspeed.cli.serve_smg.spawn_engine", AsyncMock(return_value=engine)),
+        patch("tokenspeed.cli.serve_smg.wait_grpc_serving", side_effect=slow_probe),
+        patch("tokenspeed.cli.serve_smg.terminate_then_kill", AsyncMock()),
+        patch("tokenspeed.cli.serve_smg.kill_process_tree", lambda *a, **kw: None),
     ):
         rc = await run_smg(
             engine_args=[],
@@ -813,17 +829,17 @@ async def test_first_nonzero_child_exit_propagates():
         loop = asyncio.get_running_loop()
         loop.call_later(0.05, startup_done.set)
 
-    with patch(
-        "tokenspeed.cli.serve_smg.spawn_engine", AsyncMock(return_value=engine)
-    ), patch(
-        "tokenspeed.cli.serve_smg.spawn_gateway", AsyncMock(return_value=gateway)
-    ), patch(
-        "tokenspeed.cli.serve_smg.wait_grpc_serving", AsyncMock()
-    ), patch(
-        "tokenspeed.cli.serve_smg.wait_http_ready",
-        side_effect=gateway_probe_then_release,
-    ), patch(
-        "tokenspeed.cli.serve_smg.terminate_then_kill", AsyncMock()
+    with (
+        patch("tokenspeed.cli.serve_smg.spawn_engine", AsyncMock(return_value=engine)),
+        patch(
+            "tokenspeed.cli.serve_smg.spawn_gateway", AsyncMock(return_value=gateway)
+        ),
+        patch("tokenspeed.cli.serve_smg.wait_grpc_serving", AsyncMock()),
+        patch(
+            "tokenspeed.cli.serve_smg.wait_http_ready",
+            side_effect=gateway_probe_then_release,
+        ),
+        patch("tokenspeed.cli.serve_smg.terminate_then_kill", AsyncMock()),
     ):
         rc = await run_smg(
             engine_args=[],
@@ -846,14 +862,11 @@ async def test_engine_exit_during_probe_fails_fast():
 
     engine.wait = AsyncMock(return_value=2)
 
-    with patch(
-        "tokenspeed.cli.serve_smg.spawn_engine", AsyncMock(return_value=engine)
-    ), patch(
-        "tokenspeed.cli.serve_smg.wait_grpc_serving", side_effect=hung_probe
-    ), patch(
-        "tokenspeed.cli.serve_smg.terminate_then_kill", AsyncMock()
-    ), patch(
-        "tokenspeed.cli.serve_smg.kill_process_tree", lambda *a, **kw: None
+    with (
+        patch("tokenspeed.cli.serve_smg.spawn_engine", AsyncMock(return_value=engine)),
+        patch("tokenspeed.cli.serve_smg.wait_grpc_serving", side_effect=hung_probe),
+        patch("tokenspeed.cli.serve_smg.terminate_then_kill", AsyncMock()),
+        patch("tokenspeed.cli.serve_smg.kill_process_tree", lambda *a, **kw: None),
     ):
         rc = await run_smg(
             engine_args=[],
@@ -877,18 +890,15 @@ async def test_gateway_exit_during_probe_fails_fast():
 
     gateway.wait = AsyncMock(return_value=2)
 
-    with patch(
-        "tokenspeed.cli.serve_smg.spawn_engine", AsyncMock(return_value=engine)
-    ), patch(
-        "tokenspeed.cli.serve_smg.spawn_gateway", AsyncMock(return_value=gateway)
-    ), patch(
-        "tokenspeed.cli.serve_smg.wait_grpc_serving", AsyncMock()
-    ), patch(
-        "tokenspeed.cli.serve_smg.wait_http_ready", side_effect=hung_http
-    ), patch(
-        "tokenspeed.cli.serve_smg.terminate_then_kill", AsyncMock()
-    ), patch(
-        "tokenspeed.cli.serve_smg.kill_process_tree", lambda *a, **kw: None
+    with (
+        patch("tokenspeed.cli.serve_smg.spawn_engine", AsyncMock(return_value=engine)),
+        patch(
+            "tokenspeed.cli.serve_smg.spawn_gateway", AsyncMock(return_value=gateway)
+        ),
+        patch("tokenspeed.cli.serve_smg.wait_grpc_serving", AsyncMock()),
+        patch("tokenspeed.cli.serve_smg.wait_http_ready", side_effect=hung_http),
+        patch("tokenspeed.cli.serve_smg.terminate_then_kill", AsyncMock()),
+        patch("tokenspeed.cli.serve_smg.kill_process_tree", lambda *a, **kw: None),
     ):
         rc = await run_smg(
             engine_args=[],

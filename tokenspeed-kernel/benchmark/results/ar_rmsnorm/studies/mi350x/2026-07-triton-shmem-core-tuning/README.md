@@ -4,11 +4,14 @@ Date: 2026-07-31
 
 ## Decision
 
-This study supplies the promotion evidence; the sole live policy record is
+**Historical restricted configuration only.** This campaign used eager
+prefill, C32-only decode capture, 0.90 HBM, overlap off, and passive health.
+Default-compatible requalification supersedes its deployment conclusion; the
+sole live policy record is
 [GPT-OSS-120B status](../../../docs/gpt-oss-120b-status.md).
 
-Promote profile `gpt-oss-120b-mi350x-triton-core-v3` for the **capacity
-objective** on the qualified TP=4 rank set:
+Profile `gpt-oss-120b-mi350x-triton-core-v3` was promoted for the **capacity
+objective under that restricted configuration** on the qualified TP=4 rank set:
 
 ```text
 HIP_VISIBLE_DEVICES=1,2,5,6
@@ -30,9 +33,9 @@ Percentage point estimates are arithmetic means of the 15 paired changes;
 `median TPOT` names each run's TPOT statistic, not a median across pair-level
 changes. Confidence intervals use the paired hierarchical bootstrap.
 
-This clears the predeclared capacity gate: at least +1% throughput with CI
-excluding zero and no TPOT regression. The latency objective's -1.5% threshold
-is not cleared, but latency improves rather than regresses.
+Under the restricted configuration, this clears the predeclared capacity gate:
+at least +1% throughput with CI excluding zero and no TPOT regression. The
+latency objective's -1.5% threshold is not cleared.
 
 Keep explicit upstream-unfused as the fallback for unqualified rank sets,
 profile mismatch, or backend decline. WS=8 remains deferred while physical GPU
@@ -194,4 +197,5 @@ The dominant 9.05 us/site decode-core problem is resolved. Remaining local gap:
 Do not reopen the blocked-kernel block/grid/XCD/fast-path sweeps. Further work
 would be a much smaller kernel-codegen investigation or the already-documented
 producer-direct/progress-publication systems project. The current profile has
-cleared a deployment objective and is the new triton-shmem baseline.
+cleared the capacity objective under restricted controls and remains the kernel
+baseline, not current deployment policy.

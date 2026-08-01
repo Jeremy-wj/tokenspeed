@@ -1,6 +1,6 @@
 # AR+RMSNorm benchmarking and promotion methodology
 
-Updated: 2026-07-31
+Updated: 2026-08-01
 
 ## Purpose
 
@@ -23,7 +23,8 @@ of the measured object. Fixed-shape timing is screening evidence only.
 The qualification history demonstrates why safety and performance are separate:
 profile v4 and the post-rebase fused baselines passed safety but failed
 performance, while core-v3 later passed both the safety/evidence gates and the
-capacity objective. Dated results belong in the
+capacity objective under restricted serving controls. Default-compatible
+requalification remained safe but did not promote. Dated results belong in the
 [study index](../studies/README.md); the live decision belongs in
 [GPT-OSS-120B status](gpt-oss-120b-status.md).
 

@@ -142,6 +142,12 @@ differences do not establish link locality or a one-slot reuse race; later
 unfused timeouts showed that the one-slot path was not the common cause. The
 subsequent root-cause closure is recorded below.
 
+The 2026-07-31 default-compatibility pass later restored the standard generated
+health probes and overlap scheduler together with normal prefill/decode graphs
+and 0.95 HBM utilization. Bounded full-ladder serving passed. Passive health
+and disabled overlap therefore remain useful historical isolation controls, not
+requirements of the qualified kernel profile.
+
 Curated evidence:
 `studies/mi350x/2026-07-repeatability/serving-stability-summary.json`.
 

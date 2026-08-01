@@ -1,4 +1,5 @@
 """Bounded single-server AR+RMSNorm serving stability reproducer."""
+
 from __future__ import annotations
 
 import argparse
@@ -42,9 +43,12 @@ def _write(path: Path, payload: dict) -> None:
 def _args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--label", required=True)
-    parser.add_argument("--devices", default="1,2,3,5")
+    parser.add_argument("--devices", default="1,2,5,6")
     parser.add_argument("--world-size", type=int, default=4)
-    parser.add_argument("--container", default="jeremwan-tokenspeed-profiler")
+    parser.add_argument(
+        "--container",
+        default=os.environ.get("TOKENSPEED_CONTAINER", "jeremwan-tokenspeed-profiler"),
+    )
     parser.add_argument(
         "--backend",
         choices=("auto", "triton_shmem", "symm_mem", "iris"),
@@ -53,12 +57,21 @@ def _args():
     parser.add_argument("--fusion", type=int, choices=(0, 1), default=1)
     parser.add_argument("--fusion-max-m", type=int, default=0)
     parser.add_argument("--double-buffer-input", type=int, choices=(0, 1), default=0)
-    parser.add_argument("--inkernel-barrier", type=int, choices=(0, 1), default=1)
-    parser.add_argument("--barrier-grid", type=int, default=0)
+    parser.add_argument(
+        "--inkernel-barrier",
+        type=int,
+        choices=(0, 1),
+        default=int(os.environ.get("TS_TRITON_SHMEM_INKERNEL_BARRIER", "0")),
+    )
+    parser.add_argument(
+        "--barrier-grid",
+        type=int,
+        default=int(os.environ.get("TS_TRITON_SHMEM_BARRIER_GRID", "0")),
+    )
     parser.add_argument(
         "--deep-health-mode",
         choices=("generate", "passive", "passive_when_busy"),
-        default="passive",
+        default="generate",
     )
     parser.add_argument("--input-len", type=int, default=128)
     parser.add_argument("--output-len", type=int, default=128)
@@ -77,7 +90,13 @@ def _args():
     parser.add_argument("--serve-extra-args", default="")
     parser.add_argument("--ignored-busy-gpus", default="3")
     parser.add_argument("--run-root", type=Path)
-    return parser.parse_args()
+    args = parser.parse_args()
+    if os.environ.get("AR_NORM_PROFILE_ID") != "gpt-oss-120b-mi350x-triton-core-v3":
+        parser.error(
+            "source benchmark/profiles/ar_rmsnorm/"
+            "gpt_oss_120b_mi350x.env before running this GPT-OSS reproducer"
+        )
+    return args
 
 
 def main() -> int:
@@ -88,9 +107,7 @@ def main() -> int:
     hip_map = hip_to_physical_gpu_map()
     selected = {hip_map[int(index)] for index in args.devices.split(",")}
     ignored = {
-        int(index)
-        for index in args.ignored_busy_gpus.split(",")
-        if index.strip()
+        int(index) for index in args.ignored_busy_gpus.split(",") if index.strip()
     }
     args.selected_physical_gpus = selected
     args.ignored_busy_gpus = ignored
@@ -152,9 +169,6 @@ def main() -> int:
             "ignored_busy_gpus": sorted(ignored),
             "hip_to_physical": hip_map,
             "engine_module": engine_module,
-            "triton_ar_disable": int(
-                os.environ.get("TS_TRITON_AR_DISABLE", "0")
-            ),
         }
     )
     summary = {
@@ -298,7 +312,6 @@ def main() -> int:
             args.inkernel_barrier,
             engine_module,
             args.deep_health_mode,
-            int(os.environ.get("TS_TRITON_AR_DISABLE", "0")),
             args.double_buffer_input,
             "--disable-overlap-schedule" in args.serve_extra_args,
         )

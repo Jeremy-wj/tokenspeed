@@ -6,9 +6,10 @@ This study re-establishes the GPT-OSS-120B, TP=4, MI350X baseline after the
 rebase onto upstream `3f88dcc2`. The measured code head was `eb69cf15`; each
 campaign manifest records the full dirty-tree hash and script hashes.
 
-Its fusion-off deployment conclusion was superseded by
-[core-v3 tuning](../2026-07-triton-shmem-core-tuning/README.md) on qualified HIP
-`1,2,5,6`. This study remains the post-rebase baseline and control-definition
+Core-v3 later cleared capacity under restricted controls, but
+[default compatibility](../2026-07-default-compatibility/README.md) restored
+explicit unfused as deployment default. This study remains the post-rebase
+baseline and control-definition
 record.
 
 Raw artifacts are immutable under:

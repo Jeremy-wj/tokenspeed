@@ -133,8 +133,7 @@ def _code_identity() -> dict[str, Any]:
         "git_dirty": bool(status) if status is not None else None,
         "git_status_porcelain": status.splitlines() if status else [],
         "source_sha256": {
-            relative: _sha256(_REPO_ROOT / relative)
-            for relative in _IDENTITY_FILES
+            relative: _sha256(_REPO_ROOT / relative) for relative in _IDENTITY_FILES
         },
     }
 
@@ -152,7 +151,6 @@ def _relevant_environment() -> dict[str, str]:
         "PROBE_SEED",
         "PROBE_TIMEOUT_S",
         "TS_ARNORM_BACKEND",
-        "TS_TRITON_AR_DISABLE",
     }
     prefixes = ("TS_TRITON_SHMEM_",)
     return {
@@ -166,8 +164,7 @@ def _validate_config() -> dict[str, Any]:
     impl = os.environ.get("BENCH_IMPL", "auto").strip().lower()
     if impl not in _SUPPORTED_IMPLS:
         raise ValueError(
-            f"unsupported BENCH_IMPL={impl!r}; expected "
-            f"{sorted(_SUPPORTED_IMPLS)}"
+            f"unsupported BENCH_IMPL={impl!r}; expected {sorted(_SUPPORTED_IMPLS)}"
         )
     world_size = _env_int("BENCH_WS", 4)
     hidden = _env_int("BENCH_N", 2880)
@@ -185,8 +182,7 @@ def _validate_config() -> dict[str, Any]:
     ):
         raise ValueError("PROBE_CALLS_PER_GRAPH must cover odd and even counts")
     calls_by_m = {
-        m: call_counts[index % len(call_counts)]
-        for index, m in enumerate(ms)
+        m: call_counts[index % len(call_counts)] for index, m in enumerate(ms)
     }
     if not any(count % 2 for count in calls_by_m.values()) or not any(
         count % 2 == 0 for count in calls_by_m.values()
@@ -196,9 +192,7 @@ def _validate_config() -> dict[str, Any]:
     replay_limit = _env_int("PROBE_MAX_REPLAYS", 1000)
     replays = _env_int("PROBE_REPLAYS", 1000)
     if replay_limit < 1 or replay_limit > _HARD_MAX_REPLAYS:
-        raise ValueError(
-            f"PROBE_MAX_REPLAYS must be in [1, {_HARD_MAX_REPLAYS}]"
-        )
+        raise ValueError(f"PROBE_MAX_REPLAYS must be in [1, {_HARD_MAX_REPLAYS}]")
     minimum_replays = 3 * len(ms)
     if replays < minimum_replays:
         raise ValueError(
@@ -303,14 +297,10 @@ class ProbeCase:
     residual_templates: list[torch.Tensor]
     scratches: list[torch.Tensor]
     graph: torch.cuda.CUDAGraph | None = None
-    graph_outputs: list[tuple[torch.Tensor, torch.Tensor]] = field(
-        default_factory=list
-    )
+    graph_outputs: list[tuple[torch.Tensor, torch.Tensor]] = field(default_factory=list)
 
 
-def _residual_template(
-    m: int, n: int, call: int, device: torch.device
-) -> torch.Tensor:
+def _residual_template(m: int, n: int, call: int, device: torch.device) -> torch.Tensor:
     rows = torch.arange(m, dtype=torch.int32, device=device).remainder(31)
     cols = torch.arange(n, dtype=torch.int32, device=device).remainder(257)
     values = (
@@ -321,9 +311,7 @@ def _residual_template(
     return values.to(torch.bfloat16)
 
 
-def _create_cases(
-    config: dict[str, Any], device: torch.device
-) -> dict[int, ProbeCase]:
+def _create_cases(config: dict[str, Any], device: torch.device) -> dict[int, ProbeCase]:
     cases: dict[int, ProbeCase] = {}
     for m in config["ms"]:
         calls = config["calls_by_m"][m]
@@ -435,8 +423,7 @@ def _precreate_backend(
         )
         iris_mod.IRIS_AR_RMSNORM_STATES[key] = state
         return None, {
-            str(m): "fused_iris_allreduce_residual_rmsnorm"
-            for m in config["ms"]
+            str(m): "fused_iris_allreduce_residual_rmsnorm" for m in config["ms"]
         }
 
     if impl == "symm_mem":
@@ -447,9 +434,7 @@ def _precreate_backend(
             hidden_dim=hidden,
             device=device,
         )
-        return None, {
-            str(m): "fused_native_symm_mem" for m in config["ms"]
-        }
+        return None, {str(m): "fused_native_symm_mem" for m in config["ms"]}
 
     from tokenspeed_kernel.ops.communication import triton_shmem as ts
 
@@ -469,9 +454,7 @@ def _precreate_backend(
         oneshot = (not state._is_twoshot) or (
             state._oneshot_max_m > 0 and m <= state._oneshot_max_m
         )
-        paths[str(m)] = (
-            state._oneshot_kernel_for_m(m) if oneshot else "twoshot_blocked"
-        )
+        paths[str(m)] = state._oneshot_kernel_for_m(m) if oneshot else "twoshot_blocked"
     return None, paths
 
 
@@ -492,9 +475,7 @@ def _launch(
             case.m * config["hidden"] * torch.bfloat16.itemsize
             <= _ORDINARY_AR_MAX_BYTES
         )
-        for x, residual, scratch in zip(
-            case.xs, case.residuals, case.scratches
-        ):
+        for x, residual, scratch in zip(case.xs, case.residuals, case.scratches):
             scratch.copy_(x)
             if use_iris:
                 if not tri.all_reduce_can_run(ordinary_state, scratch):
@@ -564,9 +545,7 @@ def _check_outputs(
             reference_residual.pow(2).mean(dim=-1, keepdim=True) + config["eps"]
         )
         reference_norm *= config["_weight"].float()
-        residual_error = (
-            residual_out.float() - reference_residual
-        ).abs().max().item()
+        residual_error = (residual_out.float() - reference_residual).abs().max().item()
         norm_error = (norm_out.float() - reference_norm).abs().max().item()
         residual_ok = torch.allclose(
             residual_out.float(),
@@ -614,9 +593,7 @@ def _capture_all_graphs(
     for case in cases.values():
         graph = torch.cuda.CUDAGraph()
         with torch.cuda.graph(graph, pool=pool, stream=capture_stream):
-            graph_outputs = _launch(
-                case, config, rank, group, weight, ordinary_state
-            )
+            graph_outputs = _launch(case, config, rank, group, weight, ordinary_state)
         if pool is None:
             pool = graph.pool()
         case.graph = graph
@@ -660,9 +637,7 @@ def _rank_main(
         )
         config["_weight"] = weight
 
-        ordinary_state, paths = _precreate_backend(
-            config, rank, group, device
-        )
+        ordinary_state, paths = _precreate_backend(config, rank, group, device)
         result["paths"] = paths
         if config["impl"] == "triton_shmem":
             result["signal_zero_status"] = "not_exposed_by_safe_public_api"
@@ -672,14 +647,10 @@ def _rank_main(
         for index, case in enumerate(cases.values()):
             epoch = -(index + 1)
             _set_case_inputs(case, rank, epoch)
-            outputs = _launch(
-                case, config, rank, group, weight, ordinary_state
-            )
+            outputs = _launch(case, config, rank, group, weight, ordinary_state)
             torch.cuda.synchronize()
             checked = _check_outputs(case, outputs, config, epoch)
-            result["preflight"].append(
-                {"M": case.m, "epoch": epoch, **checked}
-            )
+            result["preflight"].append({"M": case.m, "epoch": epoch, **checked})
 
         gathered_paths: list[Any] = [None] * config["world_size"]
         dist.all_gather_object(gathered_paths, paths, group=group)
@@ -690,9 +661,7 @@ def _rank_main(
         # Every graph is captured before the recorded safety sequence begins.
         for case in cases.values():
             _set_case_inputs(case, rank, epoch=0)
-        _capture_all_graphs(
-            cases, config, rank, group, weight, ordinary_state
-        )
+        _capture_all_graphs(cases, config, rank, group, weight, ordinary_state)
         result["captured_graphs"] = len(cases)
         result["graph_outputs_retained"] = True
         result["retained_graph_output_pairs"] = sum(
@@ -712,13 +681,9 @@ def _rank_main(
                     case.graph.replay()
                     outputs = case.graph_outputs
                 else:
-                    outputs = _launch(
-                        case, config, rank, group, weight, ordinary_state
-                    )
+                    outputs = _launch(case, config, rank, group, weight, ordinary_state)
                 torch.cuda.synchronize()
-                checked = _check_outputs(
-                    case, outputs, config, step["epoch"]
-                )
+                checked = _check_outputs(case, outputs, config, step["epoch"])
             except Exception:
                 launch_error = traceback.format_exc()
                 checked = {"pass": False, "calls": []}
@@ -739,9 +704,7 @@ def _rank_main(
             {
                 "status": (
                     "pass"
-                    if preflight_pass
-                    and path_agreement
-                    and failed_steps == 0
+                    if preflight_pass and path_agreement and failed_steps == 0
                     else "fail"
                 ),
                 "preflight_pass": preflight_pass,
@@ -813,9 +776,7 @@ def _run_spawn(
             complete = True
             break
     if not complete:
-        spawn_error = (
-            f"probe exceeded hard timeout of {config['timeout_s']} seconds"
-        )
+        spawn_error = f"probe exceeded hard timeout of {config['timeout_s']} seconds"
         for child in context.processes:
             if child.is_alive():
                 child.terminate()
@@ -951,9 +912,7 @@ def main() -> int:
         ).hexdigest(),
         "sequence": sequence,
         "per_rank_results": ordered_results,
-        "per_rank_errors": [
-            rank_errors[rank] for rank in sorted(rank_errors)
-        ],
+        "per_rank_errors": [rank_errors[rank] for rank in sorted(rank_errors)],
         "spawn_error": spawn_error,
     }
     _write_json(payload, os.environ.get("PROBE_JSON"))

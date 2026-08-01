@@ -16,6 +16,7 @@ the explicit local candidate against the same control. ``--stability-only``
 runs only the control and is the canonical residual-runtime gate. Use
 ``--dry-run`` to inspect the schedule without touching a server or GPU.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -42,8 +43,7 @@ from typing import Any, Iterable, Sequence
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BENCHMARK_DIR = REPO_ROOT / "benchmark"
 DEFAULT_RAW_ROOT = (
-    REPO_ROOT
-    / "benchmark/results/ar_rmsnorm/raw/current/gpt-oss-120b/mi350x"
+    REPO_ROOT / "benchmark/results/ar_rmsnorm/raw/current/gpt-oss-120b/mi350x"
 )
 GPU_LOCK_PATH = Path("/tmp/tokenspeed-ar-rmsnorm-gpu.lock")
 SERVE_SCRIPT = BENCHMARK_DIR / "e2e_gptoss_serve.sh"
@@ -139,9 +139,7 @@ def campaign_arms(name: str, *, stability_only: bool = False) -> tuple[Arm, ...]
     if not stability_only:
         return arms
     if name not in ("unfused", "iris", "triton_shmem"):
-        raise ValueError(
-            "--stability-only requires an upstream-unfused comparison"
-        )
+        raise ValueError("--stability-only requires an upstream-unfused comparison")
     return (arms[0],)
 
 
@@ -200,6 +198,7 @@ def build_schedule(
 
 def parse_amd_smi_processes(payload: str) -> dict[int, list[dict[str, Any]]]:
     """Parse ``amd-smi process --json`` into non-empty process records."""
+
     def numeric(value: Any) -> float:
         try:
             return float(value or 0)
@@ -213,11 +212,7 @@ def parse_amd_smi_processes(payload: str) -> dict[int, list[dict[str, Any]]]:
         active = []
         for wrapper in gpu_record.get("process_list", []):
             info = wrapper.get("process_info", {})
-            vram = (
-                info.get("memory_usage", {})
-                .get("vram_mem", {})
-                .get("value", 0)
-            )
+            vram = info.get("memory_usage", {}).get("vram_mem", {}).get("value", 0)
             occupancy = info.get("cu_occupancy", 0)
             if numeric(vram) > 0 or numeric(occupancy) > 0:
                 active.append(info)
@@ -259,10 +254,7 @@ def hip_to_physical_gpu_map() -> dict[int, int]:
         subprocess.check_output(["amd-smi", "list", "--json"], text=True)
     )
     ordered = sorted(records, key=lambda record: int(record["node_id"]))
-    return {
-        hip_index: int(record["gpu"])
-        for hip_index, record in enumerate(ordered)
-    }
+    return {hip_index: int(record["gpu"]) for hip_index, record in enumerate(ordered)}
 
 
 def physical_to_kfd_id_map() -> dict[int, int]:
@@ -270,10 +262,7 @@ def physical_to_kfd_id_map() -> dict[int, int]:
     records = json.loads(
         subprocess.check_output(["amd-smi", "list", "--json"], text=True)
     )
-    return {
-        int(record["gpu"]): int(record["kfd_id"])
-        for record in records
-    }
+    return {int(record["gpu"]): int(record["kfd_id"]) for record in records}
 
 
 def read_kfd_gpu_processes(
@@ -292,27 +281,21 @@ def read_kfd_gpu_processes(
             continue
         pid = int(process_dir.name)
         try:
-            command = Path(f"/proc/{pid}/comm").read_text(
-                encoding="utf-8"
-            ).strip()
+            command = Path(f"/proc/{pid}/comm").read_text(encoding="utf-8").strip()
         except OSError:
             command = ""
         for gpu, kfd_id in physical_to_kfd_id.items():
             try:
                 vram = int(
-                    (process_dir / f"vram_{kfd_id}").read_text(
-                        encoding="utf-8"
-                    ).strip()
+                    (process_dir / f"vram_{kfd_id}").read_text(encoding="utf-8").strip()
                 )
             except (OSError, ValueError):
                 vram = 0
             try:
                 occupancy = int(
-                    (
-                        process_dir
-                        / f"stats_{kfd_id}"
-                        / "cu_occupancy"
-                    ).read_text(encoding="utf-8").strip()
+                    (process_dir / f"stats_{kfd_id}" / "cu_occupancy")
+                    .read_text(encoding="utf-8")
+                    .strip()
                 )
             except (OSError, ValueError):
                 occupancy = 0
@@ -348,9 +331,7 @@ def hierarchical_bootstrap(
         sampled_values: list[float] = []
         for block in rng.choices(block_ids, k=len(block_ids)):
             block_values = values_by_block[block]
-            sampled_values.extend(
-                rng.choices(block_values, k=len(block_values))
-            )
+            sampled_values.extend(rng.choices(block_values, k=len(block_values)))
         draws.append(statistics.fmean(sampled_values))
     draws.sort()
 
@@ -358,11 +339,7 @@ def hierarchical_bootstrap(
         index = round((len(draws) - 1) * fraction)
         return draws[index]
 
-    flattened = [
-        value
-        for block in block_ids
-        for value in values_by_block[block]
-    ]
+    flattened = [value for block in block_ids for value in values_by_block[block]]
     return {
         "mean": statistics.fmean(flattened),
         "ci95_low": percentile(0.025),
@@ -457,9 +434,7 @@ def _run(
         print(result.stdout, end="")
     if check and result.returncode != 0:
         if timed_out:
-            raise TimeoutError(
-                f"command exceeded {timeout_seconds}s: {rendered}"
-            )
+            raise TimeoutError(f"command exceeded {timeout_seconds}s: {rendered}")
         raise subprocess.CalledProcessError(
             result.returncode,
             command,
@@ -494,10 +469,8 @@ def _git_metadata() -> dict[str, Any]:
                 TEARDOWN_SCRIPT,
                 BENCHMARK_DIR / "e2e_arnorm_serve.sh",
                 BENCHMARK_DIR / "e2e_arnorm_bench.sh",
-                BENCHMARK_DIR
-                / "profiles/ar_rmsnorm/gpt_oss_120b_mi350x.env",
-                REPO_ROOT
-                / "python/tokenspeed_kernel/ops/communication/triton.py",
+                BENCHMARK_DIR / "profiles/ar_rmsnorm/gpt_oss_120b_mi350x.env",
+                REPO_ROOT / "python/tokenspeed_kernel/ops/communication/triton.py",
                 REPO_ROOT
                 / "python/tokenspeed_kernel/ops/communication/triton_shmem.py",
                 REPO_ROOT
@@ -582,9 +555,7 @@ def _container_host_pids(container: str) -> set[int]:
         text=True,
     )
     return {
-        int(line.strip())
-        for line in output.splitlines()[1:]
-        if line.strip().isdigit()
+        int(line.strip()) for line in output.splitlines()[1:] if line.strip().isdigit()
     }
 
 
@@ -755,10 +726,7 @@ def _wait_for_health(
     serve_log: Path | None = None,
 ) -> None:
     if dry_run:
-        print(
-            f"+ wait up to {timeout_seconds}s for "
-            f"http://127.0.0.1:{port}/health"
-        )
+        print(f"+ wait up to {timeout_seconds}s for http://127.0.0.1:{port}/health")
         return
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline:
@@ -797,9 +765,7 @@ def _wait_for_health(
                 None,
             )
             if fatal_line is not None:
-                raise RuntimeError(
-                    f"server failed before health: {fatal_line.strip()}"
-                )
+                raise RuntimeError(f"server failed before health: {fatal_line.strip()}")
         time.sleep(5)
     raise TimeoutError(f"server did not become healthy in {timeout_seconds}s")
 
@@ -846,9 +812,7 @@ def _trace_counts(path: Path) -> dict[str, int]:
     with opener(path, "rt", encoding="utf-8") as handle:
         events = json.load(handle).get("traceEvents", [])
     names = [
-        str(event.get("name", ""))
-        for event in events
-        if event.get("cat") == "kernel"
+        str(event.get("name", "")) for event in events if event.get("cat") == "kernel"
     ]
     lowered = [name.lower() for name in names]
     return {
@@ -863,15 +827,9 @@ def _trace_counts(path: Path) -> dict[str, int]:
         "iris_all_reduce": sum(
             "iris_stage_one_shot_allreduce_kernel" in name for name in names
         ),
-        "legacy_all_reduce": sum(
-            "amd_all_reduce_kernel" in name for name in names
-        ),
+        "legacy_all_reduce": sum("amd_all_reduce_kernel" in name for name in names),
         "rccl": sum(
-            (
-                "nccl" in name
-                or "rccl" in name
-                or "reduce_kernel" in name
-            )
+            ("nccl" in name or "rccl" in name or "reduce_kernel" in name)
             and "rmsnorm" not in name
             for name in lowered
         ),
@@ -884,7 +842,7 @@ def validate_trace_signatures(
     *,
     world_size: int,
     arm: Arm,
-    require_prefill_twoshot: bool = True,
+    require_captured_prefill_fallback: bool = True,
 ) -> dict[str, Any]:
     traces = sorted(trace_dir.glob("*.trace.json*"))
     if len(traces) != world_size:
@@ -904,9 +862,7 @@ def validate_trace_signatures(
                 + counts["symm_mem_fused"]
             )
             ordinary_count = (
-                counts["iris_all_reduce"]
-                + counts["legacy_all_reduce"]
-                + counts["rccl"]
+                counts["iris_all_reduce"] + counts["legacy_all_reduce"] + counts["rccl"]
             )
             if fused_count or counts["rmsnorm"] < 73 or ordinary_count == 0:
                 raise RuntimeError(
@@ -916,9 +872,7 @@ def validate_trace_signatures(
             continue
         if arm.signature_family == "iris_fused":
             if counts["iris_fused"] == 0:
-                raise RuntimeError(
-                    f"missing Iris fused signature in {trace}: {counts}"
-                )
+                raise RuntimeError(f"missing Iris fused signature in {trace}: {counts}")
             if counts["oneshot"] or counts["twoshot"]:
                 raise RuntimeError(
                     f"Iris arm entered triton_shmem in {trace}: {counts}"
@@ -936,19 +890,17 @@ def validate_trace_signatures(
             raise RuntimeError(
                 f"unsupported fused signature family {arm.signature_family!r}"
             )
-        if arm.signature_family == "triton_shmem_fused" and arm.fusion_max_m:
-            if counts["twoshot"] != 0 or counts["rmsnorm"] < 73:
-                raise RuntimeError(
-                    f"gate arm did not use unfused prefill in {trace}: {counts}"
-                )
-        elif (
-            arm.signature_family == "triton_shmem_fused"
-            and require_prefill_twoshot
-            and counts["twoshot"] == 0
+        if arm.signature_family == "triton_shmem_fused" and (
+            arm.fusion_max_m or require_captured_prefill_fallback
         ):
-            raise RuntimeError(
-                f"baseline arm missing fused two-shot prefill in {trace}"
+            ordinary_count = (
+                counts["iris_all_reduce"] + counts["legacy_all_reduce"] + counts["rccl"]
             )
+            if counts["twoshot"] != 0 or counts["rmsnorm"] < 73 or ordinary_count == 0:
+                raise RuntimeError(
+                    f"captured prefill did not use complete ordinary fallback "
+                    f"in {trace}: {counts}"
+                )
         ranks.append({"trace": trace.name, **counts})
     return {"status": "passed", "ranks": ranks}
 
@@ -961,7 +913,6 @@ def _serve_proof(
     inkernel_barrier: int,
     engine_module: str,
     deep_health_mode: str,
-    triton_ar_disable: int = 0,
     double_buffer_input: int = 0,
     disable_overlap_schedule: bool = False,
 ) -> dict[str, Any]:
@@ -982,7 +933,6 @@ def _serve_proof(
         f"INKERNEL={inkernel_barrier}",
         f"ENGINE_MODULE={engine_module}",
         f"DEEP_HEALTH_MODE={deep_health_mode}",
-        f"TRITON_AR_DISABLE={triton_ar_disable}",
     )
     missing = [token for token in required if token not in run_env]
     if missing:
@@ -1015,9 +965,7 @@ def _serve_proof(
     else:
         state_lines = []
     resolved_backend_lines = [
-        line
-        for line in text.splitlines()
-        if "AR+RMSNorm backend resolved:" in line
+        line for line in text.splitlines() if "AR+RMSNorm backend resolved:" in line
     ]
     if arm.signature_family == "triton_shmem_fused" and not any(
         "selected=triton_shmem" in line for line in resolved_backend_lines
@@ -1037,7 +985,11 @@ def _serve_proof(
     }
 
 
-def _qualified_profile_proof(serve_log: Path) -> dict[str, Any]:
+def _qualified_profile_proof(
+    serve_log: Path,
+    *,
+    disable_overlap_schedule: bool = False,
+) -> dict[str, Any]:
     """Fail closed if a promotion phase drifted from the qualified profile."""
     text = serve_log.read_text(encoding="utf-8", errors="replace")
     run_env = next(
@@ -1048,31 +1000,36 @@ def _qualified_profile_proof(serve_log: Path) -> dict[str, Any]:
         raise RuntimeError(f"RUN_ENV missing from {serve_log}")
     required_run_env = (
         "PROFILE_ID=gpt-oss-120b-mi350x-triton-core-v3",
-        "DEEP_HEALTH_MODE=passive",
+        "PROFILE_PURE_TP=1",
+        "HVD=1,2,5,6",
+        "CAP=2048",
+        "DEEP_HEALTH_MODE=generate",
+        "COARSE=1",
         "FOLD_COPYIN=0",
+        "WORKGROUP_SYNC=1",
         "SHMEM_OUTPUT_RING=72",
         "INPUT_SITE_RING=72",
         "BORROW_TWOSHOT_OUTPUT=1",
+        "INKERNEL=1",
+        "ONESHOT_MAX_M=384",
         "ONESHOT_VARIANT=padded",
         "PADDED_MAX_M=64",
         "ONESHOT_NUM_WARPS=4",
         "DOUBLE_BUFFER_INPUT=0",
         "BARRIER_GRID=0",
+        "GRID_CAP=128",
+        "GRID_CAP_MIN_M=256",
+        "FUSION_MAX_M=0",
         "FORWARD_MARKERS=1",
     )
     required_server_args = {
-        "gpu_memory_utilization=0.9": (
-            r"\bgpu_memory_utilization=0\.9(?:,|\))"
+        "gpu_memory_utilization=0.95": (r"\bgpu_memory_utilization=0\.95(?:,|\))"),
+        "cudagraph_capture_sizes=None": (r"\bcudagraph_capture_sizes=None(?:,|\))"),
+        "disable_prefill_graph=False": (r"\bdisable_prefill_graph=False(?:,|\))"),
+        f"disable_overlap_schedule={disable_overlap_schedule}": (
+            rf"\bdisable_overlap_schedule={disable_overlap_schedule}(?:,|\))"
         ),
-        "cudagraph_capture_sizes=[32]": (
-            r"\bcudagraph_capture_sizes=\[32\](?:,|\))"
-        ),
-        "disable_prefill_graph=True": (
-            r"\bdisable_prefill_graph=True(?:,|\))"
-        ),
-        "disable_overlap_schedule=True": (
-            r"\bdisable_overlap_schedule=True(?:,|\))"
-        ),
+        "prefill graph captured": (r"\bprefill breakable graph: captured buckets \["),
     }
     missing = [token for token in required_run_env if token not in run_env]
     missing.extend(
@@ -1109,6 +1066,10 @@ def _arm_environment(
     label: str,
 ) -> dict[str, str]:
     env = os.environ.copy()
+    if args.comparison in {"gate256", "input_ring"}:
+        # These arms intentionally alter qualified profile policy. Keep them
+        # available as diagnostics without falsely claiming core-v3 identity.
+        env["AR_NORM_PROFILE_ID"] = "unqualified-manual"
     env.update(
         {
             "CONTAINER": args.container,
@@ -1128,7 +1089,6 @@ def _arm_environment(
             ),
             "TS_TRITON_SHMEM_BARRIER_GRID": str(args.barrier_grid),
             "TS_TRITON_SHMEM_INKERNEL_BARRIER": str(args.inkernel_barrier),
-            "TS_TRITON_AR_DISABLE": str(args.triton_ar_disable),
             "TS_SERVE_ENGINE_MODULE": args.engine_module,
             "TOKENSPEED_DEEP_HEALTH_MODE": args.deep_health_mode,
             "TOKENSPEED_PROFILE_WITH_STACK": "0",
@@ -1196,11 +1156,10 @@ def _start_phase(
     if not args.dry_run:
         if args.comparison in ("unfused", "iris", "triton_shmem"):
             profile_proof = _qualified_profile_proof(
-                phase_dir / f"serve-{label}.log"
+                phase_dir / f"serve-{label}.log",
+                disable_overlap_schedule=args.disable_overlap_schedule,
             )
-            _write_json(
-                phase_dir / "qualified-profile-proof.json", profile_proof
-            )
+            _write_json(phase_dir / "qualified-profile-proof.json", profile_proof)
         _assert_gpu_isolation(
             phase_dir,
             container=args.container,
@@ -1233,9 +1192,9 @@ def _gpu_guard_history_is_clean(phase_dir: Path) -> bool:
             records.append(json.loads(line))
     preflight_path = phase_dir / "preflight.json"
     if preflight_path.exists():
-        attempt_start = json.loads(
-            preflight_path.read_text(encoding="utf-8")
-        ).get("time")
+        attempt_start = json.loads(preflight_path.read_text(encoding="utf-8")).get(
+            "time"
+        )
         if attempt_start:
             records = [
                 record
@@ -1376,13 +1335,10 @@ def _run_arm(
                         args.inkernel_barrier,
                         args.engine_module,
                         args.deep_health_mode,
-                        args.triton_ar_disable,
                         arm_double_buffer,
                         args.disable_overlap_schedule,
                     )
-                    produced_results.append(
-                        str(output_file.relative_to(arm_dir))
-                    )
+                    produced_results.append(str(output_file.relative_to(arm_dir)))
                     print(f"Reusing validated {decode_label}")
                     continue
             active_env, active_log = _start_phase(
@@ -1435,7 +1391,6 @@ def _run_arm(
                     args.inkernel_barrier,
                     args.engine_module,
                     args.deep_health_mode,
-                    args.triton_ar_disable,
                     arm_double_buffer,
                     args.disable_overlap_schedule,
                 )
@@ -1527,7 +1482,8 @@ def _run_arm(
         if not args.skip_profiles:
             # Aggregate-M workloads are split into smaller scheduler
             # microbatches. Use sequential 512-token requests so every trace
-            # contains a direct M512 prefill and proves the two-shot path.
+            # contains a direct M512 prefill and proves captured oversize calls
+            # take the complete ordinary fallback.
             trace_dir = prefill_dir / "traces" / "direct-m512-proof"
             profile_workload = Workload(
                 "profile-direct-m512",
@@ -1588,7 +1544,6 @@ def _run_arm(
                 args.inkernel_barrier,
                 args.engine_module,
                 args.deep_health_mode,
-                args.triton_ar_disable,
                 arm_double_buffer,
                 args.disable_overlap_schedule,
             )
@@ -1741,9 +1696,7 @@ def analyze_campaign(
         and decode_tpot["ci95_high"] <= 1.0
     )
     if sample_sufficient and not (latency_gate or capacity_gate):
-        reasons.append(
-            "neither latency nor capacity promotion threshold was cleared"
-        )
+        reasons.append("neither latency nor capacity promotion threshold was cleared")
 
     summary = {
         "generated_at": _utc_now(),
@@ -1909,7 +1862,6 @@ def _manifest(
             "cap": args.cap,
             "barrier_grid": args.barrier_grid,
             "inkernel_barrier": args.inkernel_barrier,
-            "triton_ar_disable": args.triton_ar_disable,
             "engine_module": args.engine_module,
             "deep_health_mode": args.deep_health_mode,
             "double_buffer_input": args.double_buffer_input,
@@ -1960,32 +1912,25 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--bootstrap-samples", type=int, default=10000)
     parser.add_argument("--bootstrap-seed", type=int, default=20260727)
     parser.add_argument("--world-size", type=int, default=4)
-    parser.add_argument("--devices", default="1,2,3,5")
+    parser.add_argument("--devices", default="1,2,5,6")
     parser.add_argument("--cap", type=int, default=2048)
     parser.add_argument(
         "--barrier-grid",
         type=int,
-        default=0,
+        default=int(os.environ.get("TS_TRITON_SHMEM_BARRIER_GRID", "0")),
         help="Fixed in-kernel barrier participant count; 0 keeps M-dependent.",
     )
     parser.add_argument(
         "--inkernel-barrier",
         type=int,
         choices=(0, 1),
-        default=1,
+        default=int(os.environ.get("TS_TRITON_SHMEM_INKERNEL_BARRIER", "0")),
         help="Use fused in-kernel barriers (1) or separate barrier kernels (0).",
-    )
-    parser.add_argument(
-        "--triton-ar-disable",
-        type=int,
-        choices=(0, 1),
-        default=int(os.environ.get("TS_TRITON_AR_DISABLE", "0")),
-        help="Disable standalone small-message Triton all-reduce and use RCCL.",
     )
     parser.add_argument(
         "--deep-health-mode",
         choices=("generate", "passive", "passive_when_busy"),
-        default="passive",
+        default="generate",
     )
     parser.add_argument(
         "--double-buffer-input",
@@ -1997,7 +1942,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--disable-overlap-schedule",
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False,
     )
     parser.add_argument(
         "--restart-container-per-server",
@@ -2012,7 +1957,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--container",
-        default="jeremwan-tokenspeed-profiler",
+        default=os.environ.get("TOKENSPEED_CONTAINER", "jeremwan-tokenspeed-profiler"),
     )
     parser.add_argument("--port", type=int, default=8100)
     parser.add_argument("--control-port", type=int, default=8101)
@@ -2045,6 +1990,11 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
+    if os.environ.get("AR_NORM_PROFILE_ID") != "gpt-oss-120b-mi350x-triton-core-v3":
+        parser.error(
+            "source benchmark/profiles/ar_rmsnorm/"
+            "gpt_oss_120b_mi350x.env before running this GPT-OSS campaign"
+        )
     if args.blocks < 1:
         parser.error("--blocks must be positive")
     if args.bootstrap_samples < 100:
@@ -2060,8 +2010,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         or not args.decode_only
     ):
         parser.error(
-            "--stability-only requires an upstream-unfused comparison "
-            "and --decode-only"
+            "--stability-only requires an upstream-unfused comparison and --decode-only"
         )
     args.ignored_busy_gpus = set(args.ignored_busy_gpus)
     if args.engine_module is None:
@@ -2074,8 +2023,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     args.physical_to_kfd_id = physical_to_kfd_id_map()
     try:
         args.selected_physical_gpus = {
-            args.hip_to_physical_gpu[int(device)]
-            for device in args.devices.split(",")
+            args.hip_to_physical_gpu[int(device)] for device in args.devices.split(",")
         }
     except (KeyError, ValueError):
         parser.error("--devices contains an unknown HIP visibility index")
@@ -2160,11 +2108,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 bootstrap_samples=args.bootstrap_samples,
                 bootstrap_seed=args.bootstrap_seed,
             )
-        decision = (
-            summary["stability"]
-            if args.stability_only
-            else summary["promotion"]
-        )
+        decision = summary["stability"] if args.stability_only else summary["promotion"]
         print(json.dumps(decision, indent=2, sort_keys=True))
         return 0
     finally:

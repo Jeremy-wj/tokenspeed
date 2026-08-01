@@ -1,6 +1,6 @@
 # GPT-OSS-120B AR+RMSNorm producer and buffer lifetime contract
 
-Updated: 2026-07-31
+Updated: 2026-08-01
 
 This is the normative ownership contract for explicit `triton_shmem` and any
 captured backend that borrows persistent inputs or outputs.
@@ -87,13 +87,15 @@ Profile `gpt-oss-120b-mi350x-triton-realigned-v2` now implements the eager
 two-shot case with two coarse symmetric `norm_out`/`residual_out` pairs and
 independent peer-pointer tables. Consecutive two-shot sites alternate pairs;
 the completion barrier remains, so peer pushes are visible before return.
-Captured two-shot calls and calls with explicit caller outputs retain the copied
-compatibility path. A 72-site chained correctness test covers M257 and repeated
-M512/1024/2048 calls with residual outputs fed into the next site.
+Direct captured two-shot calls and calls with explicit caller outputs retain
+the copied compatibility path for operator testing. Production dispatch now
+declines captured calls above M384 to avoid transient returned outputs. A
+72-site chained correctness test covers M257 and repeated M512/1024/2048 eager
+calls with residual outputs fed into the next site.
 
 Core-v3 inherits these lifetime contracts unchanged; it replaces only the
 M<=64 decode core and has independently passed graph, transition, bounded-serve,
-and 15-pair campaign qualification.
+and 15/15 safety pairs under both restricted and default-compatible campaigns.
 
 The earlier assumption that `torch.empty_like` inside capture gave each fused
 site stable storage was disproven in full serving. Those tensors were transient
@@ -101,13 +103,16 @@ allocations in the HIP graph private pool; captured custom kernels retained raw
 output pointers after Python tensor lifetimes and graph-pool reuse/layout had
 diverged.
 
-Qualified profile `gpt-oss-120b-mi350x-qualified-v4` preallocates 72 `norm_out`
-and 72 `residual_out` slots before capture for `M <= 256`. Each GPT-OSS fused
-site captures one persistent pair, and a complete 72-site forward does not
-revisit it until all prior consumers are dead. Larger eager-prefill outputs may
-remain dynamically allocated because no graph retains their pointers. This
-contract is model-specific and must not be inferred for a model with a
-different site count or conditional execution.
+Core-v3 preallocates 72 `norm_out` and 72 `residual_out` slots through its
+one-shot M384 cap. Each GPT-OSS fused site captures one persistent pair, and a
+complete 72-site forward does not revisit it until all prior consumers are
+dead. Eager two-shot calls use the separate two-pair borrowed-output path.
+Captured calls above M384 decline triton-shmem before launch and capture the
+complete ordinary all-reduce + RMSNorm fallback; they never return transient
+custom-kernel outputs. Direct operator calls with explicit caller outputs retain
+the copied two-shot compatibility path. This contract is model-specific and
+must not be inferred for a model with a different site count or conditional
+execution.
 
 ## Rejected two-slot prototype
 
@@ -133,7 +138,7 @@ their original barriers.
 
 Validation includes eager wraparound, two interleaved 72-call graph variants,
 100 replays in the focused test, 1000 M-boundary transition replays, bounded
-serving, and the 15-pair campaign. The 72-call graph improved by 19.8%.
+serving, and 15/15 safety pairs. The 72-call graph improved by 19.8%.
 
 ## Decision boundary
 

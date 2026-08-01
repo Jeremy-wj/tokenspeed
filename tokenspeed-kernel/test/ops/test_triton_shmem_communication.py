@@ -90,6 +90,57 @@ def _reference(x, residual, weight, world_size, hidden, eps, device):
     return ref_residual, ref_norm
 
 
+def test_core_v3_profile_validation_is_explicit(monkeypatch):
+    _skip_if_unsupported(1)
+    from tokenspeed_kernel.ops.communication.triton_shmem import (
+        _dynamic_grid_cap,
+        _dynamic_grid_cap_min_m,
+        _profile_validation_errors,
+    )
+
+    monkeypatch.delenv("TS_TRITON_SHMEM_GRID_CAP", raising=False)
+    monkeypatch.delenv("TS_TRITON_SHMEM_GRID_CAP_MIN_M", raising=False)
+    assert _dynamic_grid_cap() == 0
+    assert _dynamic_grid_cap_min_m() == 0
+
+    profile_env = {
+        "TS_TRITON_SHMEM_COARSE": "1",
+        "TS_TRITON_SHMEM_INKERNEL_BARRIER": "1",
+        "TS_TRITON_SHMEM_FOLD_COPYIN": "0",
+        "TS_TRITON_SHMEM_WORKGROUP_SYNC": "1",
+        "TS_TRITON_SHMEM_OUTPUT_RING": "72",
+        "TS_TRITON_SHMEM_INPUT_SITE_RING": "72",
+        "TS_TRITON_SHMEM_BORROW_TWOSHOT_OUTPUT": "1",
+        "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT": "0",
+        "TS_TRITON_SHMEM_ONESHOT_MAX_M": "384",
+        "TS_TRITON_SHMEM_ONESHOT_BLOCK_N": "0",
+        "TS_TRITON_SHMEM_ONESHOT_VARIANT": "padded",
+        "TS_TRITON_SHMEM_PADDED_MAX_M": "64",
+        "TS_TRITON_SHMEM_ONESHOT_NUM_WARPS": "4",
+        "TS_TRITON_SHMEM_TWOSHOT_BLOCK_N": "0",
+        "TS_TRITON_SHMEM_GRID_CAP": "128",
+        "TS_TRITON_SHMEM_GRID_CAP_MIN_M": "256",
+        "TS_TRITON_SHMEM_BARRIER_GRID": "0",
+        "TS_TRITON_SHMEM_FUSION_MAX_M": "0",
+        "TS_TRITON_SHMEM_PROFILE_PURE_TP": "1",
+    }
+    for name, value in profile_env.items():
+        monkeypatch.setenv(name, value)
+
+    kwargs = {
+        "profile_id": "gpt-oss-120b-mi350x-triton-core-v3",
+        "arch": "gfx950",
+        "world_size": 4,
+        "max_token_num": 2048,
+        "hidden_dim": 2880,
+        "dtype": torch.bfloat16,
+        "visible_devices": "1,2,5,6",
+    }
+    assert _profile_validation_errors(**kwargs) == []
+    kwargs["world_size"] = 2
+    assert "world_size=2 expected 4" in _profile_validation_errors(**kwargs)
+
+
 def _make_inputs(tokens, hidden, rank, device):
     # Each rank contributes rank+1 (sum across ranks = ws*(ws+1)/2); residual is
     # non-uniform (deterministic, identical across ranks -> replicated per TP)
@@ -156,9 +207,7 @@ def _corr_worker_main(rank: int, world_size: int, port: int, hidden: int) -> Non
             torch.testing.assert_close(
                 residual_out.float(), ref_residual, atol=2e-2, rtol=2e-2
             )
-            torch.testing.assert_close(
-                norm_out.float(), ref_norm, atol=2e-2, rtol=2e-2
-            )
+            torch.testing.assert_close(norm_out.float(), ref_norm, atol=2e-2, rtol=2e-2)
     finally:
         dist.destroy_process_group()
 
@@ -233,14 +282,12 @@ def _random_corr_worker(rank, world_size, port, hidden, error_dict):
                         device=device,
                         generator=residual_generator,
                     )
-                    norm_out, residual_out = (
-                        triton_shmem_allreduce_residual_rmsnorm(
-                            state,
-                            input_tensor=x,
-                            residual=residual,
-                            weight=weight,
-                            eps=_EPS,
-                        )
+                    norm_out, residual_out = triton_shmem_allreduce_residual_rmsnorm(
+                        state,
+                        input_tensor=x,
+                        residual=residual,
+                        weight=weight,
+                        eps=_EPS,
                     )
                     reduced = x.float()
                     dist.all_reduce(reduced)
@@ -262,9 +309,11 @@ def _random_corr_worker(rank, world_size, port, hidden, error_dict):
                         rtol=2e-2,
                     )
             if state._output_ring_size:
-                assert state._output_ring_index == (
-                    len((1, 4, 32, 128, 256)) * iterations
-                ) % state._output_ring_size
+                assert (
+                    state._output_ring_index
+                    == (len((1, 4, 32, 128, 256)) * iterations)
+                    % state._output_ring_size
+                )
         finally:
             dist.destroy_process_group()
     except Exception:
@@ -292,6 +341,7 @@ def test_triton_shmem_arrms_output_ring_random_world4(monkeypatch):
 
 def test_triton_shmem_arrms_input_site_ring_random_world4(monkeypatch):
     _skip_if_unsupported(4)
+    monkeypatch.setenv("TS_TRITON_SHMEM_INKERNEL_BARRIER", "1")
     monkeypatch.setenv("TS_TRITON_SHMEM_INPUT_SITE_RING", "72")
     monkeypatch.setenv("TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT", "0")
     _spawn_and_collect(
@@ -303,6 +353,7 @@ def test_triton_shmem_arrms_input_site_ring_random_world4(monkeypatch):
 
 def test_triton_shmem_arrms_padded_wholerow_random_world4(monkeypatch):
     _skip_if_unsupported(4)
+    monkeypatch.setenv("TS_TRITON_SHMEM_INKERNEL_BARRIER", "1")
     monkeypatch.setenv("TS_TRITON_SHMEM_INPUT_SITE_RING", "72")
     monkeypatch.setenv("TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT", "0")
     monkeypatch.setenv("TS_TRITON_SHMEM_ONESHOT_VARIANT", "padded")
@@ -346,9 +397,7 @@ def _twoshot_borrow_worker(rank, world_size, port, hidden, error_dict):
                 0.5, 1.5, hidden, dtype=torch.bfloat16, device=device
             )
 
-            expected_norm_ptrs = {
-                tensor.data_ptr() for tensor in state._twoshot_y_ring
-            }
+            expected_norm_ptrs = {tensor.data_ptr() for tensor in state._twoshot_y_ring}
             expected_residual_ptrs = {
                 tensor.data_ptr() for tensor in state._twoshot_residual_ring
             }
@@ -371,21 +420,18 @@ def _twoshot_borrow_worker(rank, world_size, port, hidden, error_dict):
                         dtype=torch.bfloat16,
                         device=device,
                     )
-                    norm_out, residual_out = (
-                        triton_shmem_allreduce_residual_rmsnorm(
-                            state,
-                            input_tensor=x,
-                            residual=residual,
-                            weight=weight,
-                            eps=_EPS,
-                        )
+                    norm_out, residual_out = triton_shmem_allreduce_residual_rmsnorm(
+                        state,
+                        input_tensor=x,
+                        residual=residual,
+                        weight=weight,
+                        eps=_EPS,
                     )
                     reduced = x.float()
                     dist.all_reduce(reduced)
                     reference_residual = reduced + reference_residual_input
                     reference_norm = reference_residual * torch.rsqrt(
-                        reference_residual.pow(2).mean(dim=-1, keepdim=True)
-                        + _EPS
+                        reference_residual.pow(2).mean(dim=-1, keepdim=True) + _EPS
                     )
                     reference_norm *= weight.float()
                     torch.testing.assert_close(
@@ -419,16 +465,14 @@ def _twoshot_borrow_worker(rank, world_size, port, hidden, error_dict):
             norm_out = torch.empty_like(x)
             residual_out = torch.empty_like(x)
             slot_before = state._twoshot_output_index
-            returned_norm, returned_residual = (
-                triton_shmem_allreduce_residual_rmsnorm(
-                    state,
-                    input_tensor=x,
-                    residual=residual,
-                    weight=weight,
-                    eps=_EPS,
-                    norm_out=norm_out,
-                    residual_out=residual_out,
-                )
+            returned_norm, returned_residual = triton_shmem_allreduce_residual_rmsnorm(
+                state,
+                input_tensor=x,
+                residual=residual,
+                weight=weight,
+                eps=_EPS,
+                norm_out=norm_out,
+                residual_out=residual_out,
             )
             assert returned_norm.data_ptr() == norm_out.data_ptr()
             assert returned_residual.data_ptr() == residual_out.data_ptr()
@@ -464,9 +508,7 @@ def _fusion_gate_worker(rank, world_size, port, error_dict):
         from tokenspeed_kernel.ops.communication import triton, triton_shmem
 
         hidden = 2880
-        weight = torch.linspace(
-            0.5, 1.5, hidden, dtype=torch.bfloat16, device=device
-        )
+        weight = torch.linspace(0.5, 1.5, hidden, dtype=torch.bfloat16, device=device)
         x, residual = _make_inputs(256, hidden, rank, device)
         norm_out, residual_out, *_ = triton.allreduce_residual_rmsnorm(
             x,
@@ -477,9 +519,10 @@ def _fusion_gate_worker(rank, world_size, port, error_dict):
             max_token_num=2048,
         )
         assert norm_out is not None and residual_out is not None
-        state = triton_shmem.TRITON_SHMEM_AR_RMSNORM_STATES[
-            (id(dist.group.WORLD), 2048, hidden, torch.bfloat16)
-        ]
+        state_key = triton_shmem.triton_shmem_state_cache_key(
+            dist.group.WORLD, 2048, hidden, torch.bfloat16
+        )
+        state = triton_shmem.TRITON_SHMEM_AR_RMSNORM_STATES[state_key]
         assert state.max_token_num == 2048
 
         x, residual = _make_inputs(512, hidden, rank, device)
@@ -510,9 +553,7 @@ def test_triton_shmem_arrms_separate_performance_gate_world4():
         join=True,
     )
     if error_dict:
-        raise RuntimeError(
-            "\n".join(f"Rank {r}: {e}" for r, e in error_dict.items())
-        )
+        raise RuntimeError("\n".join(f"Rank {r}: {e}" for r, e in error_dict.items()))
 
 
 def test_triton_shmem_arrms_world8():
@@ -537,9 +578,7 @@ def _subgroup_worker(rank, world_size, port, interleaved, error_dict):
             rank=rank,
             world_size=world_size,
         )
-        rank_sets = (
-            [(0, 2), (1, 3)] if interleaved else [(0, 1), (2, 3)]
-        )
+        rank_sets = [(0, 2), (1, 3)] if interleaved else [(0, 1), (2, 3)]
         groups = [dist.new_group(ranks) for ranks in rank_sets]
         group_idx = next(i for i, ranks in enumerate(rank_sets) if rank in ranks)
         ranks = rank_sets[group_idx]
@@ -560,16 +599,12 @@ def _subgroup_worker(rank, world_size, port, interleaved, error_dict):
             dtype=torch.bfloat16,
         )
         assert state is not None
-        weight = torch.linspace(
-            0.5, 1.5, hidden, dtype=torch.bfloat16, device=device
-        )
+        weight = torch.linspace(0.5, 1.5, hidden, dtype=torch.bfloat16, device=device)
         expected_reduced = float(sum(r + 1 for r in ranks))
         for tokens in (64, 256, 512):
             x, residual = _make_inputs(tokens, hidden, rank, device)
-            norm_out, residual_out = (
-                triton_shmem_allreduce_residual_rmsnorm(
-                    state, x, residual, weight, _EPS
-                )
+            norm_out, residual_out = triton_shmem_allreduce_residual_rmsnorm(
+                state, x, residual, weight, _EPS
             )
             ref_residual = (
                 torch.full_like(x, expected_reduced, dtype=torch.float32)
@@ -582,9 +617,7 @@ def _subgroup_worker(rank, world_size, port, interleaved, error_dict):
             torch.testing.assert_close(
                 residual_out.float(), ref_residual, atol=2e-2, rtol=2e-2
             )
-            torch.testing.assert_close(
-                norm_out.float(), ref_norm, atol=2e-2, rtol=2e-2
-            )
+            torch.testing.assert_close(norm_out.float(), ref_norm, atol=2e-2, rtol=2e-2)
     except Exception:
         error_dict[rank] = traceback.format_exc()
     finally:
@@ -602,9 +635,7 @@ def _run_subgroup(interleaved: bool) -> None:
         join=True,
     )
     if error_dict:
-        raise RuntimeError(
-            "\n".join(f"Rank {r}: {e}" for r, e in error_dict.items())
-        )
+        raise RuntimeError("\n".join(f"Rank {r}: {e}" for r, e in error_dict.items()))
 
 
 def test_triton_shmem_arrms_disjoint_subgroups():
@@ -624,9 +655,7 @@ def _graph_worker_fn(
     rank, world_size, port, hidden, tokens, fold_copyin, replays, error_dict
 ):
     try:
-        _graph_worker_main(
-            rank, world_size, port, hidden, tokens, fold_copyin, replays
-        )
+        _graph_worker_main(rank, world_size, port, hidden, tokens, fold_copyin, replays)
     except Exception:
         error_dict[rank] = traceback.format_exc()
 
@@ -649,9 +678,8 @@ def _graph_worker_main(
         world_size=world_size,
     )
     try:
-        os.environ["TS_TRITON_SHMEM_FOLD_COPYIN"] = (
-            "1" if fold_copyin else "0"
-        )
+        os.environ["TS_TRITON_SHMEM_FOLD_COPYIN"] = "1" if fold_copyin else "0"
+        os.environ["TS_TRITON_SHMEM_INKERNEL_BARRIER"] = "1" if fold_copyin else "0"
         from tokenspeed_kernel.ops.communication.triton_shmem import (
             create_triton_shmem_ar_rmsnorm_state,
             triton_shmem_allreduce_residual_rmsnorm,
@@ -769,8 +797,10 @@ def test_triton_shmem_arrms_folded_copyin_graph_world4():
     )
 
 
-def test_triton_shmem_arrms_gridcap_graph_world4():
+def test_triton_shmem_arrms_gridcap_graph_world4(monkeypatch):
     # Exercises the gfx950 ws4 M>=256 integration cap (256 -> 128 CTAs).
+    monkeypatch.setenv("TS_TRITON_SHMEM_GRID_CAP", "128")
+    monkeypatch.setenv("TS_TRITON_SHMEM_GRID_CAP_MIN_M", "256")
     _run_graph(
         world_size=4,
         hidden=2880,
@@ -807,9 +837,7 @@ def _double_buffer_graph_worker(
         )
         assert state is not None
         assert len(state._input_ring) == 2
-        weight = torch.linspace(
-            0.5, 1.5, hidden, dtype=torch.bfloat16, device=device
-        )
+        weight = torch.linspace(0.5, 1.5, hidden, dtype=torch.bfloat16, device=device)
         residual = (
             torch.arange(tokens * hidden, dtype=torch.float32, device=device)
             .reshape(tokens, hidden)
@@ -858,10 +886,7 @@ def _double_buffer_graph_worker(
             if iteration % 10 == 0 or iteration == replays:
                 torch.cuda.synchronize()
                 for index in range(2):
-                    rank_sum = (
-                        world_size * (world_size + 1) // 2
-                        + index * world_size
-                    )
+                    rank_sum = world_size * (world_size + 1) // 2 + index * world_size
                     reduced = torch.full(
                         (tokens, hidden),
                         rank_sum * iteration,
@@ -904,15 +929,14 @@ def test_triton_shmem_double_buffer_even_graph_world4():
         join=True,
     )
     if error_dict:
-        raise RuntimeError(
-            "\n".join(f"Rank {r}: {e}" for r, e in error_dict.items())
-        )
+        raise RuntimeError("\n".join(f"Rank {r}: {e}" for r, e in error_dict.items()))
 
 
 def _input_site_ring_graph_worker(
     rank, world_size, port, hidden, tokens, replays, error_dict
 ):
     try:
+        os.environ["TS_TRITON_SHMEM_INKERNEL_BARRIER"] = "1"
         os.environ["TS_TRITON_SHMEM_INPUT_SITE_RING"] = "72"
         os.environ["TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT"] = "0"
         torch.cuda.set_device(rank)
@@ -950,9 +974,7 @@ def _input_site_ring_graph_worker(
 
             def make_graph_inputs():
                 xs = [
-                    torch.empty(
-                        (tokens, hidden), dtype=torch.bfloat16, device=device
-                    )
+                    torch.empty((tokens, hidden), dtype=torch.bfloat16, device=device)
                     for _ in range(72)
                 ]
                 norm_outs = [torch.empty_like(xs[0]) for _ in range(72)]
@@ -1002,9 +1024,8 @@ def _input_site_ring_graph_worker(
                 if iteration % 10 == 0 or iteration == replays:
                     torch.cuda.synchronize()
                     for index in (0, 35, 71):
-                        rank_sum = (
-                            world_size * (world_size + 1) // 2
-                            + world_size * (1 + (index % 3))
+                        rank_sum = world_size * (world_size + 1) // 2 + world_size * (
+                            1 + (index % 3)
                         )
                         reduced = torch.full(
                             (tokens, hidden),
@@ -1054,6 +1075,27 @@ def test_triton_shmem_padded_wholerow_graph_world4(monkeypatch):
         (4, _get_open_port(), 2880, 32, 100),
         4,
     )
+
+
+def test_triton_shmem_capture_requires_persistent_output(monkeypatch):
+    _skip_if_unsupported(1)
+    from tokenspeed_kernel.ops.communication.triton_shmem import (
+        triton_shmem_can_run,
+    )
+
+    state = type(
+        "State",
+        (),
+        {"_output_ring_size": 72, "_output_ring_max_m": 384},
+    )()
+    small = type("Input", (), {"shape": (384, 2880)})()
+    large = type("Input", (), {"shape": (512, 2880)})()
+
+    monkeypatch.setattr(torch.cuda, "is_current_stream_capturing", lambda: True)
+    assert triton_shmem_can_run(state, small)
+    assert not triton_shmem_can_run(state, large)
+    monkeypatch.setattr(torch.cuda, "is_current_stream_capturing", lambda: False)
+    assert triton_shmem_can_run(state, large)
 
 
 def test_triton_shmem_arrms_twoshot_graph_world8():

@@ -1,6 +1,6 @@
 # AR+RMSNorm profiling workflow
 
-Updated: 2026-07-31
+Updated: 2026-08-01
 
 Pre-rebase traces remain legacy. New runs must record the resolved ordinary AR
 backend, fused backend, rank-side selected-backend log, kernel signatures, and
@@ -156,10 +156,12 @@ window identical.
 - gpt-oss compatibility wrappers: `benchmark/e2e_gptoss_*.sh`
 - Model profiles: `benchmark/profiles/ar_rmsnorm/`
 
-The generic serve, benchmark, profile, and teardown paths all default to the
-canonical `jeremwan-tokenspeed-profiler` container. Set `CONTAINER` only to
-target an intentionally equivalent replacement that has passed the
-qualification checks above.
+The generic serve, benchmark, profile, and teardown paths accept `CONTAINER` or
+`TOKENSPEED_CONTAINER`; the qualified lab value is
+`jeremwan-tokenspeed-profiler`. `CONTAINER_REPO_ROOT` overrides the repository
+mount inside the container. Host output roots are derived from the launcher
+location unless `AR_RMSNORM_RESULT_ROOT` is set, so workflows do not require a
+specific username or checkout path.
 
 New output roots default under:
 
@@ -196,6 +198,14 @@ Example benchmark arguments:
 ```
 
 Every expected rank file must exist and be nonempty.
+
+Final matched 32-step Perfetto-compatible traces:
+
+```text
+raw/current/gpt-oss-120b/mi350x/2026-08-01/serving-repros/
+  final-perfetto-fused/traces/repro-repeat0/*-TP{0,1,2,3}.trace.json.gz
+  final-perfetto-unfused/traces/repro-repeat0/*-TP{0,1,2,3}.trace.json.gz
+```
 
 Analysis:
 
@@ -304,9 +314,10 @@ interleaved shared-state graph transitions and a complete multi-arm serve.
 Fast stability diagnosis should precede a full campaign:
 
 ```bash
-python3 -m benchmark.repro_ar_rmsnorm_serving \
-  --label <case> --devices <HIP-indices> \
-  --deep-health-mode passive --output-len 128 --timeout 90
+source tokenspeed-kernel/benchmark/profiles/ar_rmsnorm/gpt_oss_120b_mi350x.env
+PYTHONPATH=tokenspeed-kernel \
+  python3 -m benchmark.repro_ar_rmsnorm_serving \
+  --label <case> --devices 1,2,5,6 --output-len 128 --timeout 90
 ```
 
 The reproducer runs one bounded server/configuration, applies the same GPU PID
@@ -319,10 +330,10 @@ Before paired qualification, require three fresh unfused seeds on the target
 rank set:
 
 ```bash
-python3 benchmark/run_ar_rmsnorm_repeatability.py \
+PYTHONPATH=tokenspeed-kernel \
+  python3 -m benchmark.run_ar_rmsnorm_repeatability \
   --stability-only --comparison iris --decode-only \
-  --blocks 1 --seeds 0,1,2 --devices <qualified-HIP-indices> \
-  --deep-health-mode passive --disable-overlap-schedule \
+  --blocks 1 --seeds 0,1,2 --devices 1,2,5,6 \
   --double-buffer-input 0 --barrier-grid 0 --skip-profiles
 ```
 
@@ -332,14 +343,26 @@ after all expected seeds complete.
 The required serving harness is:
 
 ```bash
-python3 benchmark/run_ar_rmsnorm_repeatability.py \
+PYTHONPATH=tokenspeed-kernel \
+  python3 -m benchmark.run_ar_rmsnorm_repeatability \
   --comparison iris --blocks 3 --seeds 0,1,2,3,4 \
-  --devices <qualified-HIP-indices>
+  --devices 1,2,5,6
 ```
 
 Run explicit `triton_shmem` separately with
 `--comparison triton_shmem`. Resume reuses a decode result only when result,
 serve proof, and the complete phase GPU-guard history all revalidate.
+
+Base-default safety campaigns leave overlap enabled. Final performance
+qualification uses a matched, reversible no-overlap policy:
+
+```bash
+PYTHONPATH=tokenspeed-kernel \
+  python3 -m benchmark.run_ar_rmsnorm_repeatability \
+  --comparison triton_shmem --blocks 3 --seeds 0,1,2,3,4 \
+  --decode-only --skip-profiles --disable-overlap-schedule \
+  --devices 1,2,5,6
+```
 
 The runner records HIP-to-physical mapping, restarts the dedicated container
 before every server, rejects foreign PIDs before measurement, and samples GPU
@@ -355,24 +378,45 @@ Qualified core-v3 proof requires:
 
 ```text
 AR_NORM_PROFILE_ID=gpt-oss-120b-mi350x-triton-core-v3
+TS_TRITON_SHMEM_PROFILE_PURE_TP=1
+TS_TRITON_SHMEM_COARSE=1
+TS_TRITON_SHMEM_INKERNEL_BARRIER=1
 TS_TRITON_SHMEM_ONESHOT_VARIANT=padded
 TS_TRITON_SHMEM_PADDED_MAX_M=64
 TS_TRITON_SHMEM_ONESHOT_NUM_WARPS=4
 TS_TRITON_SHMEM_INPUT_SITE_RING=72
 TS_TRITON_SHMEM_OUTPUT_RING=72
 TS_TRITON_SHMEM_BORROW_TWOSHOT_OUTPUT=1
+TS_TRITON_SHMEM_GRID_CAP=128
+TS_TRITON_SHMEM_GRID_CAP_MIN_M=256
 ```
 
+Resolved server proof must retain base defaults:
+
+```text
+gpu_memory_utilization=0.95
+disable_prefill_graph=False
+cudagraph_capture_sizes=None
+disable_overlap_schedule=False
+deep health mode=generate
+```
+
+For the final performance-only policy,
+`disable_overlap_schedule=True` replaces only that one line and must match in
+both arms.
+
 Decode proof must contain
-`fused_ar_rmsnorm_oneshot_wholerow_padded_kernel`; direct-M512 proof must still
-contain two-shot. The qualified campaign rank set is HIP `1,2,5,6`.
+`fused_ar_rmsnorm_oneshot_wholerow_padded_kernel`. Captured direct-M512 proof
+must contain ordinary all-reduce plus RMSNorm and no triton-shmem two-shot;
+the eager/standalone transition probe must still prove the two-shot kernel.
+The qualified campaign rank set is HIP `1,2,5,6`.
 
 Universal reserved-sink graph padding and persistent per-site fused outputs are
 required safety invariants. Rerun a full campaign only for a changed
 implementation; do not weaken output ownership or the stability criteria. The
-standard gRPC health service and startup generation warmup remain active; only
-periodic synthetic generation probes are removed. The current promotion outcome
-belongs in [GPT-OSS-120B status](gpt-oss-120b-status.md).
+standard gRPC health service and startup generation warmup remain active;
+periodic generated health probes also remain active. The current promotion
+outcome belongs in [GPT-OSS-120B status](gpt-oss-120b-status.md).
 
 Use `--resume` only with the same campaign root. Completed decode seeds are
 reused only after their result and serve log revalidate; every resume records a

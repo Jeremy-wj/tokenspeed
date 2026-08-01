@@ -5,9 +5,10 @@ Date: 2026-07-30
 ## Campaign decision
 
 The realignment produced a qualified `triton_shmem` performance improvement,
-but not a deployment promotion. This conclusion was later superseded by
-[core-v3 tuning](../2026-07-triton-shmem-core-tuning/README.md); it remains the
-historical profile-v2 decision.
+but not a deployment promotion. Core-v3 later cleared capacity under restricted
+controls; [default compatibility](../2026-07-default-compatibility/README.md)
+restored fusion-off deployment. This remains the historical profile-v2
+decision.
 
 - The campaign retained upstream-unfused with `--disable-allreduce-fusion`.
 - Retain profile `gpt-oss-120b-mi350x-triton-realigned-v2` as an explicit
@@ -166,6 +167,6 @@ evidence-supported continuations.
 That decode-core continuation is now complete:
 [core-v3 tuning](../2026-07-triton-shmem-core-tuning/README.md) replaces the
 blocked M<=64 path with a scratch-free padded whole-row kernel, improves the
-72-call graph by 35.2%, and clears the capacity promotion gate. Profile v2
-remains the lifetime-integration baseline. Current deployment policy belongs in
-[GPT-OSS-120B status](../../../docs/gpt-oss-120b-status.md).
+72-call graph by 35.2%, and cleared the capacity gate under restricted controls.
+Profile v2 remains the lifetime-integration baseline. Current deployment policy
+belongs in [GPT-OSS-120B status](../../../docs/gpt-oss-120b-status.md).

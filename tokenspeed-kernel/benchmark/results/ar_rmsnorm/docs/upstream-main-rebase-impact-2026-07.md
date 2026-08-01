@@ -1,6 +1,6 @@
 # Upstream-main rebase and AR+RMSNorm baseline reset
 
-Updated: 2026-07-31
+Updated: 2026-08-01
 
 This is the durable record of the 2026-07-29 rebase boundary. Current deployment
 policy belongs in [GPT-OSS-120B status](gpt-oss-120b-status.md).
@@ -96,10 +96,12 @@ Later studies deliberately build on this baseline:
 - [decomposition](../studies/mi350x/2026-07-triton-shmem-decomposition/README.md)
   isolated the blocked decode core;
 - [core-v3 tuning](../studies/mi350x/2026-07-triton-shmem-core-tuning/README.md)
-  replaced that core and cleared the capacity gate on qualified HIP `1,2,5,6`.
+  replaced that core and cleared the capacity gate under restricted controls on
+  qualified HIP `1,2,5,6`.
 
-Those follow-ups supersede the reset's deployment conclusion, not its baseline
-measurements or rebase record.
+Those follow-ups superseded the reset at that time. Default-compatible
+requalification later restored explicit unfused deployment; none supersede the
+reset's baseline measurements or rebase record.
 
 ## Preserved implementation consequences
 
@@ -126,3 +128,21 @@ measurements or rebase record.
 - Runtime collection was blocked by the then-stale `tokenspeed_scheduler`
   binary, which lacked `PagedCacheTransferPolicy`.
 - Raw-evidence checksums passed for all 5,473 ignored files.
+
+## Default-compatibility follow-up
+
+The 2026-07-31 compatibility pass kept `3f88dcc2` as the immutable local
+comparison base and did not fetch or rebase. It confirmed that the branch still
+leaves `TS_ARNORM_BACKEND=auto` Iris-first and triton-shmem explicit-only.
+
+Historical incident controls were removed from the GPT-OSS profile: prefill
+graphs, the normal decode capture ladder, 0.95 HBM utilization, overlap
+scheduling, and generated health probes now use upstream defaults. The
+universal sink-row fix and complete unfused decline remain correctness changes.
+Model/architecture/topology policy moved into a fail-closed profile validator,
+and gfx950/TP=4 grid tuning moved out of generic backend defaults.
+
+The [default-compatibility study](../studies/mi350x/2026-07-default-compatibility/README.md)
+records the unit, transition, serving, and paired performance evidence. It
+supersedes configuration requirements from the rebase reset, not the rebase's
+commit mapping or baseline measurements.

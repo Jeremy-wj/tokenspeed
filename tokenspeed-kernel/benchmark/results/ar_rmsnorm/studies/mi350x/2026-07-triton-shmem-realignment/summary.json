@@ -89,7 +89,7 @@
     "gpu_period_change_pct": 4.5
   },
   "campaign": {
-    "raw_root": "raw/full-campaign-alt-v3",
+    "raw_root": "studies/mi350x/2026-07-triton-shmem-realignment/raw/full-campaign-alt-v3",
     "method": "3 restart blocks x 5 paired seeds; hierarchical bootstrap; direct-M512 signature trace",
     "safe_pairs": 15,
     "median_tpot_change_pct": 3.746674218481461,

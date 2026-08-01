@@ -1,6 +1,6 @@
 # `triton_shmem` backend design and safety
 
-Updated: 2026-07-31
+Updated: 2026-08-01
 
 ## Scope
 
@@ -40,10 +40,18 @@ runtime/layers/layernorm.py
 State cache key:
 
 ```text
-(process_group identity, max_token_num, hidden_dim, dtype)
+(process_group identity, max_token_num, hidden_dim, dtype, device,
+ profile and allocation/synchronization policy)
 ```
 
-A different model hidden size creates a distinct state and symmetric allocation.
+A different model hidden size or any environment-owned lifetime policy creates
+a distinct state and symmetric allocation. Diagnostic overrides cannot reuse an
+incompatible state created earlier in the process.
+
+Known profiles are validated before any communication allocation. Core-v3
+requires gfx950, TP=4, hidden 2880, bf16, max-token cap 2048, HIP `1,2,5,6`,
+pure TP, and its exact ring/kernel/grid policy. Unknown profiles and known
+profile mismatches decline collectively to the complete unfused path.
 
 `TS_TRITON_SHMEM_FUSION_MAX_M` is a diagnostic performance eligibility gate
 independent of `max_token_num`; zero disables it. The former M=256 deployment
@@ -59,7 +67,8 @@ Kernel variants:
 
 At TP=4 or TP=8, the state is normally two-shot, while the call-level
 one-shot overlay handles small token counts. GPT-OSS core-v3 uses padded
-whole-row for M<=64, blocked one-shot through M384, and two-shot above M384.
+whole-row for M<=64, blocked one-shot through M384, and eager/standalone
+two-shot above M384. Captured production calls above M384 decline.
 
 ## Symmetric pointer translation
 
@@ -87,7 +96,10 @@ Required structure:
   fails.
 
 HIP IPC requires expandable allocator segments to remain disabled on the
-validated ROCm build.
+validated ROCm build. Export/open success is agreed across every rank. If any
+rank cannot use a coarse HIP-IPC allocation, all ranks use fine-grained
+symmetric memory for that and subsequent data buffers instead of mixing rank
+outcomes or hanging in rendezvous.
 
 ## Synchronization
 
@@ -109,7 +121,11 @@ retain it. Two-shot always retains its output-completion barrier. See the
 Eager two-shot may return state-owned outputs only when two symmetric
 norm/residual pairs are available. Calls alternate pairs to prevent the current
 residual input aliasing the next residual output. Captured and caller-owned
-output paths retain copy-out.
+output paths retain copy-out at the direct operator layer. Production
+triton-shmem dispatch is stricter: captured calls above core-v3's persistent
+M384 output-ring cap decline and capture the complete ordinary fallback. This
+prevents two-shot prefill graphs from retaining transient custom-kernel output
+pointers.
 
 The scalar signal-pad CAS uses system-scope release/acquire semantics.
 Multi-wave programs require workgroup barriers around that scalar operation.
@@ -133,9 +149,11 @@ different-M graph deadlocks, but measured fixed grids regress pure-TP latency.
 It is a robustness control for DP/speculative/overlapped execution, not a
 default optimization.
 
-The gfx950/ws4 selective compute cap activates at M>=256. It was validated in
-the GPT-OSS-120B campaign and remains environment-overridable. New model profiles
-must sweep their own widths and token ranges before treating it as optimal.
+The generic backend has no selective compute cap and defaults to separate
+barrier kernels. Core-v3 explicitly enables in-kernel barriers and a gfx950/TP=4
+compute cap of 128 at M>=256. New model profiles must sweep their own widths,
+token ranges, and divergence behavior before enabling either performance
+policy.
 
 ## Preserved invariants
 
@@ -163,12 +181,17 @@ must sweep their own widths and token ranges before treating it as optimal.
 - Two-slot/no-exit ring: even-call graph and shared multigraph tests pass, but
   later canonical serving faults; keep disabled pending graph-stable slot phase.
 - Profile-v2 site ring: eager wraparound, two interleaved 72-call graphs,
-  1000 transition replays, bounded serving, and 15/15 campaign pairs pass.
+  1000 transition replays, bounded serving, and 15/15 safety pairs pass.
 - Eager two-shot borrowed output: 72-site chained correctness plus
   M512/1024/2048 ping-pong and caller-output fallback pass.
 - Core-v3 padded whole-row: random correctness, two interleaved 72-call graphs,
-  18-test non-WS8 suite, 1000 transition replays, bounded serving, marker
-  profiles, and 15/15 campaign pairs pass. WS=8 is not core-v3-qualified.
+  20-test non-WS8 suite, 1000 transition replays, bounded serving, marker
+  profiles, and 15/15 restricted-campaign safety pairs pass. WS=8 is not
+  core-v3-qualified.
+- Default-compatible serving: normal prefill graphs (40 buckets through M2048),
+  normal decode capture, 0.95 HBM utilization, overlap scheduling, and generated
+  health probes complete the M128-M4096 prefill ladder plus long decode on the
+  qualified rank set. The dated compatibility study owns current measurements.
 
 Producer-direct inputs and any genericization of borrowed outputs or
 trailing-barrier removal require the separate

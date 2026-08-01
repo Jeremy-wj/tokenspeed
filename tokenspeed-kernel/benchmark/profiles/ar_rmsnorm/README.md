@@ -14,11 +14,25 @@ The profile emits
 `TS_TRITON_SHMEM_OUTPUT_RING=72`,
 `TS_TRITON_SHMEM_INPUT_SITE_RING=72`, and
 `TS_TRITON_SHMEM_BORROW_TWOSHOT_OUTPUT=1`. It selects padded whole-row decode
-for M<=64 with four warps and retains blocked/two-shot fallback above that.
-Campaign runs also validate the
-resolved server arguments; the profile ID alone does not hide command-line
-overrides. Core-v3 is capacity-promoted on qualified HIP `1,2,5,6` at +1.29%
-throughput and -0.80% median TPOT. Unfused remains the control and fallback.
+for M<=64 with four warps, blocked one-shot through M384, and eager two-shot
+above that. Captured calls above M384 use the complete ordinary fallback. The
+gfx950/TP=4 grid cap is profile-owned (`128` from M256), not a generic backend
+default.
+
+The profile does not override TokenSpeed's normal graph, memory, overlap, or
+health behavior. Prefill graphs, the default decode capture ladder, 0.95 HBM
+utilization, overlap scheduling, and standard generated health probes remain
+enabled. Campaign runs validate those resolved server arguments as well as
+architecture, topology, rank set, hidden size, dtype, token cap, rings, and
+kernel policy. A mismatch declines triton-shmem before state creation and uses
+the complete unfused path.
+
+Core-v3's original restricted promotion is historical. Default-compatible
+requalification did not promote, so explicit unfused is deployment default,
+control, and fallback. Base overlap remains supported; disablement is only the
+stable performance-measurement policy. The
+[live status](../../results/ar_rmsnorm/docs/gpt-oss-120b-status.md) owns metrics
+and deployment policy.
 
 Usage:
 
@@ -26,6 +40,7 @@ Usage:
 source benchmark/profiles/ar_rmsnorm/gpt_oss_120b_mi350x.env
 ENABLE_ALLREDUCE_FUSION=1 \
   bash benchmark/e2e_arnorm_serve.sh 4 1,2,5,6 2048 triton_shmem
+# Add --disable-overlap-schedule only for matched performance reproduction.
 ```
 
 For a new hidden size:

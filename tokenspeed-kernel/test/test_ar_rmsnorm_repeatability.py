@@ -90,32 +90,53 @@ def test_qualified_profile_proof_accepts_canonical_profile(tmp_path):
     serve_log = tmp_path / "serve.log"
     serve_log.write_text(
         "RUN_ENV PROFILE_ID=gpt-oss-120b-mi350x-triton-core-v3 "
-        "DEEP_HEALTH_MODE=passive FOLD_COPYIN=0 SHMEM_OUTPUT_RING=72 "
+        "PROFILE_PURE_TP=1 HVD=1,2,5,6 CAP=2048 "
+        "DEEP_HEALTH_MODE=generate COARSE=1 FOLD_COPYIN=0 WORKGROUP_SYNC=1 "
+        "SHMEM_OUTPUT_RING=72 "
         "INPUT_SITE_RING=72 BORROW_TWOSHOT_OUTPUT=1 "
+        "INKERNEL=1 ONESHOT_MAX_M=384 GRID_CAP=128 GRID_CAP_MIN_M=256 "
         "ONESHOT_VARIANT=padded PADDED_MAX_M=64 ONESHOT_NUM_WARPS=4 "
-        "DOUBLE_BUFFER_INPUT=0 BARRIER_GRID=0 FORWARD_MARKERS=1\n"
-        "ServerArgs(gpu_memory_utilization=0.9, "
-        "cudagraph_capture_sizes=[32], disable_prefill_graph=True, "
-        "disable_overlap_schedule=True)\n",
+        "DOUBLE_BUFFER_INPUT=0 BARRIER_GRID=0 FUSION_MAX_M=0 "
+        "FORWARD_MARKERS=1\n"
+        "ServerArgs(gpu_memory_utilization=0.95, "
+        "cudagraph_capture_sizes=None, disable_prefill_graph=False, "
+        "disable_overlap_schedule=False)\n"
+        "prefill breakable graph: captured buckets [16, 32, 2048]\n",
         encoding="utf-8",
     )
     assert _qualified_profile_proof(serve_log)["status"] == "passed"
+    serve_log.write_text(
+        serve_log.read_text(encoding="utf-8").replace(
+            "disable_overlap_schedule=False",
+            "disable_overlap_schedule=True",
+        ),
+        encoding="utf-8",
+    )
+    assert (
+        _qualified_profile_proof(serve_log, disable_overlap_schedule=True)["status"]
+        == "passed"
+    )
 
 
 def test_qualified_profile_proof_rejects_memory_override(tmp_path):
     serve_log = tmp_path / "serve.log"
     serve_log.write_text(
         "RUN_ENV PROFILE_ID=gpt-oss-120b-mi350x-triton-core-v3 "
-        "DEEP_HEALTH_MODE=passive FOLD_COPYIN=0 SHMEM_OUTPUT_RING=72 "
+        "PROFILE_PURE_TP=1 HVD=1,2,5,6 CAP=2048 "
+        "DEEP_HEALTH_MODE=generate COARSE=1 FOLD_COPYIN=0 WORKGROUP_SYNC=1 "
+        "SHMEM_OUTPUT_RING=72 "
         "INPUT_SITE_RING=72 BORROW_TWOSHOT_OUTPUT=1 "
+        "INKERNEL=1 ONESHOT_MAX_M=384 GRID_CAP=128 GRID_CAP_MIN_M=256 "
         "ONESHOT_VARIANT=padded PADDED_MAX_M=64 ONESHOT_NUM_WARPS=4 "
-        "DOUBLE_BUFFER_INPUT=0 BARRIER_GRID=0 FORWARD_MARKERS=1\n"
-        "ServerArgs(gpu_memory_utilization=0.95, "
-        "cudagraph_capture_sizes=[32], disable_prefill_graph=True, "
-        "disable_overlap_schedule=True)\n",
+        "DOUBLE_BUFFER_INPUT=0 BARRIER_GRID=0 FUSION_MAX_M=0 "
+        "FORWARD_MARKERS=1\n"
+        "ServerArgs(gpu_memory_utilization=0.9, "
+        "cudagraph_capture_sizes=None, disable_prefill_graph=False, "
+        "disable_overlap_schedule=False)\n"
+        "prefill breakable graph: captured buckets [16, 32, 2048]\n",
         encoding="utf-8",
     )
-    with pytest.raises(RuntimeError, match="gpu_memory_utilization=0.9"):
+    with pytest.raises(RuntimeError, match="gpu_memory_utilization=0.95"):
         _qualified_profile_proof(serve_log)
 
 
@@ -191,9 +212,7 @@ def test_parse_amd_smi_ignores_zero_usage_ghosts():
                     {
                         "process_info": {
                             "pid": 2,
-                            "memory_usage": {
-                                "vram_mem": {"value": 1_500_000_000}
-                            },
+                            "memory_usage": {"vram_mem": {"value": 1_500_000_000}},
                             "cu_occupancy": 0,
                         }
                     }
@@ -217,7 +236,8 @@ def test_partition_live_gpu_processes_preserves_transient_queries():
 
 
 def test_read_kfd_gpu_processes_is_nonintrusive(tmp_path):
-    process_dir = tmp_path / "100"
+    fake_pid = 999_999_999
+    process_dir = tmp_path / str(fake_pid)
     (process_dir / "stats_123").mkdir(parents=True)
     (process_dir / "vram_123").write_text("4096\n", encoding="utf-8")
     (process_dir / "stats_123" / "cu_occupancy").write_text(
@@ -227,7 +247,7 @@ def test_read_kfd_gpu_processes_is_nonintrusive(tmp_path):
     assert read_kfd_gpu_processes({2: 123}, root=tmp_path) == {
         2: [
             {
-                "pid": 100,
+                "pid": fake_pid,
                 "name": "",
                 "vram_bytes": 4096,
                 "cu_occupancy": 7,
@@ -334,10 +354,7 @@ def test_resume_requires_clean_gpu_guard_history(tmp_path):
     assert _gpu_guard_history_is_clean(tmp_path)
     with guard.open("a", encoding="utf-8") as handle:
         handle.write(
-            json.dumps(
-                {"unexpected_active_processes": {"1": [{"pid": 123}]}}
-            )
-            + "\n"
+            json.dumps({"unexpected_active_processes": {"1": [{"pid": 123}]}}) + "\n"
         )
     assert not _gpu_guard_history_is_clean(tmp_path)
     (tmp_path / "preflight.json").write_text(
@@ -416,10 +433,9 @@ def test_trace_signature_validation_distinguishes_gate(tmp_path):
     for rank in range(2):
         _write_trace(
             baseline_dir / f"baseline-TP{rank}.trace.json.gz",
-            [
-                "fused_ar_rmsnorm_oneshot_blocked_kernel",
-                "fused_ar_rmsnorm_twoshot_blocked_kernel",
-            ],
+            ["fused_ar_rmsnorm_oneshot_blocked_kernel"]
+            + ["iris_stage_one_shot_allreduce_kernel"]
+            + ["_rmsnorm_kernel"] * 73,
         )
     result = validate_trace_signatures(
         baseline_dir,
@@ -430,9 +446,10 @@ def test_trace_signature_validation_distinguishes_gate(tmp_path):
 
     gate_dir = tmp_path / "gate"
     gate_dir.mkdir()
-    gate_names = ["fused_ar_rmsnorm_oneshot_blocked_kernel"] + [
-        "_rmsnorm_kernel"
-    ] * 73
+    gate_names = [
+        "fused_ar_rmsnorm_oneshot_blocked_kernel",
+        "iris_stage_one_shot_allreduce_kernel",
+    ] + ["_rmsnorm_kernel"] * 73
     for rank in range(2):
         _write_trace(
             gate_dir / f"gate-TP{rank}.trace.json.gz",
@@ -461,12 +478,14 @@ def test_trace_signature_validation_distinguishes_post_rebase_backends(tmp_path)
             iris_dir / f"iris-TP{rank}.trace.json.gz",
             ["iris_allreduce_residual_rmsnorm_kernel"],
         )
-    assert validate_trace_signatures(
-        unfused_dir, world_size=2, arm=unfused
-    )["status"] == "passed"
-    assert validate_trace_signatures(
-        iris_dir, world_size=2, arm=iris
-    )["status"] == "passed"
+    assert (
+        validate_trace_signatures(unfused_dir, world_size=2, arm=unfused)["status"]
+        == "passed"
+    )
+    assert (
+        validate_trace_signatures(iris_dir, world_size=2, arm=iris)["status"]
+        == "passed"
+    )
 
 
 def _write_arm(
@@ -497,15 +516,9 @@ def _write_arm(
         "decode",
     ):
         for seed in (0, 1):
-            baseline = {
-                metric: 100.0
-                for metric in METRICS
-            }
+            baseline = {metric: 100.0 for metric in METRICS}
             baseline["output_throughput"] = 1000.0
-            payload = {
-                key: value * multiplier
-                for key, value in baseline.items()
-            }
+            payload = {key: value * multiplier for key, value in baseline.items()}
             (results / f"{workload}-seed{seed}.json").write_text(
                 json.dumps(payload),
                 encoding="utf-8",

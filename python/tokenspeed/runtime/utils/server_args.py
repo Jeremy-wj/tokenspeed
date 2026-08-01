@@ -619,6 +619,47 @@ class ServerArgs:
                 "--enable-allreduce-fusion and --disable-allreduce-fusion "
                 "are mutually exclusive"
             )
+        arnorm_backend = os.environ.get("TS_ARNORM_BACKEND", "auto").strip().lower()
+        if arnorm_backend not in {
+            "auto",
+            "triton_shmem",
+            "iris",
+            "symm_mem",
+        }:
+            raise ValueError(
+                "TS_ARNORM_BACKEND must be auto, triton_shmem, iris, or "
+                f"symm_mem; got {arnorm_backend!r}"
+            )
+        profile_id = os.environ.get("AR_NORM_PROFILE_ID", "").strip()
+        if arnorm_backend == "triton_shmem":
+            incompatible: list[str] = []
+            if self.mapping.nnodes != 1:
+                incompatible.append("multi-node mapping")
+            if not self.mapping.has_attn_tp:
+                incompatible.append("no attention tensor parallel group")
+            if self.mapping.has_attn_dp:
+                incompatible.append("attention data parallelism")
+            if self.speculative_algorithm is not None:
+                incompatible.append(
+                    f"speculative decoding ({self.speculative_algorithm})"
+                )
+            if (
+                profile_id == "gpt-oss-120b-mi350x-triton-core-v3"
+                and self.mapping.attn.tp_size != 4
+            ):
+                incompatible.append(
+                    f"profile requires TP=4, got {self.mapping.attn.tp_size}"
+                )
+            pure_tp = not incompatible
+            os.environ["TS_TRITON_SHMEM_PROFILE_PURE_TP"] = "1" if pure_tp else "0"
+            if incompatible:
+                self.enable_allreduce_fusion = False
+                self.disable_allreduce_fusion = True
+                logger.warning(
+                    "Declined triton_shmem allreduce fusion before model "
+                    "initialization (%s); using the complete unfused path",
+                    ", ".join(incompatible),
+                )
         # Auto-enable allreduce fusion on supported single-node TP configurations.
         platform = current_platform()
         if (
@@ -762,8 +803,7 @@ class ServerArgs:
             nargs="?",
             metavar="model",
             default=None,
-            help="The model name or path (positional argument). "
-            "Equivalent to --model.",
+            help="The model name or path (positional argument). Equivalent to --model.",
         )
         parser.add_argument(
             "--model",
@@ -1499,9 +1539,7 @@ class ServerArgs:
             "--deepseek-v4-prefill-chunk-size",
             type=int,
             default=ServerArgs.deepseek_v4_prefill_chunk_size,
-            help=(
-                "Maximum number of requests per DeepSeek V4 FlashMLA prefill " "chunk."
-            ),
+            help=("Maximum number of requests per DeepSeek V4 FlashMLA prefill chunk."),
         )
         parser.add_argument(
             "--grammar-backend",
@@ -2063,8 +2101,7 @@ class PortArgs:
     def init_new(server_args: ServerArgs, dp_rank: int | None = None) -> "PortArgs":
         # DP attention. Use TCP + port to handle both single-node and multi-node.
         local_auto_cluster = (
-            server_args.mapping.nnodes == 1
-            and server_args.dist_init_addr is None
+            server_args.mapping.nnodes == 1 and server_args.dist_init_addr is None
         )
         if local_auto_cluster:
             # Only use default port fallback when dp_size == 1

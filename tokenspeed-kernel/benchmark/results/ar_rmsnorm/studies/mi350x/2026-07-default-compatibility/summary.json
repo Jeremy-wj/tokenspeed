@@ -1,0 +1,107 @@
+{
+  "date": "2026-08-01",
+  "status": "safe_default_compatible_clean_no_overlap_not_promoted",
+  "comparison_base": "local upstream/main 3f88dcc2575af30eb44ef02448ee880ebcc40f25",
+  "profile": "gpt-oss-120b-mi350x-triton-core-v3",
+  "topology": {
+    "world_size": 4,
+    "hip_visible_devices": "1,2,5,6",
+    "physical_gpus": [
+      0,
+      2,
+      4,
+      6
+    ],
+    "world_size_8_qualified": false
+  },
+  "restored_defaults": {
+    "gpu_memory_utilization": 0.95,
+    "prefill_graph": true,
+    "decode_capture_sizes": "automatic",
+    "overlap_schedule": true,
+    "deep_health_mode": "generate"
+  },
+  "safety": {
+    "unit_tests_passed": 135,
+    "non_world_size_8_communication_tests_passed": 20,
+    "transition_replays": 1000,
+    "captured_transition_graphs": 9,
+    "transition_operations_checked_per_rank": 1652,
+    "transition_failed_steps": 0,
+    "fused_full_ladder_workloads": 7,
+    "fused_completed_requests_per_workload": 128,
+    "fused_failed_requests": 0,
+    "unfused_full_ladder_workloads": 7,
+    "unfused_completed_requests_per_workload": 128,
+    "unfused_failed_requests": 0
+  },
+  "performance": {
+    "comparison": "triton_shmem versus explicit upstream-unfused",
+    "policy": "matched --disable-overlap-schedule performance policy; base overlap remains supported",
+    "blocks": 3,
+    "pairs": 15,
+    "output_throughput_percent": {
+      "mean": 0.4511063278925698,
+      "ci95_low": -0.04673816013766707,
+      "ci95_high": 0.9156903725652773
+    },
+    "median_tpot_percent": {
+      "mean": -0.5079869890596264,
+      "ci95_low": -0.9009497196527128,
+      "ci95_high": -0.06315958116389335
+    },
+    "mean_tpot_percent": {
+      "mean": -0.48146407125348717,
+      "ci95_low": -0.9313409471344796,
+      "ci95_high": 0.010907743255560801
+    },
+    "capacity_promoted": false,
+    "latency_promoted": false,
+    "reason": "The clean no-overlap campaign is stable and improves median TPOT with CI excluding zero, but throughput is below the +1% capacity threshold with CI crossing zero and latency does not reach the -1.5% objective."
+  },
+  "overlap_diagnostic": {
+    "path": "raw/current/gpt-oss-120b/mi350x/2026-08-01/2026-08-01-stable-default-qualification",
+    "output_throughput_percent": {
+      "mean": -0.6344489759546283,
+      "ci95_low": -10.203636049844079,
+      "ci95_high": 10.13961209105065
+    },
+    "median_tpot_percent": {
+      "mean": 4.748241371904746,
+      "ci95_low": -1.6293602223210302,
+      "ci95_high": 13.809977978794775
+    },
+    "note": "Overlap-on 15-pair diagnostic; fresh servers occupied distinct approximately 29 s and 37 s modes in both arms."
+  },
+  "historical_evidence": {
+    "noisy_overlap_on_qualification": {
+      "path": "raw/current/gpt-oss-120b/mi350x/2026-07-31/2026-07-31-compat-captured-fallback-qualification",
+      "disposition": "superseded noisy evidence; not used for live conclusions"
+    },
+    "pre_decline_supporting": {
+      "path": "raw/current/gpt-oss-120b/mi350x/2026-07-31/2026-07-31-compat-defaults-qualification-v2",
+      "disposition": "supporting only; source identity differs"
+    },
+    "overlap_stall_repro": "raw/current/gpt-oss-120b/mi350x/2026-08-01/serving-repros/compat-overlap-stall-repro",
+    "overlap_off_control": "raw/current/gpt-oss-120b/mi350x/2026-08-01/serving-repros/compat-no-overlap-control"
+  },
+  "perfetto": {
+    "steps": 32,
+    "ranks": 4,
+    "fused_oneshot_signatures_per_rank": 2232,
+    "unfused_iris_allreduce_signatures_per_rank": 2190,
+    "unfused_rccl_signatures_per_rank": 4704,
+    "unfused_rmsnorm_signatures_per_rank": 2336
+  },
+  "raw_evidence": {
+    "narrow_prefill_graph_smoke": "raw/current/gpt-oss-120b/mi350x/2026-07-31/serving-repros/compat-prefill-graph-128-256",
+    "fused_full_ladder": "raw/current/gpt-oss-120b/mi350x/2026-07-31/serving-repros/compat-defaults-full-captured-fallback",
+    "unfused_full_ladder": "raw/current/gpt-oss-120b/mi350x/2026-07-31/serving-repros/compat-defaults-unfused-full",
+    "base_default_screen": "raw/current/gpt-oss-120b/mi350x/2026-08-01/2026-08-01-stable-default-screen",
+    "base_default_qualification": "raw/current/gpt-oss-120b/mi350x/2026-08-01/2026-08-01-stable-default-qualification",
+    "paired_screen": "raw/current/gpt-oss-120b/mi350x/2026-08-01/2026-08-01-stable-no-overlap-screen-v2",
+    "paired_qualification": "raw/current/gpt-oss-120b/mi350x/2026-08-01/2026-08-01-stable-no-overlap-qualification",
+    "fused_perfetto": "raw/current/gpt-oss-120b/mi350x/2026-08-01/serving-repros/final-perfetto-fused/traces/repro-repeat0",
+    "unfused_perfetto": "raw/current/gpt-oss-120b/mi350x/2026-08-01/serving-repros/final-perfetto-unfused/traces/repro-repeat0"
+  }
+}

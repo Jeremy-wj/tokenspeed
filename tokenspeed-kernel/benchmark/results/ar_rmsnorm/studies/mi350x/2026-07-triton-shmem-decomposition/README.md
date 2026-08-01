@@ -13,9 +13,10 @@ tuning:
 - at M2048 both the core and integration overhead lost.
 
 The later [core-v3 study](../2026-07-triton-shmem-core-tuning/README.md)
-replaced the blocked decode core and superseded this study's fusion-off
-deployment conclusion on qualified HIP `1,2,5,6`. The stage accounting and
-closed-path conclusions remain valid for profile v2.
+replaced the blocked decode core and cleared capacity under restricted controls.
+[Default compatibility](../2026-07-default-compatibility/README.md) later
+restored fusion-off deployment. The stage accounting and closed-path
+conclusions remain valid for profile v2.
 
 Exact results are in [summary.json](summary.json). Raw probe output is local
 under `raw/` and Git-ignored.

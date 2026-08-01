@@ -173,6 +173,14 @@ separate lifetime contracts without reopening either incident. See the
 studies. Current deployment policy belongs in
 [GPT-OSS-120B status](gpt-oss-120b-status.md).
 
+The later default-compatibility pass restored 0.95 HBM utilization, the normal
+decode capture ladder, prefill graphs, overlap scheduling, and generated health
+probes. The complete M128-M4096 prefill ladder and long decode passed on the
+qualified rank set. This confirms those settings were conservative incident
+controls, not durable fixes; reserved-sink padding and graph-stable fused
+storage remain the actual safety requirements. The clean Aug 1 no-overlap
+campaign is the canonical paired decode evidence after restoration.
+
 ## Harness findings
 
 The investigation also exposed two independent startup-port races and one local
@@ -182,6 +190,7 @@ orchestration risk:
 - internal distributed ports used probe-then-release ephemeral clusters;
 - concurrent local diagnostics could restart the shared dedicated container.
 
-The launcher now defers the metrics-port choice, internal ports use a locked
-rotating non-ephemeral cluster, health waits fail on first fatal log signature,
-and the benchmark/reproducer share an exclusive GPU-campaign lock.
+The launcher now allocates engine, RL-control, metrics, and internal distributed
+ports from locked rotating non-ephemeral clusters. Health waits fail on the
+first fatal log signature, and the benchmark/reproducer share an exclusive
+GPU-campaign lock.

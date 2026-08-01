@@ -413,41 +413,40 @@ def _test_backend_registry(rank, world_size, device, group, ref_group):
     assert result.shape == inp.shape
 
 
-def _test_declined_arrms_fusion_falls_back(
-    rank, world_size, device, group, ref_group
-):
+def _test_declined_arrms_fusion_falls_back(rank, world_size, device, group, ref_group):
     import tokenspeed.runtime.layers.layernorm as layernorm_mod
-    from tokenspeed.runtime.layers.layernorm import RMSNorm
+    from tokenspeed.runtime.layers.layernorm import GemmaRMSNorm, RMSNorm
     from tokenspeed.runtime.utils.env import global_server_args_dict
 
     hidden = 2880
     tokens = 8
     global_server_args_dict["comm_fusion_max_num_tokens"] = 256
-    norm = RMSNorm(hidden).to(device=device, dtype=torch.bfloat16)
-    x = torch.full(
-        (tokens, hidden), rank + 1, dtype=torch.bfloat16, device=device
-    )
+    x = torch.full((tokens, hidden), rank + 1, dtype=torch.bfloat16, device=device)
     residual = torch.linspace(
         0, 1, tokens * hidden, dtype=torch.bfloat16, device=device
     ).reshape(tokens, hidden)
 
-    expected_x = x.clone()
-    dist.all_reduce(expected_x, group=ref_group)
-    expected_norm, expected_residual = norm(expected_x, residual)
-
     original = layernorm_mod.triton_allreduce_residual_rmsnorm
-    layernorm_mod.triton_allreduce_residual_rmsnorm = (
-        lambda **_: (None, None, None, None)
+    layernorm_mod.triton_allreduce_residual_rmsnorm = lambda **_: (
+        None,
+        None,
+        None,
+        None,
     )
     try:
-        actual_norm, actual_residual, _ = norm.forward_with_allreduce_fusion(
-            rank, group, x, residual
-        )
+        for norm_cls in (RMSNorm, GemmaRMSNorm):
+            norm = norm_cls(hidden).to(device=device, dtype=torch.bfloat16)
+            expected_x = x.clone()
+            dist.all_reduce(expected_x, group=ref_group)
+            expected_norm, expected_residual = norm(expected_x, residual)
+
+            actual_norm, actual_residual, _ = norm.forward_with_allreduce_fusion(
+                rank, group, x, residual
+            )
+            torch.testing.assert_close(actual_residual, expected_residual)
+            torch.testing.assert_close(actual_norm, expected_norm)
     finally:
         layernorm_mod.triton_allreduce_residual_rmsnorm = original
-
-    torch.testing.assert_close(actual_residual, expected_residual)
-    torch.testing.assert_close(actual_norm, expected_norm)
 
 
 # ---------------------------------------------------------------------------
@@ -530,7 +529,6 @@ WORLD_SIZES = [
 
 
 class TestCommOps:
-
     @pytest.mark.parametrize("world_size", WORLD_SIZES)
     def test_all_reduce(self, world_size):
         _run(world_size, _test_all_reduce)

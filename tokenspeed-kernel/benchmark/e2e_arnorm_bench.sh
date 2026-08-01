@@ -3,6 +3,9 @@
 # Usage: e2e_arnorm_bench.sh <label> <input_len> <output_len> <prompts> <concurrency> [seed] [extra args...]
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
+
 LBL="${1:?label}"
 IL="${2:?input length}"
 OL="${3:?output length}"
@@ -16,8 +19,9 @@ SERVED_MODEL_NAME="${SERVED_MODEL_NAME:-$(basename "$MODEL_PATH")}"
 MODEL_LABEL="${MODEL_LABEL:-$SERVED_MODEL_NAME}"
 HARDWARE_LABEL="${HARDWARE_LABEL:-unknown-hardware}"
 PORT="${PORT:-8100}"
-CONTAINER="${CONTAINER:-jeremwan-tokenspeed-profiler}"
-RESULT_ROOT="${AR_RMSNORM_RESULT_ROOT:-/home/jeremwan/tokenspeed/tokenspeed-kernel/benchmark/results/ar_rmsnorm/raw}"
+CONTAINER="${CONTAINER:-${TOKENSPEED_CONTAINER:-jeremwan-tokenspeed-profiler}}"
+CONTAINER_REPO_ROOT="${CONTAINER_REPO_ROOT:-${REPO_ROOT}}"
+RESULT_ROOT="${AR_RMSNORM_RESULT_ROOT:-${SCRIPT_DIR}/results/ar_rmsnorm/raw}"
 RUN_DATE="${RUN_DATE:-$(date -u +%F)}"
 RUN_ROOT="${RUN_ROOT:-${RESULT_ROOT}/runs/${MODEL_LABEL}/${HARDWARE_LABEL}/${RUN_DATE}}"
 LOG_DIR="${LOG_DIR:-${RUN_ROOT}/logs}"
@@ -26,8 +30,8 @@ LOG="${LOG_DIR}/bench-${SAFE_LBL}-seed${SEED}.log"
 
 mkdir -p "$LOG_DIR"
 echo "===== [${LBL}] model=${MODEL_LABEL} in=${IL} out=${OL} n=${NP} conc=${CC} seed=${SEED} ====="
-docker exec "$CONTAINER" bash -lc "cd /home/jeremwan/tokenspeed && \
-  PYTHONPATH=/home/jeremwan/tokenspeed/tokenspeed-kernel-amd/python:/home/jeremwan/tokenspeed/tokenspeed-kernel/python:/home/jeremwan/tokenspeed/python:${PYTHONPATH:-} \
+docker exec "$CONTAINER" bash -lc "cd '${CONTAINER_REPO_ROOT}' && \
+  PYTHONPATH='${CONTAINER_REPO_ROOT}/tokenspeed-kernel-amd/python:${CONTAINER_REPO_ROOT}/tokenspeed-kernel/python:${CONTAINER_REPO_ROOT}/python':${PYTHONPATH:-} \
   python -m tokenspeed.cli bench serve --backend openai --host 127.0.0.1 --port '${PORT}' \
     --model '${MODEL_PATH}' --served-model-name '${SERVED_MODEL_NAME}' \
     --dataset-name random --random-input-len '${IL}' --random-output-len '${OL}' \

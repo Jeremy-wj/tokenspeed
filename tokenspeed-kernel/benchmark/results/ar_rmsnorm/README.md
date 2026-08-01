@@ -5,14 +5,17 @@ triton-shmem into TokenSpeed and optimizes it against end-to-end model serving.
 
 ## Current checkpoint
 
-GPT-OSS-120B TP=4 on MI350X has passed parity for the capacity objective:
+GPT-OSS-120B TP=4 on MI350X is safe with base TokenSpeed defaults, but the
+default-compatible profile is not performance-promoted:
 
-- promote profile `gpt-oss-120b-mi350x-triton-core-v3` only on qualified HIP
-  `1,2,5,6` (physical GPUs `0,2,4,6`);
-- the 15-pair campaign measured **+1.29% output throughput** (95% CI +0.52% to
-  +2.08%) and **-0.80% median TPOT** (95% CI -1.42% to -0.25%);
-- retain explicit upstream-unfused with `--disable-allreduce-fusion` as the
-  control and fallback for every unqualified rank set or profile mismatch;
+- the final clean 15-pair no-overlap campaign measured +0.45% throughput and
+  -0.51% median TPOT; it did not clear capacity or latency promotion;
+- base overlap scheduling remains safe but is excluded from performance
+  qualification because fresh servers occupy distinct performance modes;
+- retain explicit upstream-unfused with `--disable-allreduce-fusion` as
+  deployment default, control, and fallback;
+- triton-shmem remains safety-qualified only on HIP `1,2,5,6` (physical GPUs
+  `0,2,4,6`);
 - WS=8 remains unqualified.
 
 The [GPT-OSS-120B status](docs/gpt-oss-120b-status.md) is the sole live
@@ -23,8 +26,10 @@ and incident findings remain valid engineering evidence.
 ## Evidence map
 
 - [Study index](studies/README.md) — all curated studies and their status.
+- [Default compatibility](studies/mi350x/2026-07-default-compatibility/README.md)
+  — restored base defaults, safety evidence, and current 15-pair decision.
 - [Core-v3 tuning](studies/mi350x/2026-07-triton-shmem-core-tuning/README.md) —
-  current qualification and promotion evidence.
+  historical restricted-configuration promotion evidence.
 - [Backend decomposition](studies/mi350x/2026-07-triton-shmem-decomposition/README.md)
   — stage accounting and closed optimization paths.
 - [Realignment](studies/mi350x/2026-07-triton-shmem-realignment/README.md) —

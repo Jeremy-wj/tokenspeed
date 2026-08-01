@@ -44,7 +44,7 @@ from tokenspeed.cli._proc import (
     wait_grpc_serving,
     wait_http_ready,
 )
-from tokenspeed.runtime.utils.network import get_free_port
+from tokenspeed.runtime.utils.network import get_free_port, get_free_port_cluster
 from tokenspeed.runtime.utils.process import kill_process_tree
 
 logger = logging.getLogger(__name__)
@@ -211,7 +211,11 @@ def _gateway_args_with_default_log_level(gateway_args: list[str]) -> list[str]:
     return [*gateway_args, "--log-level", DEFAULT_SMG_LOG_LEVEL]
 
 
-def _gateway_args_with_default_prometheus_port(gateway_args: list[str]) -> list[str]:
+def _gateway_args_with_default_prometheus_port(
+    gateway_args: list[str],
+    *,
+    default_port: int | None = None,
+) -> list[str]:
     """Bind the smg Prometheus exporter to a freshly allocated free port.
 
     smg's own default (``29000``) — and any *fixed* port — collides when
@@ -220,14 +224,15 @@ def _gateway_args_with_default_prometheus_port(gateway_args: list[str]) -> list[
     the bind panics with ``AddrInUse`` even though no process holds it).
     A dead metrics server makes the gateway exit during startup, the
     tokenizer registration job never runs, and the first request surfaces
-    ``tokenizer_not_found`` / ``no worker available``. Allocating a fresh
-    free port per launch (like the engine and control ports) avoids every
-    collision; callers that need a stable scrape target can still pass an
-    explicit ``--prometheus-port``.
+    ``tokenizer_not_found`` / ``no worker available``. The launcher supplies a
+    rotating locked non-ephemeral cluster for engine, control, and metrics;
+    standalone callers still receive a fresh free port. Callers that need a
+    stable scrape target can pass an explicit ``--prometheus-port``.
     """
     if "--prometheus-port" in gateway_args:
         return gateway_args
-    return [*gateway_args, "--prometheus-port", str(get_free_port())]
+    port = default_port if default_port is not None else get_free_port()
+    return [*gateway_args, "--prometheus-port", str(port)]
 
 
 def _user_model_id(gateway_args: list[str]) -> str | None:
@@ -435,7 +440,11 @@ def _gateway_args_with_defaults(
     return gateway_args
 
 
-def _add_rl_control_port(engine_args: list[str]) -> tuple[list[str], str]:
+def _add_rl_control_port(
+    engine_args: list[str],
+    *,
+    default_port: int | None = None,
+) -> tuple[list[str], str]:
     """Wire the in-engine RL control-plane port for the sidecar to proxy.
 
     The control plane is ungated (always on); ensure ``--rl-control-port``
@@ -446,7 +455,7 @@ def _add_rl_control_port(engine_args: list[str]) -> tuple[list[str], str]:
         idx = engine_args.index("--rl-control-port")
         port = int(engine_args[idx + 1])
         return engine_args, f"http://127.0.0.1:{port}"
-    port = get_free_port()
+    port = default_port if default_port is not None else get_free_port()
     return [*engine_args, "--rl-control-port", str(port)], (f"http://127.0.0.1:{port}")
 
 
@@ -573,11 +582,19 @@ async def run_smg(
             pass  # Windows: signal handlers via asyncio aren't supported. Out of scope.
 
     try:
-        engine_port = get_free_port()
+        port_base = get_free_port_cluster(
+            (0, 1, 2),
+            start=30_000,
+            end=32_760,
+            state_path="/tmp/tokenspeed-smg-port-cluster",
+        )
+        engine_port = port_base
 
         # Wire the in-engine RL control-plane port (always on). Must happen
         # before spawn_engine.
-        engine_args, rl_control_url = _add_rl_control_port(engine_args)
+        engine_args, rl_control_url = _add_rl_control_port(
+            engine_args, default_port=port_base + 1
+        )
 
         engine = await spawn_engine(engine_args, host="127.0.0.1", port=engine_port)
         engine_log = asyncio.create_task(_stream_to(engine, ENGINE_TAG))
@@ -595,7 +612,9 @@ async def run_smg(
         # Allocate the unreserved metrics port only after the engine and its
         # control ports are live. Allocating it during argv preprocessing left
         # a long TOCTOU window in which this launch could claim the same port.
-        gateway_args = _gateway_args_with_default_prometheus_port(gateway_args)
+        gateway_args = _gateway_args_with_default_prometheus_port(
+            gateway_args, default_port=port_base + 2
+        )
         gateway = await spawn_gateway(
             gateway_args, engine_host="127.0.0.1", engine_port=engine_port
         )

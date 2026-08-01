@@ -5,6 +5,8 @@
 #     <world_size> <visible_devices> <fusion_cap> <backend> [serve args...]
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
 MODE="${1:?profile mode}"
 WS="${2:?world size}"
 HVD="${3:?visible devices}"
@@ -14,8 +16,8 @@ shift 5
 
 MODEL_LABEL="${MODEL_LABEL:?source an AR+RMSNorm model profile}"
 HARDWARE_LABEL="${HARDWARE_LABEL:-unknown-hardware}"
-export CONTAINER="${CONTAINER:-jeremwan-tokenspeed-profiler}"
-RESULT_ROOT="${AR_RMSNORM_RESULT_ROOT:-/home/jeremwan/tokenspeed/tokenspeed-kernel/benchmark/results/ar_rmsnorm/raw}"
+export CONTAINER="${CONTAINER:-${TOKENSPEED_CONTAINER:-jeremwan-tokenspeed-profiler}}"
+RESULT_ROOT="${AR_RMSNORM_RESULT_ROOT:-${SCRIPT_DIR}/results/ar_rmsnorm/raw}"
 RUN_DATE="${RUN_DATE:-$(date -u +%F)}"
 export RUN_ROOT="${RUN_ROOT:-${RESULT_ROOT}/runs/${MODEL_LABEL}/${HARDWARE_LABEL}/${RUN_DATE}}"
 PROFILE_ROOT="${PROFILE_ROOT:-${RUN_ROOT}/profiles/${MODE}}"

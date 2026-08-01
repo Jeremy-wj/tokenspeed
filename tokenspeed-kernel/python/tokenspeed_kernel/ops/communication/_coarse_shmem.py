@@ -89,7 +89,9 @@ def _export_handle(ptr: int) -> tuple[bytes, int]:
     base = ctypes.c_void_p()
     size = ctypes.c_size_t()
     _check(
-        _HIP.hipMemGetAddressRange(ctypes.byref(base), ctypes.byref(size), ctypes.c_void_p(ptr)),
+        _HIP.hipMemGetAddressRange(
+            ctypes.byref(base), ctypes.byref(size), ctypes.c_void_p(ptr)
+        ),
         "hipMemGetAddressRange",
     )
     handle = _hipIpcMemHandle()
@@ -106,7 +108,9 @@ def _open_base(raw: bytes, opened: dict[bytes, int]) -> int:
     ctypes.memmove(ctypes.byref(handle), raw, 64)
     out = ctypes.c_void_p()
     _check(
-        _HIP.hipIpcOpenMemHandle(ctypes.byref(out), handle, _HIP_IPC_LAZY_ENABLE_PEER_ACCESS),
+        _HIP.hipIpcOpenMemHandle(
+            ctypes.byref(out), handle, _HIP_IPC_LAZY_ENABLE_PEER_ACCESS
+        ),
         "hipIpcOpenMemHandle",
     )
     opened[raw] = out.value
@@ -152,21 +156,59 @@ def alloc_coarse_symm(
     rank = dist.get_rank(group)
     tensor = torch.empty(shape, dtype=dtype, device=device)
 
-    raw, offset = _export_handle(tensor.data_ptr())
+    try:
+        raw, offset = _export_handle(tensor.data_ptr())
+        local_export = {"handle": raw, "offset": offset, "error": None}
+    except Exception as exc:  # noqa: BLE001 - synchronize fallback across ranks
+        local_export = {
+            "handle": None,
+            "offset": None,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
     gathered: list = [None] * world_size
-    dist.all_gather_object(gathered, (raw, offset), group=group)
+    dist.all_gather_object(gathered, local_export, group=group)
+    export_errors = [
+        f"rank {rank}: {item['error']}"
+        for rank, item in enumerate(gathered)
+        if item["error"] is not None
+    ]
+    if export_errors:
+        raise RuntimeError(
+            "coarse HIP-IPC export failed on one or more ranks: "
+            + "; ".join(export_errors)
+        )
 
     opened = _opened_cache if _opened_cache is not None else {}
-    my_bases_before = set(opened.values())
+    opened_keys_before = set(opened)
     peer_ptrs: list[int] = []
-    for peer in range(world_size):
-        if peer == rank:
-            peer_ptrs.append(tensor.data_ptr())
-            continue
-        praw, poff = gathered[peer]
-        peer_ptrs.append(_open_base(praw, opened) + poff)
+    local_open_error = None
+    try:
+        for peer in range(world_size):
+            if peer == rank:
+                peer_ptrs.append(tensor.data_ptr())
+                continue
+            item = gathered[peer]
+            peer_ptrs.append(_open_base(item["handle"], opened) + item["offset"])
+    except Exception as exc:  # noqa: BLE001 - synchronize fallback across ranks
+        local_open_error = f"{type(exc).__name__}: {exc}"
 
-    newly_opened = [b for b in opened.values() if b not in my_bases_before]
+    open_errors: list = [None] * world_size
+    dist.all_gather_object(open_errors, local_open_error, group=group)
+    failed_opens = [
+        f"rank {rank}: {error}"
+        for rank, error in enumerate(open_errors)
+        if error is not None
+    ]
+    newly_opened_keys = set(opened) - opened_keys_before
+    if failed_opens:
+        for key in newly_opened_keys:
+            _HIP.hipIpcCloseMemHandle(ctypes.c_void_p(opened.pop(key)))
+        raise RuntimeError(
+            "coarse HIP-IPC open failed on one or more ranks: "
+            + "; ".join(failed_opens)
+        )
+
+    newly_opened = [opened[key] for key in newly_opened_keys]
     return CoarseSymmBuffer(
         tensor=tensor,
         peer_ptrs_dev=torch.tensor(peer_ptrs, dtype=torch.uint64, device=device),
