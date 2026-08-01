@@ -1,0 +1,94 @@
+{
+  "date": "2026-08-01",
+  "decision": {
+    "candidate": "glm-5.2-fp8-mi350x-triton-v1",
+    "deployment_default": "upstream_unfused",
+    "performance_promoted": false,
+    "reason": "The fused operator is faster, but the five-pair one-restart serving screen measured a +0.59% mean TPOT regression and is not promotion-eligible."
+  },
+  "environment": {
+    "container": "jeremwan-tokenspeed-profiler",
+    "image": "jeremwan/tokenspeed:rocm7.2.4-torch2.11-profiler",
+    "image_id": "sha256:04df0a0098e677846ecdd83981124c3e671cc5ea0361076ae88827ffe2bd2555",
+    "torch": "2.11.0+rocm7.2",
+    "hip_runtime": 70253211,
+    "rocprofiler_sdk": "1.1.0",
+    "scheduler": "tokenspeed-scheduler 0.1.3 rebuilt with TOKENSPEED_FLAT_KVCACHE=OFF",
+    "world_size": 8,
+    "visible_devices": "0,1,2,3,4,5,6,7"
+  },
+  "model": {
+    "name": "GLM-5.2-FP8",
+    "snapshot": "70311cfa0158cce7dd2cf5d2e04f68e3fdc3efc1",
+    "path": "/data/models/hf/hub/models--zai-org--GLM-5.2-FP8/snapshots/70311cfa0158cce7dd2cf5d2e04f68e3fdc3efc1",
+    "checkpoint_bytes": 755617140416,
+    "hidden_size": 6144,
+    "layers": 78,
+    "expected_fused_sites": 156,
+    "parallelism": "attention TP8, dense TP8, MoE EP8"
+  },
+  "operator": {
+    "shape": {
+      "M": 32,
+      "N": 6144,
+      "calls_per_graph": 156
+    },
+    "max_rank_median_us_per_site": {
+      "upstream_unfused": 35.37664046654334,
+      "iris_fused": 37.49464719723432,
+      "triton_v1": 31.976534770085262
+    },
+    "triton_v1_vs_unfused_pct": -9.61070391629854,
+    "transition_probe": {
+      "status": "pass",
+      "graph_replays": 1000,
+      "M_values": [1, 8, 16, 31, 32],
+      "ops_checked_per_rank": 1690,
+      "failed_steps": 0
+    }
+  },
+  "serving": {
+    "qualified_for_promotion": false,
+    "screening_policy": {
+      "max_model_len": 80000,
+      "max_num_seqs": 16,
+      "enforce_eager": true,
+      "deep_health": "passive",
+      "passive_health_stuck_seconds": 3600,
+      "kvstore_ratio": 0,
+      "comm_fusion_max_tokens": 32
+    },
+    "unfused_concurrency_16": {
+      "input_tokens_per_request": 128,
+      "output_tokens_per_request": 8,
+      "requests": 16,
+      "duration_seconds": 605.0497231670015,
+      "output_tokens_per_second": 0.2115528610277049,
+      "median_ttft_ms": 13187.897977004468,
+      "median_tpot_ms": 84551.39354885822
+    },
+    "paired_canary": {
+      "restart_blocks": 1,
+      "pairs": 5,
+      "input_tokens": 8,
+      "output_tokens": 2,
+      "concurrency": 1,
+      "paired_tpot_change_pct": [
+        1.2058319839270082,
+        1.63246495349374,
+        -1.9383697311018675,
+        0.7497610565760144,
+        1.2944577155602976
+      ],
+      "mean_tpot_change_pct": 0.5888291956910385,
+      "median_tpot_change_pct": 1.2058319839270082
+    }
+  },
+  "validation": {
+    "hip_event_query_capture": "pass",
+    "triton_shmem_communication": "23 passed",
+    "repeatability_harness": "22 passed",
+    "profile_specific_tests": "6 passed",
+    "full_site_graph_replays": 1000
+  }
+}

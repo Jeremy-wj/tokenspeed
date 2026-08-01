@@ -16,6 +16,7 @@ from benchmark.run_ar_rmsnorm_repeatability import (
     _assert_gpu_isolation,
     _bench_command,
     _gpu_guard_history_is_clean,
+    _model_profile_proof,
     _qualified_profile_proof,
     _run,
     _wait_for_health,
@@ -138,6 +139,30 @@ def test_qualified_profile_proof_rejects_memory_override(tmp_path):
     )
     with pytest.raises(RuntimeError, match="gpu_memory_utilization=0.95"):
         _qualified_profile_proof(serve_log)
+
+
+def test_model_profile_proof_accepts_generic_profile(tmp_path, monkeypatch):
+    model_path = "/models/glm-5.2"
+    monkeypatch.setenv("MODEL_PATH", model_path)
+    monkeypatch.setenv("MODEL_LABEL", "glm-5.2-fp8")
+    monkeypatch.setenv("HIDDEN_SIZE", "6144")
+    monkeypatch.setenv("AR_NORM_PROFILE_ID", "unqualified-manual")
+    serve_log = tmp_path / "serve.log"
+    serve_log.write_text(
+        "RUN_ENV MODEL=glm-5.2-fp8 HIDDEN=6144 "
+        "PROFILE_ID=unqualified-manual HVD=0,1,2,3,4,5,6,7 "
+        "WS=8 CAP=2048 FORWARD_MARKERS=1\n"
+        f"ServerArgs(model='{model_path}', enable_allreduce_fusion=False)\n",
+        encoding="utf-8",
+    )
+    proof = _model_profile_proof(
+        serve_log,
+        devices="0,1,2,3,4,5,6,7",
+        world_size=8,
+        cap=2048,
+    )
+    assert proof["status"] == "passed"
+    assert proof["model_path"] == model_path
 
 
 def test_wait_for_health_fails_fast_on_startup_error(tmp_path, monkeypatch):

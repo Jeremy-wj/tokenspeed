@@ -137,8 +137,6 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
     impl, block_n_override = _resolve_impl(requested_impl)
     if block_n_override is not None:
         os.environ["TS_TRITON_SHMEM_ONESHOT_BLOCK_N"] = str(block_n_override)
-    else:
-        os.environ.pop("TS_TRITON_SHMEM_ONESHOT_BLOCK_N", None)
     if impl in _FUSED_IMPLS:
         os.environ["TS_ARNORM_BACKEND"] = impl
     else:
@@ -276,7 +274,12 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
         # arm; Iris and native production paths must not depend on local state.
         from tokenspeed_kernel.ops.communication import triton_shmem as ts
 
-        state_key = (id(group), m, n, torch.bfloat16)
+        state_key = ts.triton_shmem_state_cache_key(
+            group,
+            m,
+            n,
+            torch.bfloat16,
+        )
         triton_shmem_state = ts.TRITON_SHMEM_AR_RMSNORM_STATES.get(state_key)
         if triton_shmem_state is None:
             raise RuntimeError("triton_shmem dispatcher state was not precreated")

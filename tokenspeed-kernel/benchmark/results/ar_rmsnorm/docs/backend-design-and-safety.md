@@ -50,8 +50,12 @@ incompatible state created earlier in the process.
 
 Known profiles are validated before any communication allocation. Core-v3
 requires gfx950, TP=4, hidden 2880, bf16, max-token cap 2048, HIP `1,2,5,6`,
-pure TP, and its exact ring/kernel/grid policy. Unknown profiles and known
-profile mismatches decline collectively to the complete unfused path.
+pure TP, and its exact ring/kernel/grid policy. GLM-5.2 profile v1 requires
+gfx950, TP=8, hidden 6144, bf16, max-token cap 32, all eight visible devices,
+156 input/output sites, and its exact padded-kernel policy. The GLM profile is
+operator- and eager-screen-qualified only; captured model serving remains
+unqualified. Unknown profiles and known profile mismatches decline collectively
+to the complete unfused path.
 
 `TS_TRITON_SHMEM_FUSION_MAX_M` is a diagnostic performance eligibility gate
 independent of `max_token_num`; zero disables it. The former M=256 deployment
@@ -192,6 +196,11 @@ policy.
   normal decode capture, 0.95 HBM utilization, overlap scheduling, and generated
   health probes complete the M128-M4096 prefill ladder plus long decode on the
   qualified rank set. The dated compatibility study owns current measurements.
+- GLM-5.2 profile v1: ws=8/N=6144 full 156-call M32 graph completed 1,000
+  replays; the five-M shared-state matrix completed 1,000 interleaved replays
+  and 1,690 checked operations/rank. Bounded eager serving resolved the exact
+  profile on all ranks and completed five canaries. Production graph serving
+  and restart-randomized performance qualification remain open.
 
 Producer-direct inputs and any genericization of borrowed outputs or
 trailing-barrier removal require the separate

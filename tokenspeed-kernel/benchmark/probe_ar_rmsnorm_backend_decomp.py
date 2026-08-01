@@ -875,6 +875,17 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
                 }
             )
         else:
+            use_input_site = (
+                triton_state._input_site_ring_size > 0
+                and m <= triton_state._input_site_max_m
+            )
+            needs_exit_barrier = not (
+                triton_state._double_buffer_input or use_input_site
+            )
+            use_output_ring = (
+                triton_state._output_ring_size > 0
+                and m <= triton_state._output_ring_max_m
+            )
             t_triton_core = _time_gpu(
                 lambda: _launch_triton_oneshot_core(
                     tk,
@@ -891,7 +902,7 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
                 group,
             )
             triton_state._barrier()
-            t_triton_kernel_sync = _time_gpu(
+            t_triton_kernel_entry = _time_gpu(
                 lambda: triton_state._run_oneshot(
                     triton_x,
                     input_bases,
@@ -906,6 +917,24 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
                     triton_residual,
                     False,
                     False,
+                ),
+                group,
+            )
+            t_triton_kernel_full = _time_gpu(
+                lambda: triton_state._run_oneshot(
+                    triton_x,
+                    input_bases,
+                    x,
+                    residual,
+                    weight,
+                    _EPS,
+                    m,
+                    _N,
+                    ws,
+                    triton_norm,
+                    triton_residual,
+                    False,
+                    needs_exit_barrier,
                 ),
                 group,
             )
@@ -938,55 +967,70 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
                 ref_norm,
                 ref_residual,
             )
-            triton_stage_sum = t_triton_copy + t_triton_kernel_sync
-            sync_derived = (
-                t_triton_prealloc
-                - t_triton_copy
-                - t_triton_core
+            entry_derived = t_triton_kernel_entry - t_triton_core
+            exit_derived = t_triton_kernel_full - t_triton_kernel_entry
+            triton_stage_sum = (
+                t_triton_copy + t_triton_core + entry_derived + exit_derived
             )
             row = _base_row(
                 backend="triton_shmem_realigned",
-                path=f"{triton_state._oneshot_kernel_for_m(m)}_site_ring",
+                path=(
+                    f"{triton_state._oneshot_kernel_for_m(m)}"
+                    + ("_site_ring" if use_input_site else "_persistent_input")
+                ),
                 transport="coarse_ipc_peer_pull",
                 ws=ws,
                 m=m,
             )
             row.update(
                 {
-                    "output_alloc_method": "model_profile_output_ring",
+                    "output_alloc_method": (
+                        "model_profile_output_ring"
+                        if use_output_ring
+                        else "per_call_empty_like"
+                    ),
                     "copy_in_ms": t_triton_copy,
-                    "copy_in_method": "direct_site_ring_copy",
-                    "entry_sync_ms": (
-                        sync_derived
+                    "copy_in_method": (
+                        "direct_site_ring_copy"
+                        if use_input_site
+                        else "direct_persistent_input_copy"
                     ),
-                    "entry_sync_method": (
-                        "derived_total_minus_copy_and_no_sync_core"
-                    ),
+                    "entry_sync_ms": entry_derived,
+                    "entry_sync_method": "full_entry_kernel_minus_no_sync_core",
                     "core_kernel_ms": t_triton_core,
                     "core_kernel_method": "direct_fused_kernel_no_sync_diagnostic",
-                    "comm_norm_kernel_ms": t_triton_kernel_sync,
+                    "comm_norm_kernel_ms": t_triton_kernel_full,
                     "comm_norm_kernel_method": (
-                        "direct_fused_kernel_including_entry_sync"
+                        "direct_fused_kernel_including_required_sync"
                     ),
-                    "exit_sync_method": "omitted_site_ring_delayed_reuse",
+                    "exit_sync_ms": exit_derived,
+                    "exit_sync_method": (
+                        "omitted_by_site_lifetime"
+                        if not needs_exit_barrier
+                        else "full_kernel_minus_entry_only_kernel"
+                    ),
                     "stage_sum_ms": triton_stage_sum,
                     "total_prealloc_ms": t_triton_prealloc,
                     "total_public_ms": t_triton_public,
                     "unaccounted_prealloc_ms": (
                         t_triton_prealloc - triton_stage_sum
                     ),
-                    "sync_derived_ms": (
-                        sync_derived
-                    ),
+                    "sync_derived_ms": entry_derived + exit_derived,
                     "sync_derived_method": (
-                        "total_prealloc_minus_copy_and_no_sync_core"
+                        "entry_and_exit_cumulative_kernel_differences"
                     ),
                     "marginal_copy_in_ms": t_triton_copy,
-                    "marginal_entry_sync_ms": sync_derived,
+                    "marginal_entry_sync_ms": entry_derived,
                     "marginal_comm_norm_ms": t_triton_core,
+                    "marginal_exit_sync_ms": exit_derived,
                     "marginal_sum_ms": t_triton_prealloc,
                     "notes": (
-                        "one-shot exit barrier omitted by 72-site delayed reuse"
+                        "one-shot exit barrier "
+                        + (
+                            "omitted by graph-stable input-site lifetime"
+                            if not needs_exit_barrier
+                            else "retained for persistent-input reuse"
+                        )
                     ),
                 }
             )

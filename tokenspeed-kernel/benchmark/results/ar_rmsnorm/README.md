@@ -18,6 +18,16 @@ default-compatible profile is not performance-promoted:
   `0,2,4,6`);
 - WS=8 remains unqualified.
 
+GLM-5.2-FP8 TP=8 has a validated operator-level candidate but no promotable
+serving baseline:
+
+- profile v1 improves the synthetic 156-call M32 graph by 9.61%;
+- its shared-state 1000-replay transition matrix passes on all eight MI350X;
+- the current AMD FP8 model stack measures only 0.212 output tokens/s in the
+  bounded concurrency-16 control;
+- retain explicit upstream-unfused until the model baseline, captured serving,
+  and full paired campaign are qualified.
+
 The [GPT-OSS-120B status](docs/gpt-oss-120b-status.md) is the sole live
 deployment and priority record. Earlier campaign decisions are dated evidence,
 not current policy. All pre-rebase performance results are legacy; their safety
@@ -38,6 +48,8 @@ and incident findings remain valid engineering evidence.
   upstream-unfused, Iris, and initial explicit-triton reset.
 - [Repeatability and incident study](studies/mi350x/2026-07-repeatability/README.md)
   — pre-rebase graph-lifetime root causes and qualification.
+- [GLM-5.2-FP8 baseline](studies/mi350x/2026-08-glm-5.2-fp8-baseline/README.md)
+  — WS=8/N=6144 characterization, bring-up incidents, and profile-v1 screen.
 
 ## Durable references
 
@@ -49,6 +61,7 @@ and incident findings remain valid engineering evidence.
 - [Serving root-cause record](docs/gpt-oss-120b-serving-root-cause.md)
 - [Upstream-main rebase record](docs/upstream-main-rebase-impact-2026-07.md)
 - [ROCm 7.2 migration and incidents](docs/history/rocm-7.2-migration-and-incidents.md)
+- [GLM-5.2-FP8 status](docs/glm-5.2-fp8-status.md)
 
 ## Artifact policy
 

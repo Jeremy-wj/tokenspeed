@@ -10,9 +10,10 @@ The runner is deliberately model-profiled and conservative:
 * all generated artifacts receive SHA256 checksums;
 * paired hierarchical bootstrap intervals preserve restart-block structure.
 
-The default post-rebase campaign compares Iris-first ``auto`` against the
-upstream-unfused TP=4/N=2880 control. ``--comparison triton_shmem`` evaluates
-the explicit local candidate against the same control. ``--stability-only``
+The default campaign compares Iris-first ``auto`` against an explicit
+upstream-unfused control. ``--comparison triton_shmem`` evaluates the explicit
+local candidate against the same control. Model identity, launch arguments, and
+artifact naming come from the sourced AR+RMSNorm profile. ``--stability-only``
 runs only the control and is the canonical residual-runtime gate. Use
 ``--dry-run`` to inspect the schedule without touching a server or GPU.
 """
@@ -42,13 +43,24 @@ from typing import Any, Iterable, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BENCHMARK_DIR = REPO_ROOT / "benchmark"
+MODEL_LABEL = os.environ.get("MODEL_LABEL", "gpt-oss-120b")
+HARDWARE_LABEL = os.environ.get("HARDWARE_LABEL", "mi350x")
 DEFAULT_RAW_ROOT = (
-    REPO_ROOT / "benchmark/results/ar_rmsnorm/raw/current/gpt-oss-120b/mi350x"
+    REPO_ROOT
+    / "benchmark/results/ar_rmsnorm/raw/current"
+    / MODEL_LABEL
+    / HARDWARE_LABEL
 )
 GPU_LOCK_PATH = Path("/tmp/tokenspeed-ar-rmsnorm-gpu.lock")
-SERVE_SCRIPT = BENCHMARK_DIR / "e2e_gptoss_serve.sh"
-BENCH_SCRIPT = BENCHMARK_DIR / "e2e_gptoss_bench.sh"
-TEARDOWN_SCRIPT = BENCHMARK_DIR / "e2e_gptoss_teardown.sh"
+SERVE_SCRIPT = BENCHMARK_DIR / "e2e_arnorm_serve.sh"
+BENCH_SCRIPT = BENCHMARK_DIR / "e2e_arnorm_bench.sh"
+TEARDOWN_SCRIPT = BENCHMARK_DIR / "e2e_arnorm_teardown.sh"
+PROFILE_ENV = Path(
+    os.environ.get(
+        "AR_NORM_PROFILE_FILE",
+        BENCHMARK_DIR / "profiles/ar_rmsnorm/gpt_oss_120b_mi350x.env",
+    )
+).resolve()
 
 
 @dataclass(frozen=True)
@@ -469,7 +481,7 @@ def _git_metadata() -> dict[str, Any]:
                 TEARDOWN_SCRIPT,
                 BENCHMARK_DIR / "e2e_arnorm_serve.sh",
                 BENCHMARK_DIR / "e2e_arnorm_bench.sh",
-                BENCHMARK_DIR / "profiles/ar_rmsnorm/gpt_oss_120b_mi350x.env",
+                PROFILE_ENV,
                 REPO_ROOT / "python/tokenspeed_kernel/ops/communication/triton.py",
                 REPO_ROOT
                 / "python/tokenspeed_kernel/ops/communication/triton_shmem.py",
@@ -1048,6 +1060,48 @@ def _qualified_profile_proof(
     }
 
 
+def _model_profile_proof(
+    serve_log: Path,
+    *,
+    devices: str,
+    world_size: int,
+    cap: int,
+) -> dict[str, Any]:
+    """Validate model/profile identity without claiming model-specific qualification."""
+    text = serve_log.read_text(encoding="utf-8", errors="replace")
+    run_env = next(
+        (line for line in text.splitlines() if line.startswith("RUN_ENV ")),
+        None,
+    )
+    if run_env is None:
+        raise RuntimeError(f"RUN_ENV missing from {serve_log}")
+    expected = {
+        "MODEL": os.environ.get("MODEL_LABEL"),
+        "HIDDEN": os.environ.get("HIDDEN_SIZE"),
+        "PROFILE_ID": os.environ.get("AR_NORM_PROFILE_ID"),
+        "HVD": devices,
+        "WS": str(world_size),
+        "CAP": str(cap),
+        "FORWARD_MARKERS": "1",
+    }
+    missing = [
+        f"{name}={value}"
+        for name, value in expected.items()
+        if value is None or f"{name}={value}" not in run_env
+    ]
+    model_path = os.environ.get("MODEL_PATH")
+    if model_path is None or f"model='{model_path}'" not in text:
+        missing.append(f"model={model_path!r}")
+    if missing:
+        raise RuntimeError(f"model profile proof missing {missing} from {serve_log}")
+    return {
+        "status": "passed",
+        "run_env": run_env,
+        "model_path": model_path,
+        "profile_file": str(PROFILE_ENV),
+    }
+
+
 def _write_checksums(root: Path) -> Path:
     checksum_path = root / "checksums.sha256"
     rows = []
@@ -1154,12 +1208,22 @@ def _start_phase(
         serve_log=phase_dir / f"serve-{label}.log",
     )
     if not args.dry_run:
-        if args.comparison in ("unfused", "iris", "triton_shmem"):
-            profile_proof = _qualified_profile_proof(
+        profile_proof = _model_profile_proof(
+            phase_dir / f"serve-{label}.log",
+            devices=args.devices,
+            world_size=args.world_size,
+            cap=args.cap,
+        )
+        if (
+            os.environ.get("AR_NORM_PROFILE_ID")
+            == "gpt-oss-120b-mi350x-triton-core-v3"
+            and args.comparison in ("unfused", "iris", "triton_shmem")
+        ):
+            profile_proof["qualified_profile"] = _qualified_profile_proof(
                 phase_dir / f"serve-{label}.log",
                 disable_overlap_schedule=args.disable_overlap_schedule,
             )
-            _write_json(phase_dir / "qualified-profile-proof.json", profile_proof)
+        _write_json(phase_dir / "model-profile-proof.json", profile_proof)
         _assert_gpu_isolation(
             phase_dir,
             container=args.container,
@@ -1856,6 +1920,12 @@ def _manifest(
         "created_at": _utc_now(),
         "run_root": str(args.run_root),
         "configuration": {
+            "model_path": os.environ["MODEL_PATH"],
+            "model_label": os.environ["MODEL_LABEL"],
+            "hidden_size": int(os.environ["HIDDEN_SIZE"]),
+            "hardware_label": os.environ["HARDWARE_LABEL"],
+            "profile_id": os.environ["AR_NORM_PROFILE_ID"],
+            "profile_file": str(PROFILE_ENV),
             "world_size": args.world_size,
             "comparison": args.comparison,
             "devices": args.devices,
@@ -1911,9 +1981,20 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--order-seed", type=int, default=20260727)
     parser.add_argument("--bootstrap-samples", type=int, default=10000)
     parser.add_argument("--bootstrap-seed", type=int, default=20260727)
-    parser.add_argument("--world-size", type=int, default=4)
-    parser.add_argument("--devices", default="1,2,5,6")
-    parser.add_argument("--cap", type=int, default=2048)
+    parser.add_argument(
+        "--world-size",
+        type=int,
+        default=int(os.environ.get("AR_NORM_WORLD_SIZE", "4")),
+    )
+    parser.add_argument(
+        "--devices",
+        default=os.environ.get("AR_NORM_DEVICES", "1,2,5,6"),
+    )
+    parser.add_argument(
+        "--cap",
+        type=int,
+        default=int(os.environ.get("COMM_FUSION_MAX_NUM_TOKENS", "2048")),
+    )
     parser.add_argument(
         "--barrier-grid",
         type=int,
@@ -1974,7 +2055,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--ignored-busy-gpus",
         type=_parse_csv_ints,
-        default=[3],
+        default=_parse_csv_ints(os.environ.get("AR_NORM_IGNORED_BUSY_GPUS", "3")),
         help="Physical AMD-SMI indices allowed to remain occupied.",
     )
     parser.add_argument("--skip-profiles", action="store_true")
@@ -1990,11 +2071,24 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
-    if os.environ.get("AR_NORM_PROFILE_ID") != "gpt-oss-120b-mi350x-triton-core-v3":
+    required_profile_env = (
+        "MODEL_PATH",
+        "MODEL_LABEL",
+        "HIDDEN_SIZE",
+        "HARDWARE_LABEL",
+        "AR_NORM_PROFILE_ID",
+        "AR_NORM_PROFILE_FILE",
+    )
+    missing_profile_env = [
+        name for name in required_profile_env if not os.environ.get(name)
+    ]
+    if missing_profile_env:
         parser.error(
-            "source benchmark/profiles/ar_rmsnorm/"
-            "gpt_oss_120b_mi350x.env before running this GPT-OSS campaign"
+            "source an AR+RMSNorm model profile before running; missing "
+            + ", ".join(missing_profile_env)
         )
+    if not PROFILE_ENV.is_file():
+        parser.error(f"AR_NORM_PROFILE_FILE does not exist: {PROFILE_ENV}")
     if args.blocks < 1:
         parser.error("--blocks must be positive")
     if args.bootstrap_samples < 100:

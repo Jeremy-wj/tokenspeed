@@ -43,8 +43,15 @@ def _write(path: Path, payload: dict) -> None:
 def _args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--label", required=True)
-    parser.add_argument("--devices", default="1,2,5,6")
-    parser.add_argument("--world-size", type=int, default=4)
+    parser.add_argument(
+        "--devices",
+        default=os.environ.get("AR_NORM_DEVICES", "1,2,5,6"),
+    )
+    parser.add_argument(
+        "--world-size",
+        type=int,
+        default=int(os.environ.get("AR_NORM_WORLD_SIZE", "4")),
+    )
     parser.add_argument(
         "--container",
         default=os.environ.get("TOKENSPEED_CONTAINER", "jeremwan-tokenspeed-profiler"),
@@ -55,6 +62,11 @@ def _args():
         default="triton_shmem",
     )
     parser.add_argument("--fusion", type=int, choices=(0, 1), default=1)
+    parser.add_argument(
+        "--cap",
+        type=int,
+        default=int(os.environ.get("COMM_FUSION_MAX_NUM_TOKENS", "2048")),
+    )
     parser.add_argument("--fusion-max-m", type=int, default=0)
     parser.add_argument("--double-buffer-input", type=int, choices=(0, 1), default=0)
     parser.add_argument(
@@ -88,13 +100,25 @@ def _args():
         help="Capture a bounded no-stack torch trace during the workload.",
     )
     parser.add_argument("--serve-extra-args", default="")
-    parser.add_argument("--ignored-busy-gpus", default="3")
+    parser.add_argument(
+        "--ignored-busy-gpus",
+        default=os.environ.get("AR_NORM_IGNORED_BUSY_GPUS", "3"),
+    )
     parser.add_argument("--run-root", type=Path)
     args = parser.parse_args()
-    if os.environ.get("AR_NORM_PROFILE_ID") != "gpt-oss-120b-mi350x-triton-core-v3":
+    required = (
+        "MODEL_PATH",
+        "MODEL_LABEL",
+        "HIDDEN_SIZE",
+        "HARDWARE_LABEL",
+        "AR_NORM_PROFILE_ID",
+        "AR_NORM_PROFILE_FILE",
+    )
+    missing = [name for name in required if not os.environ.get(name)]
+    if missing:
         parser.error(
-            "source benchmark/profiles/ar_rmsnorm/"
-            "gpt_oss_120b_mi350x.env before running this GPT-OSS reproducer"
+            "source an AR+RMSNorm model profile before running; missing "
+            + ", ".join(missing)
         )
     return args
 
@@ -116,7 +140,9 @@ def main() -> int:
     args.dry_run = False
     run_root = args.run_root or (
         REPO_ROOT
-        / "benchmark/results/ar_rmsnorm/raw/current/gpt-oss-120b/mi350x"
+        / "benchmark/results/ar_rmsnorm/raw/current"
+        / os.environ["MODEL_LABEL"]
+        / os.environ["HARDWARE_LABEL"]
         / datetime.now().strftime("%Y-%m-%d")
         / "serving-repros"
         / args.label
@@ -202,7 +228,7 @@ def main() -> int:
             str(SERVE_SCRIPT),
             str(args.world_size),
             args.devices,
-            "2048",
+            str(args.cap),
             args.backend,
             *shlex.split(args.serve_extra_args),
         ]
@@ -307,7 +333,7 @@ def main() -> int:
         summary["serve_proof"] = _serve_proof(
             run_root / f"serve-{args.label}.log",
             arm,
-            2048,
+            args.cap,
             args.barrier_grid,
             args.inkernel_barrier,
             engine_module,

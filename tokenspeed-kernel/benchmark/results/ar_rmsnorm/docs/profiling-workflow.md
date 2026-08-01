@@ -156,6 +156,13 @@ window identical.
 - gpt-oss compatibility wrappers: `benchmark/e2e_gptoss_*.sh`
 - Model profiles: `benchmark/profiles/ar_rmsnorm/`
 
+The GLM-5.2-FP8 profile is
+`benchmark/profiles/ar_rmsnorm/glm_5_2_fp8_mi350x.env`. Its current WS=8
+serving controls are diagnostic and model-specific; see the
+[GLM status](glm-5.2-fp8-status.md). The generic repeatability and reproducer
+paths derive model, artifact root, world size, device set, and fusion cap from
+the sourced profile.
+
 The generic serve, benchmark, profile, and teardown paths accept `CONTAINER` or
 `TOKENSPEED_CONTAINER`; the qualified lab value is
 `jeremwan-tokenspeed-profiler`. `CONTAINER_REPO_ROOT` overrides the repository

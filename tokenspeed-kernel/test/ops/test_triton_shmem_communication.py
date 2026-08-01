@@ -141,6 +141,50 @@ def test_core_v3_profile_validation_is_explicit(monkeypatch):
     assert "world_size=2 expected 4" in _profile_validation_errors(**kwargs)
 
 
+def test_glm52_v1_profile_validation_is_explicit(monkeypatch):
+    _skip_if_unsupported(1)
+    from tokenspeed_kernel.ops.communication.triton_shmem import (
+        _profile_validation_errors,
+    )
+
+    profile_env = {
+        "TS_TRITON_SHMEM_COARSE": "1",
+        "TS_TRITON_SHMEM_INKERNEL_BARRIER": "1",
+        "TS_TRITON_SHMEM_FOLD_COPYIN": "0",
+        "TS_TRITON_SHMEM_WORKGROUP_SYNC": "1",
+        "TS_TRITON_SHMEM_OUTPUT_RING": "156",
+        "TS_TRITON_SHMEM_INPUT_SITE_RING": "156",
+        "TS_TRITON_SHMEM_BORROW_TWOSHOT_OUTPUT": "0",
+        "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT": "0",
+        "TS_TRITON_SHMEM_ONESHOT_MAX_M": "32",
+        "TS_TRITON_SHMEM_ONESHOT_BLOCK_N": "0",
+        "TS_TRITON_SHMEM_ONESHOT_VARIANT": "padded",
+        "TS_TRITON_SHMEM_PADDED_MAX_M": "32",
+        "TS_TRITON_SHMEM_ONESHOT_NUM_WARPS": "4",
+        "TS_TRITON_SHMEM_TWOSHOT_BLOCK_N": "0",
+        "TS_TRITON_SHMEM_GRID_CAP": "0",
+        "TS_TRITON_SHMEM_GRID_CAP_MIN_M": "0",
+        "TS_TRITON_SHMEM_BARRIER_GRID": "0",
+        "TS_TRITON_SHMEM_FUSION_MAX_M": "0",
+        "TS_TRITON_SHMEM_PROFILE_PURE_TP": "1",
+    }
+    for name, value in profile_env.items():
+        monkeypatch.setenv(name, value)
+
+    kwargs = {
+        "profile_id": "glm-5.2-fp8-mi350x-triton-v1",
+        "arch": "gfx950",
+        "world_size": 8,
+        "max_token_num": 32,
+        "hidden_dim": 6144,
+        "dtype": torch.bfloat16,
+        "visible_devices": "0,1,2,3,4,5,6,7",
+    }
+    assert _profile_validation_errors(**kwargs) == []
+    kwargs["max_token_num"] = 2048
+    assert "max_token_num=2048 expected 32" in _profile_validation_errors(**kwargs)
+
+
 def _make_inputs(tokens, hidden, rank, device):
     # Each rank contributes rank+1 (sum across ranks = ws*(ws+1)/2); residual is
     # non-uniform (deterministic, identical across ranks -> replicated per TP)

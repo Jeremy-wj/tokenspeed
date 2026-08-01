@@ -90,6 +90,7 @@ logger = logging.getLogger(__file__)
 
 _platform = current_platform()
 _CORE_V3_PROFILE = "gpt-oss-120b-mi350x-triton-core-v3"
+_GLM52_V1_PROFILE = "glm-5.2-fp8-mi350x-triton-v1"
 _STATE_ENV_KEYS = (
     "AR_NORM_PROFILE_ID",
     "TS_TRITON_SHMEM_PROFILE_PURE_TP",
@@ -334,7 +335,7 @@ def _profile_validation_errors(
     """Return profile mismatches without allocating communication state."""
     if not profile_id or profile_id == "unqualified-manual":
         return []
-    if profile_id != _CORE_V3_PROFILE:
+    if profile_id not in {_CORE_V3_PROFILE, _GLM52_V1_PROFILE}:
         return [f"unknown AR_NORM_PROFILE_ID={profile_id!r}"]
 
     errors: list[str] = []
@@ -346,39 +347,70 @@ def _profile_validation_errors(
         "dtype": dtype,
         "visible_devices": visible_devices,
     }
-    expected = {
-        "arch": "gfx950",
-        "world_size": 4,
-        "max_token_num": 2048,
-        "hidden_dim": 2880,
-        "dtype": torch.bfloat16,
-        "visible_devices": "1,2,5,6",
-    }
+    if profile_id == _CORE_V3_PROFILE:
+        expected = {
+            "arch": "gfx950",
+            "world_size": 4,
+            "max_token_num": 2048,
+            "hidden_dim": 2880,
+            "dtype": torch.bfloat16,
+            "visible_devices": "1,2,5,6",
+        }
+        expected_env = {
+            "TS_TRITON_SHMEM_COARSE": "1",
+            "TS_TRITON_SHMEM_INKERNEL_BARRIER": "1",
+            "TS_TRITON_SHMEM_FOLD_COPYIN": "0",
+            "TS_TRITON_SHMEM_WORKGROUP_SYNC": "1",
+            "TS_TRITON_SHMEM_OUTPUT_RING": "72",
+            "TS_TRITON_SHMEM_INPUT_SITE_RING": "72",
+            "TS_TRITON_SHMEM_BORROW_TWOSHOT_OUTPUT": "1",
+            "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT": "0",
+            "TS_TRITON_SHMEM_ONESHOT_MAX_M": "384",
+            "TS_TRITON_SHMEM_ONESHOT_BLOCK_N": "0",
+            "TS_TRITON_SHMEM_ONESHOT_VARIANT": "padded",
+            "TS_TRITON_SHMEM_PADDED_MAX_M": "64",
+            "TS_TRITON_SHMEM_ONESHOT_NUM_WARPS": "4",
+            "TS_TRITON_SHMEM_TWOSHOT_BLOCK_N": "0",
+            "TS_TRITON_SHMEM_GRID_CAP": "128",
+            "TS_TRITON_SHMEM_GRID_CAP_MIN_M": "256",
+            "TS_TRITON_SHMEM_BARRIER_GRID": "0",
+            "TS_TRITON_SHMEM_FUSION_MAX_M": "0",
+            "TS_TRITON_SHMEM_PROFILE_PURE_TP": "1",
+        }
+    else:
+        expected = {
+            "arch": "gfx950",
+            "world_size": 8,
+            "max_token_num": 32,
+            "hidden_dim": 6144,
+            "dtype": torch.bfloat16,
+            "visible_devices": "0,1,2,3,4,5,6,7",
+        }
+        expected_env = {
+            "TS_TRITON_SHMEM_COARSE": "1",
+            "TS_TRITON_SHMEM_INKERNEL_BARRIER": "1",
+            "TS_TRITON_SHMEM_FOLD_COPYIN": "0",
+            "TS_TRITON_SHMEM_WORKGROUP_SYNC": "1",
+            "TS_TRITON_SHMEM_OUTPUT_RING": "156",
+            "TS_TRITON_SHMEM_INPUT_SITE_RING": "156",
+            "TS_TRITON_SHMEM_BORROW_TWOSHOT_OUTPUT": "0",
+            "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT": "0",
+            "TS_TRITON_SHMEM_ONESHOT_MAX_M": "32",
+            "TS_TRITON_SHMEM_ONESHOT_BLOCK_N": "0",
+            "TS_TRITON_SHMEM_ONESHOT_VARIANT": "padded",
+            "TS_TRITON_SHMEM_PADDED_MAX_M": "32",
+            "TS_TRITON_SHMEM_ONESHOT_NUM_WARPS": "4",
+            "TS_TRITON_SHMEM_TWOSHOT_BLOCK_N": "0",
+            "TS_TRITON_SHMEM_GRID_CAP": "0",
+            "TS_TRITON_SHMEM_GRID_CAP_MIN_M": "0",
+            "TS_TRITON_SHMEM_BARRIER_GRID": "0",
+            "TS_TRITON_SHMEM_FUSION_MAX_M": "0",
+            "TS_TRITON_SHMEM_PROFILE_PURE_TP": "1",
+        }
     for field, expected_value in expected.items():
         if actual[field] != expected_value:
             errors.append(f"{field}={actual[field]!r} expected {expected_value!r}")
 
-    expected_env = {
-        "TS_TRITON_SHMEM_COARSE": "1",
-        "TS_TRITON_SHMEM_INKERNEL_BARRIER": "1",
-        "TS_TRITON_SHMEM_FOLD_COPYIN": "0",
-        "TS_TRITON_SHMEM_WORKGROUP_SYNC": "1",
-        "TS_TRITON_SHMEM_OUTPUT_RING": "72",
-        "TS_TRITON_SHMEM_INPUT_SITE_RING": "72",
-        "TS_TRITON_SHMEM_BORROW_TWOSHOT_OUTPUT": "1",
-        "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT": "0",
-        "TS_TRITON_SHMEM_ONESHOT_MAX_M": "384",
-        "TS_TRITON_SHMEM_ONESHOT_BLOCK_N": "0",
-        "TS_TRITON_SHMEM_ONESHOT_VARIANT": "padded",
-        "TS_TRITON_SHMEM_PADDED_MAX_M": "64",
-        "TS_TRITON_SHMEM_ONESHOT_NUM_WARPS": "4",
-        "TS_TRITON_SHMEM_TWOSHOT_BLOCK_N": "0",
-        "TS_TRITON_SHMEM_GRID_CAP": "128",
-        "TS_TRITON_SHMEM_GRID_CAP_MIN_M": "256",
-        "TS_TRITON_SHMEM_BARRIER_GRID": "0",
-        "TS_TRITON_SHMEM_FUSION_MAX_M": "0",
-        "TS_TRITON_SHMEM_PROFILE_PURE_TP": "1",
-    }
     for name, expected_value in expected_env.items():
         actual_value = os.environ.get(name)
         if actual_value != expected_value:

@@ -48,3 +48,13 @@ evidence.
 
 Prefer each study's machine-readable summary for exact values. Raw logs, traces,
 and campaign trees under `raw/` are local and Git-ignored.
+
+## MI350X: GLM-5.2-FP8
+
+- [Initial WS=8 baseline](mi350x/2026-08-glm-5.2-fp8-baseline/README.md) —
+  N=6144 operator characterization, 156-site profile-v1 validation, model
+  bring-up incidents, and non-promotion serving screen.
+
+The [GLM-5.2-FP8 status](../docs/glm-5.2-fp8-status.md) is the live decision
+record for this model. GPT-OSS profile policy does not transfer across model,
+world size, hidden width, site count, or serving configuration.
