@@ -1,10 +1,14 @@
 {
   "date": "2026-08-01",
+  "updated": "2026-08-03",
   "decision": {
-    "candidate": "glm-5.2-fp8-mi350x-triton-v1",
+    "candidate": "glm-5.2-fp8-mi350x-triton-v2",
     "deployment_default": "upstream_unfused",
     "performance_promoted": false,
-    "reason": "The fused operator is faster, but the five-pair one-restart serving screen measured a +0.59% mean TPOT regression and is not promotion-eligible."
+    "report_focus": "captured operator graphs",
+    "reason": "Extended padded-kernel sweeps show triton-shmem is profitable for M=2 through M=42 when M1 declines to ordinary fallback. Current GLM serving is too immature to convert that operator result into a deployment claim.",
+    "successor": "../2026-08-glm-5.2-fp8-definitive-sweep/campaign.json",
+    "successor_status": "planned_not_run"
   },
   "environment": {
     "container": "jeremwan-tokenspeed-profiler",
@@ -28,22 +32,55 @@
     "parallelism": "attention TP8, dense TP8, MoE EP8"
   },
   "operator": {
-    "shape": {
-      "M": 32,
-      "N": 6144,
-      "calls_per_graph": 156
+    "artifacts": {
+      "csv": "graph-sweep.csv",
+      "json": "graph-sweep-summary.json",
+      "padded_extension": "padded-extension-summary.json"
     },
-    "max_rank_median_us_per_site": {
-      "upstream_unfused": 35.37664046654334,
-      "iris_fused": 37.49464719723432,
-      "triton_v1": 31.976534770085262
+    "matrix": {
+      "scope": "initial representative graph sweep",
+      "M_values": [1, 2, 4, 8, 16, 24, 32, 33, 42, 43, 48, 64, 96, 128, 256, 512],
+      "calls_per_graph": [1, 156],
+      "arms": ["upstream_unfused", "iris_fused", "triton_forced"],
+      "triton_policy": "padded through M32; superseded blocked diagnostic above M32",
+      "warmups": 50,
+      "replays_per_pass": 1000,
+      "successful_runs": 144
     },
-    "triton_v1_vs_unfused_pct": -9.61070391629854,
+    "profitable_window": {
+      "minimum_M": 2,
+      "maximum_M": 42,
+      "triton_vs_unfused_pct_range": [-20.91, -3.4],
+      "triton_vs_iris_pct_range": [-25.4, -13.32],
+      "forward_saving_ms_range": [0.216, 0.841]
+    },
+    "boundaries": {
+      "M1_best_triton_vs_unfused_pct": 31.35,
+      "M33_padded_triton_vs_unfused_pct": -9.53,
+      "ordinary_iris_max_M": 42,
+      "rccl_min_M": 43,
+      "M43_padded_triton_vs_unfused_pct": 25.55
+    },
+    "M1_dynamic_fix": {
+      "change": "do_not_specialize M in the padded kernel",
+      "ws4_dynamic_vs_specialized_pct": -21.83,
+      "ws4_dynamic_vs_unfused_pct": 3.92,
+      "ws4_dynamic_vs_iris_pct": -10.97,
+      "profile_v2_keeps_M1_fallback": true
+    },
+    "excluded": {
+      "M1024": "upstream-unfused single-site graph hit the ProcessGroupNCCL 480-second watchdog",
+      "M2048": "not attempted after the M1024 watchdog"
+    },
+    "retained_failures": [
+      "pass1 M32 156-site upstream-unfused eager correctness failure; isolated retry passed",
+      "pass2 M1 156-site upstream-unfused eager correctness failure; isolated retry passed"
+    ],
     "transition_probe": {
       "status": "pass",
       "graph_replays": 1000,
-      "M_values": [1, 8, 16, 31, 32],
-      "ops_checked_per_rank": 1690,
+      "M_values": [1, 2, 16, 32, 33, 40, 42],
+      "ops_checked_per_rank": 1649,
       "failed_steps": 0
     }
   },
@@ -86,9 +123,16 @@
   },
   "validation": {
     "hip_event_query_capture": "pass",
-    "triton_shmem_communication": "23 passed",
+    "triton_shmem_communication": "25 passed",
     "repeatability_harness": "22 passed",
     "profile_specific_tests": "6 passed",
-    "full_site_graph_replays": 1000
+    "full_site_graph_replays_per_pass": 1000,
+    "graph_sweep_successful_runs": 144,
+    "padded_extension_successful_graph_runs": 58,
+    "profile_v2_transition_replays": 1000,
+    "profile_v2_failed_transition_steps": 0,
+    "M1_fix_transition_replays_ws4": 70,
+    "M1_fix_failed_transition_steps_ws4": 0,
+    "order_opposed_confirmation": true
   }
 }

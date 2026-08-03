@@ -28,6 +28,7 @@ def _env_int(name: str, default: int) -> int:
 
 _M = _env_int("BENCH_M", 32)
 _N = _env_int("BENCH_N", 2880)
+_WS = _env_int("BENCH_WS", 4)
 _CALLS = _env_int("BENCH_CALLS_PER_GRAPH", 72)
 _WARM = _env_int("BENCH_GRAPH_N_WARMUP", 30)
 _REP = _env_int("BENCH_GRAPH_N_REPEAT", 1000)
@@ -86,7 +87,7 @@ def _time_graph_us(
 
 def _make_row(backend: str, path: str, **values) -> dict:
     row = {
-        "world_size": 4,
+        "world_size": _WS,
         "M": _M,
         "N": _N,
         "calls_per_graph": _CALLS,
@@ -440,7 +441,7 @@ def _write_csv(path: str, rows: list[dict]) -> None:
 
 
 def main() -> None:
-    ws = _env_int("BENCH_WS", 4)
+    ws = _WS
     manager = mp.Manager()
     out = manager.list()
     mp.spawn(_worker, args=(ws, _port(), out), nprocs=ws, join=True)

@@ -3,35 +3,26 @@
 This project integrates fused all-reduce + residual-add + RMSNorm from
 triton-shmem into TokenSpeed and optimizes it against end-to-end model serving.
 
-## Current checkpoint
+## Current checkpoints
 
-GPT-OSS-120B TP=4 on MI350X is safe with base TokenSpeed defaults, but the
-default-compatible profile is not performance-promoted:
+Each model has one live decision page. Dated studies supply evidence but do not
+override those pages.
 
-- the final clean 15-pair no-overlap campaign measured +0.45% throughput and
-  -0.51% median TPOT; it did not clear capacity or latency promotion;
-- base overlap scheduling remains safe but is excluded from performance
-  qualification because fresh servers occupy distinct performance modes;
-- retain explicit upstream-unfused with `--disable-allreduce-fusion` as
-  deployment default, control, and fallback;
-- triton-shmem remains safety-qualified only on HIP `1,2,5,6` (physical GPUs
-  `0,2,4,6`);
-- WS=8 remains unqualified.
+### GPT-OSS-120B
 
-GLM-5.2-FP8 TP=8 has a validated operator-level candidate but no promotable
-serving baseline:
+The [GPT-OSS-120B status](docs/gpt-oss-120b-status.md) owns TP=4 policy on
+MI350X. Core-v3 is safe on HIP `1,2,5,6`, but its default-compatible campaign
+did not clear the latency or capacity promotion gates. Explicit
+upstream-unfused remains the deployment default and WS=8 remains unqualified.
 
-- profile v1 improves the synthetic 156-call M32 graph by 9.61%;
-- its shared-state 1000-replay transition matrix passes on all eight MI350X;
-- the current AMD FP8 model stack measures only 0.212 output tokens/s in the
-  bounded concurrency-16 control;
-- retain explicit upstream-unfused until the model baseline, captured serving,
-  and full paired campaign are qualified.
+### GLM-5.2-FP8
 
-The [GPT-OSS-120B status](docs/gpt-oss-120b-status.md) is the sole live
-deployment and priority record. Earlier campaign decisions are dated evidence,
-not current policy. All pre-rebase performance results are legacy; their safety
-and incident findings remain valid engineering evidence.
+The [GLM-5.2-FP8 status](docs/glm-5.2-fp8-status.md) owns TP=8 policy on
+MI350X. Captured 156-site graphs establish a diagnostic profile-v2 opportunity
+at M=2-42, with ordinary fallback at M=1 and M>=43. This is operator evidence,
+not a serving claim; explicit upstream-unfused remains the deployment default.
+A [definitive cross-world-size sweep](studies/mi350x/2026-08-glm-5.2-fp8-definitive-sweep/README.md)
+is specified but has not been run.
 
 ## Evidence map
 
@@ -49,17 +40,19 @@ and incident findings remain valid engineering evidence.
 - [Repeatability and incident study](studies/mi350x/2026-07-repeatability/README.md)
   — pre-rebase graph-lifetime root causes and qualification.
 - [GLM-5.2-FP8 baseline](studies/mi350x/2026-08-glm-5.2-fp8-baseline/README.md)
-  — WS=8/N=6144 characterization, bring-up incidents, and profile-v1 screen.
+  — WS=8/N=6144 profile-v2 characterization and validation.
+- [GLM-5.2-FP8 definitive sweep](studies/mi350x/2026-08-glm-5.2-fp8-definitive-sweep/README.md)
+  — unrun WS=2/4/8 campaign contract and reporting layout.
 
 ## Durable references
 
 - [Backend design and safety](docs/backend-design-and-safety.md)
-- [Producer and buffer lifetime contract](docs/producer-lifetime-contract.md)
+- [GPT-OSS producer and buffer lifetime contract](docs/producer-lifetime-contract.md)
 - [Benchmarking and promotion methodology](docs/benchmark-methodology-recommendations-2026-07.md)
 - [Profiling and campaign workflow](docs/profiling-workflow.md)
 - [Remaining integration roadmap](docs/integration-optimization-roadmap-2026-07.md)
-- [Serving root-cause record](docs/gpt-oss-120b-serving-root-cause.md)
-- [Upstream-main rebase record](docs/upstream-main-rebase-impact-2026-07.md)
+- [GPT-OSS serving root-cause record](docs/gpt-oss-120b-serving-root-cause.md)
+- [GPT-OSS upstream-main rebase record](docs/upstream-main-rebase-impact-2026-07.md)
 - [ROCm 7.2 migration and incidents](docs/history/rocm-7.2-migration-and-incidents.md)
 - [GLM-5.2-FP8 status](docs/glm-5.2-fp8-status.md)
 

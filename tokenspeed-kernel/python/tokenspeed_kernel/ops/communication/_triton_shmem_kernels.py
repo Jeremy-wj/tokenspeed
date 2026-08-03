@@ -402,7 +402,7 @@ def fused_ar_rmsnorm_twoshot_blocked_kernel(
             tl.debug_barrier()
 
 
-@triton.jit
+@triton.jit(do_not_specialize=["M"])
 def fused_ar_rmsnorm_oneshot_wholerow_padded_kernel(
     input,
     output,

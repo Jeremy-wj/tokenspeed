@@ -1,6 +1,6 @@
 # `triton_shmem` backend design and safety
 
-Updated: 2026-08-01
+Updated: 2026-08-03
 
 ## Scope
 
@@ -9,7 +9,9 @@ This is the implementation and safety reference for the explicit local
 deployment policy. Selection requires `TS_ARNORM_BACKEND=triton_shmem`; every
 decline returns to the caller's complete unfused path.
 
-Current model policy is in [GPT-OSS-120B status](gpt-oss-120b-status.md).
+Current model policy is in the
+[GPT-OSS-120B](gpt-oss-120b-status.md) and
+[GLM-5.2-FP8](glm-5.2-fp8-status.md) status pages.
 
 ## Contract
 
@@ -48,18 +50,20 @@ A different model hidden size or any environment-owned lifetime policy creates
 a distinct state and symmetric allocation. Diagnostic overrides cannot reuse an
 incompatible state created earlier in the process.
 
-Known profiles are validated before any communication allocation. Core-v3
-requires gfx950, TP=4, hidden 2880, bf16, max-token cap 2048, HIP `1,2,5,6`,
-pure TP, and its exact ring/kernel/grid policy. GLM-5.2 profile v1 requires
-gfx950, TP=8, hidden 6144, bf16, max-token cap 32, all eight visible devices,
-156 input/output sites, and its exact padded-kernel policy. The GLM profile is
-operator- and eager-screen-qualified only; captured model serving remains
-unqualified. Unknown profiles and known profile mismatches decline collectively
-to the complete unfused path.
+Known profiles are validated before any communication allocation. GPT-OSS
+core-v3 requires gfx950, TP=4, hidden 2880, bf16, max-token cap 2048, HIP
+`1,2,5,6`, pure TP, and its exact ring/kernel/grid policy. GLM profile v2
+requires gfx950, TP=8, hidden 6144, bf16, max-token cap 42, all eight visible
+devices, 156 input/output sites, a four-warp padded core through M42, and an M2
+lower performance gate. GLM is operator-qualified only; captured model serving
+remains unqualified. Unknown profiles and known profile mismatches decline
+collectively to the complete unfused path.
 
 `TS_TRITON_SHMEM_FUSION_MAX_M` is a diagnostic performance eligibility gate
 independent of `max_token_num`; zero disables it. The former M=256 deployment
 gate is rejected and no qualified profile enables it.
+`TS_TRITON_SHMEM_FUSION_MIN_M` is the matching lower gate; profile v2 uses it
+to capture complete ordinary fallback at M1.
 
 Kernel variants:
 
@@ -68,6 +72,10 @@ Kernel variants:
   register row; scratch-free, masked, decode-specialized;
 - `oneshot_blocked`: arbitrary hidden size, blocked reduction with fp32 scratch;
 - `twoshot_blocked`: row-sharded reduction with symmetric output pushes.
+
+The padded kernel keeps runtime M non-specialized. Scalar M1 specialization
+expanded its persistent row loop into a much larger branch-heavy gfx950
+program; `do_not_specialize=["M"]` restores the compact M2 code shape.
 
 At TP=4 or TP=8, the state is normally two-shot, while the call-level
 one-shot overlay handles small token counts. GPT-OSS core-v3 uses padded
@@ -115,12 +123,14 @@ Every operation requires:
 Generic behavior retains both. The rejected two-slot input ring delays reuse by
 one call but depends on mutable host phase and remains disabled.
 
-Profile v2 instead reserves 72 input sites. Capture freezes one distinct
-symmetric view per unconditional GPT-OSS fused call; reuse is delayed for a
-complete forward, so intervening leading rendezvous prove peer reads complete.
-Only this explicit profile omits the one-shot exit barrier. Unknown site counts
-retain it. Two-shot always retains its output-completion barrier. See the
-[lifetime contract](producer-lifetime-contract.md).
+GPT-OSS core-v3 reserves 72 input sites; GLM profile v2 reserves 156. Capture
+freezes one distinct symmetric view per unconditional fused call, and reuse is
+delayed for a complete model-profile forward so intervening leading rendezvous
+prove peer reads complete. Only exact validated site-ring profiles omit the
+one-shot exit barrier. Unknown site counts retain it. Two-shot always retains
+its output-completion barrier. The GPT-OSS ownership proof is detailed in the
+[lifetime contract](producer-lifetime-contract.md); GLM currently has synthetic
+156-site graph and transition evidence only.
 
 Eager two-shot may return state-owned outputs only when two symmetric
 norm/residual pairs are available. Calls alternate pairs to prevent the current
@@ -196,11 +206,15 @@ policy.
   normal decode capture, 0.95 HBM utilization, overlap scheduling, and generated
   health probes complete the M128-M4096 prefill ladder plus long decode on the
   qualified rank set. The dated compatibility study owns current measurements.
-- GLM-5.2 profile v1: ws=8/N=6144 full 156-call M32 graph completed 1,000
-  replays; the five-M shared-state matrix completed 1,000 interleaved replays
-  and 1,690 checked operations/rank. Bounded eager serving resolved the exact
-  profile on all ranks and completed five canaries. Production graph serving
-  and restart-randomized performance qualification remain open.
+- GLM-5.2 profile v2: the padded extension establishes M2-M42 as profitable and
+  M43 as the RCCL crossover. Its seven-M transition matrix proves ordinary
+  fallback at M1 and padded triton at M2-M42 over 1,000 replays and 1,649
+  checked operations/rank. Production graph serving and restart-randomized
+  performance qualification remain open.
+- Dynamic-M padded M1: WS4 156-site replay improved 21.8% versus the specialized
+  kernel and passed a bounded 70-replay M1/M2/M42 eager/graph integration probe.
+  It remains 3.9% behind unfused at WS4, so profile v2 retains M1 fallback
+  pending qualified WS8 timing.
 
 Producer-direct inputs and any genericization of borrowed outputs or
 trailing-barrier removal require the separate

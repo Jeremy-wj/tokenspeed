@@ -8,7 +8,9 @@ interleaved graph replay, odd and even calls per graph, eager->graph and
 graph->eager transitions, changing inputs, and both returned tensors.
 
 Supported ``BENCH_IMPL`` values are ``production_unfused``, ``auto``, ``iris``,
-``symm_mem``, and ``triton_shmem``.  ``production_unfused`` follows the serving
+``symm_mem``, ``triton_shmem``, and ``triton_shmem_profile``. The profile mode
+uses complete ordinary fallback when the explicit triton performance gate
+declines. ``production_unfused`` follows the serving
 transport gate exactly: ordinary Iris all-reduce for payloads <=512 KiB, RCCL
 above 512 KiB, then TokenSpeed residual RMSNorm.  Every fused arm goes through
 the production dispatcher and treats a decline as an error.
@@ -70,6 +72,7 @@ _SUPPORTED_IMPLS = {
     "iris",
     "symm_mem",
     "triton_shmem",
+    "triton_shmem_profile",
 }
 _IDENTITY_FILES = (
     "benchmark/probe_ar_rmsnorm_transitions.py",
@@ -376,6 +379,18 @@ def _precreate_backend(
     max_m = config["max_token_num"]
     hidden = config["hidden"]
     dtype = torch.bfloat16
+    profile_fallback = impl == "triton_shmem_profile"
+    ordinary_state = None
+    ordinary_paths: dict[str, str] = {}
+
+    if profile_fallback:
+        ordinary_config = {**config, "impl": "production_unfused"}
+        ordinary_state, ordinary_paths = _precreate_backend(
+            ordinary_config,
+            rank,
+            group,
+            device,
+        )
 
     if impl == "production_unfused":
         from tokenspeed_kernel.ops.communication import iris as iris_mod
@@ -448,14 +463,23 @@ def _precreate_backend(
     )
     if state is None:
         raise RuntimeError("triton_shmem state creation declined")
-    ts.TRITON_SHMEM_AR_RMSNORM_STATES[key] = state
+    state_key = ts.triton_shmem_state_cache_key(group, max_m, hidden, dtype)
+    ts.TRITON_SHMEM_AR_RMSNORM_STATES[state_key] = state
     paths: dict[str, str] = {}
+    min_m = int(os.environ.get("TS_TRITON_SHMEM_FUSION_MIN_M", "0"))
+    fusion_max_m = int(os.environ.get("TS_TRITON_SHMEM_FUSION_MAX_M", "0"))
     for m in config["ms"]:
+        if profile_fallback and (
+            (min_m > 0 and m < min_m)
+            or (fusion_max_m > 0 and m > fusion_max_m)
+        ):
+            paths[str(m)] = ordinary_paths[str(m)]
+            continue
         oneshot = (not state._is_twoshot) or (
             state._oneshot_max_m > 0 and m <= state._oneshot_max_m
         )
         paths[str(m)] = state._oneshot_kernel_for_m(m) if oneshot else "twoshot_blocked"
-    return None, paths
+    return ordinary_state, paths
 
 
 def _launch(
@@ -470,33 +494,38 @@ def _launch(
     from tokenspeed_kernel.ops.layernorm.triton import rmsnorm
 
     outputs: list[tuple[torch.Tensor, torch.Tensor]] = []
-    if config["impl"] == "production_unfused":
+    def ordinary(
+        x: torch.Tensor,
+        residual: torch.Tensor,
+        scratch: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         use_iris = (
             case.m * config["hidden"] * torch.bfloat16.itemsize
             <= _ORDINARY_AR_MAX_BYTES
         )
+        scratch.copy_(x)
+        if use_iris:
+            if not tri.all_reduce_can_run(ordinary_state, scratch):
+                raise RuntimeError(f"ordinary Iris unexpectedly declined M={case.m}")
+            tri.all_reduce(ordinary_state, scratch)
+        else:
+            dist.all_reduce(scratch, group=group)
+        result = rmsnorm(
+            scratch,
+            weight,
+            config["eps"],
+            residual=residual,
+        )
+        if not isinstance(result, tuple) or len(result) != 2:
+            raise RuntimeError("TokenSpeed residual RMSNorm lost an output")
+        return result
+
+    if config["impl"] == "production_unfused":
         for x, residual, scratch in zip(case.xs, case.residuals, case.scratches):
-            scratch.copy_(x)
-            if use_iris:
-                if not tri.all_reduce_can_run(ordinary_state, scratch):
-                    raise RuntimeError(
-                        f"ordinary Iris unexpectedly declined M={case.m}"
-                    )
-                tri.all_reduce(ordinary_state, scratch)
-            else:
-                dist.all_reduce(scratch, group=group)
-            result = rmsnorm(
-                scratch,
-                weight,
-                config["eps"],
-                residual=residual,
-            )
-            if not isinstance(result, tuple) or len(result) != 2:
-                raise RuntimeError("TokenSpeed residual RMSNorm lost an output")
-            outputs.append(result)
+            outputs.append(ordinary(x, residual, scratch))
         return outputs
 
-    for x, residual in zip(case.xs, case.residuals):
+    for x, residual, scratch in zip(case.xs, case.residuals, case.scratches):
         norm_out, residual_out, _, _ = tri.allreduce_residual_rmsnorm(
             input_tensor=x,
             residual=residual,
@@ -507,6 +536,9 @@ def _launch(
             max_token_num=config["max_token_num"],
         )
         if norm_out is None or residual_out is None:
+            if config["impl"] == "triton_shmem_profile":
+                outputs.append(ordinary(x, residual, scratch))
+                continue
             raise RuntimeError(
                 f"production fused dispatcher declined BENCH_IMPL="
                 f"{config['impl']} M={case.m}"
@@ -626,7 +658,11 @@ def _rank_main(
         "preflight": [],
     }
     try:
-        os.environ["TS_ARNORM_BACKEND"] = config["impl"]
+        os.environ["TS_ARNORM_BACKEND"] = (
+            "triton_shmem"
+            if config["impl"] == "triton_shmem_profile"
+            else config["impl"]
+        )
         cases = _create_cases(config, device)
         weight = torch.linspace(
             0.5,
@@ -639,7 +675,7 @@ def _rank_main(
 
         ordinary_state, paths = _precreate_backend(config, rank, group, device)
         result["paths"] = paths
-        if config["impl"] == "triton_shmem":
+        if config["impl"] in {"triton_shmem", "triton_shmem_profile"}:
             result["signal_zero_status"] = "not_exposed_by_safe_public_api"
 
         # Exercise every state/path eagerly after all rendezvous work and before

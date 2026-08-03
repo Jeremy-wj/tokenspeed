@@ -25,8 +25,9 @@ profile v4 and the post-rebase fused baselines passed safety but failed
 performance, while core-v3 later passed both the safety/evidence gates and the
 capacity objective under restricted serving controls. Default-compatible
 requalification remained safe but did not promote. Dated results belong in the
-[study index](../studies/README.md); the live decision belongs in
-[GPT-OSS-120B status](gpt-oss-120b-status.md).
+[study index](../studies/README.md); live decisions are model-scoped in the
+[GPT-OSS-120B](gpt-oss-120b-status.md) and
+[GLM-5.2-FP8](glm-5.2-fp8-status.md) status pages.
 
 The methodology must answer, independently:
 
@@ -240,8 +241,8 @@ Require eager correctness, 1,000+ fixed-graph replays, the relevant transition
 matrix, interleaved shared-state graph coverage, explicit M=1 transition, a
 bounded full serve, complete fallback, and no signal/channel/epoch disagreement.
 Model-profile site rings additionally require a full-site graph (72 calls for
-GPT-OSS), wraparound, interleaved graph variants, and proof that every unknown
-site-count path retains its exit barrier.
+GPT-OSS, 156 for GLM), wraparound, interleaved graph variants, and proof that
+every unknown site-count path retains its exit barrier.
 
 ### Evidence gate
 

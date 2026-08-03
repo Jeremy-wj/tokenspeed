@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "campaign_id": "glm-5.2-fp8-mi350x-definitive-graph-v1",
+  "status": "planned",
+  "model": "glm-5.2-fp8",
+  "hardware": "mi350x",
+  "profile_env": "benchmark/profiles/ar_rmsnorm/glm_5_2_fp8_mi350x.env",
+  "benchmark_module": "benchmark.probe_ar_rmsnorm_graph_perf",
+  "world_sizes": [
+    2,
+    4,
+    8
+  ],
+  "hidden_size": 6144,
+  "dtype": "bf16",
+  "warmup": 50,
+  "replays": 1000,
+  "process_timeout_seconds": 600,
+  "cooldown_seconds_between_blocks": 120,
+  "profile_cap": 42,
+  "blocks": [
+    {
+      "name": "pass1",
+      "calls_per_graph": 156,
+      "arm_order": [
+        "upstream_unfused",
+        "iris_fused",
+        "triton_forced"
+      ],
+      "m_values": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        24,
+        32,
+        36,
+        40,
+        41,
+        42,
+        43,
+        44,
+        48,
+        64,
+        96,
+        128,
+        256
+      ]
+    },
+    {
+      "name": "pass2",
+      "calls_per_graph": 156,
+      "arm_order": [
+        "triton_forced",
+        "iris_fused",
+        "upstream_unfused"
+      ],
+      "m_values": [
+        1,
+        2,
+        16,
+        32,
+        40,
+        41,
+        42,
+        43,
+        44,
+        48,
+        64,
+        128
+      ]
+    },
+    {
+      "name": "pass-diagnostic",
+      "calls_per_graph": 1,
+      "arm_order": [
+        "iris_fused",
+        "triton_forced",
+        "upstream_unfused"
+      ],
+      "m_values": [
+        1,
+        2,
+        42,
+        43,
+        64
+      ]
+    }
+  ],
+  "arms": {
+    "upstream_unfused": {
+      "bench_impl": "production_unfused",
+      "expected_backend": [
+        "iris",
+        "rccl"
+      ]
+    },
+    "iris_fused": {
+      "bench_impl": "auto",
+      "expected_backend": [
+        "iris"
+      ]
+    },
+    "triton_forced": {
+      "bench_impl": "triton_shmem",
+      "expected_backend": [
+        "triton_shmem"
+      ],
+      "overrides": {
+        "AR_NORM_PROFILE_ID": "unqualified-manual",
+        "TS_TRITON_SHMEM_BARRIER_GRID": "0",
+        "TS_TRITON_SHMEM_COARSE": "1",
+        "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT": "0",
+        "TS_TRITON_SHMEM_FOLD_COPYIN": "0",
+        "TS_TRITON_SHMEM_FUSION_MAX_M": "0",
+        "TS_TRITON_SHMEM_FUSION_MIN_M": "1",
+        "TS_TRITON_SHMEM_GRID_CAP": "0",
+        "TS_TRITON_SHMEM_INKERNEL_BARRIER": "1",
+        "TS_TRITON_SHMEM_INPUT_SITE_RING": "156",
+        "TS_TRITON_SHMEM_ONESHOT_BLOCK_N": "0",
+        "TS_TRITON_SHMEM_ONESHOT_NUM_WARPS": "4",
+        "TS_TRITON_SHMEM_ONESHOT_VARIANT": "padded",
+        "TS_TRITON_SHMEM_OUTPUT_RING": "156",
+        "TS_TRITON_SHMEM_WORKGROUP_SYNC": "1"
+      }
+    }
+  },
+  "reporting": {
+    "primary_calls_per_graph": 156,
+    "model_faithful_world_size": 8,
+    "scaling_world_sizes": [
+      2,
+      4
+    ],
+    "tracked_outputs": [
+      "summary.json",
+      "graph-sweep.csv",
+      "graph-sweep-summary.json"
+    ]
+  }
+}

@@ -12,6 +12,9 @@ Examples:
       python3 -m benchmark.probe_ar_rmsnorm_graph_perf
     HIP_VISIBLE_DEVICES=1,2,3,5 BENCH_IMPL=production_unfused \
       python3 -m benchmark.probe_ar_rmsnorm_graph_perf
+
+``BENCH_MAX_TOKEN_NUM`` defaults to ``BENCH_M``. Set it to a larger profile
+workspace cap when screening a smaller actual M against exact profile identity.
 """
 from __future__ import annotations
 
@@ -152,6 +155,9 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
     group = dist.group.WORLD
     device = torch.device(f"cuda:{rank}")
     m = _env_int("BENCH_M", 32)
+    max_token_num = _env_int("BENCH_MAX_TOKEN_NUM", m)
+    if max_token_num < m:
+        raise ValueError("BENCH_MAX_TOKEN_NUM must be at least BENCH_M")
     n = default_hidden_size()
     calls_per_graph = _env_int("BENCH_CALLS_PER_GRAPH", 1)
     if calls_per_graph < 1:
@@ -227,7 +233,7 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
                     rank=rank,
                     group=group,
                     eps=eps,
-                    max_token_num=m,
+                    max_token_num=max_token_num,
                 )
                 if norm_out is None or residual_out is None:
                     raise RuntimeError(
@@ -276,7 +282,7 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
 
         state_key = ts.triton_shmem_state_cache_key(
             group,
-            m,
+            max_token_num,
             n,
             torch.bfloat16,
         )
@@ -408,6 +414,7 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
             "path_details": path_details,
             "world_size": ws,
             "M": m,
+            "max_token_num": max_token_num,
             "N": n,
             "payload_bytes": xs[0].numel() * xs[0].element_size(),
             "ordinary_all_reduce_max_bytes": _ORDINARY_AR_MAX_BYTES,

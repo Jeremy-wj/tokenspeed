@@ -2,7 +2,7 @@
 
 Updated: 2026-08-01
 
-This is the sole live deployment decision and priority page for GPT-OSS-120B,
+This is the live deployment decision and priority page for GPT-OSS-120B,
 TP=4, on MI350X (gfx950). Dated study conclusions remain historical evidence
 and do not override this page.
 

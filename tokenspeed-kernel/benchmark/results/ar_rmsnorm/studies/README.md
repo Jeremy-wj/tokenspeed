@@ -1,10 +1,10 @@
 # AR+RMSNorm study index
 
-Studies are dated evidence. The
-[GPT-OSS-120B status](../docs/gpt-oss-120b-status.md) is the only live
-deployment and priority record.
+Studies are dated evidence. Live deployment decisions are model-scoped:
+[GPT-OSS-120B](../docs/gpt-oss-120b-status.md) and
+[GLM-5.2-FP8](../docs/glm-5.2-fp8-status.md).
 
-## MI350X: current checkpoint chain
+## MI350X: GPT-OSS-120B checkpoint chain
 
 Read these newest-to-oldest:
 
@@ -22,7 +22,20 @@ Read these newest-to-oldest:
 5. [Post-rebase baseline](mi350x/2026-07-post-rebase-baseline/README.md) —
    explicit upstream-unfused control and initial Iris/triton reset.
 
-## MI350X: legacy performance and durable safety evidence
+## MI350X: GLM-5.2-FP8
+
+Read newest-to-oldest:
+
+1. [Definitive cross-world-size sweep](mi350x/2026-08-glm-5.2-fp8-definitive-sweep/README.md)
+   — planned WS=2/4/8 comparison of upstream-unfused, default Iris fused, and
+   forced padded Triton. The campaign has not been run.
+2. [Representative WS=8 baseline](mi350x/2026-08-glm-5.2-fp8-baseline/README.md)
+   — N=6144 profile-v2 profitable-window and transition evidence.
+
+GLM profile policy does not transfer across model, world size, hidden width,
+site count, topology, or serving configuration.
+
+## MI350X: GPT-OSS legacy performance and durable safety evidence
 
 Everything below predates upstream `3f88dcc2`; numeric performance conclusions
 are legacy. Safety, incident, and methodology findings remain engineering
@@ -48,13 +61,3 @@ evidence.
 
 Prefer each study's machine-readable summary for exact values. Raw logs, traces,
 and campaign trees under `raw/` are local and Git-ignored.
-
-## MI350X: GLM-5.2-FP8
-
-- [Initial WS=8 baseline](mi350x/2026-08-glm-5.2-fp8-baseline/README.md) —
-  N=6144 operator characterization, 156-site profile-v1 validation, model
-  bring-up incidents, and non-promotion serving screen.
-
-The [GLM-5.2-FP8 status](../docs/glm-5.2-fp8-status.md) is the live decision
-record for this model. GPT-OSS profile policy does not transfer across model,
-world size, hidden width, site count, or serving configuration.

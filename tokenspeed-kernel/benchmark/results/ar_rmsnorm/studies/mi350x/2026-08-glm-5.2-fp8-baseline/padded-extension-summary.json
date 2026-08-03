@@ -1,0 +1,115 @@
+{
+  "date": "2026-08-03",
+  "source_root": "raw/current/glm-5.2-fp8/mi350x/2026-08-01/operator/padded-extension-v1",
+  "configuration": {
+    "world_size": 8,
+    "hidden_size": 6144,
+    "calls_per_graph": 156,
+    "warmups": 50,
+    "replays_per_pass": 1000,
+    "input_site_ring": 156,
+    "output_ring": 156,
+    "in_kernel_barrier": true,
+    "warp_candidates": [1, 2, 4, 8]
+  },
+  "decision": {
+    "profile": "glm-5.2-fp8-mi350x-triton-v2",
+    "fusion_min_M": 2,
+    "fusion_max_M": 42,
+    "padded_max_M": 42,
+    "oneshot_warps": 4,
+    "reason": "Four-warp padded whole-row remains faster than both controls through M42. M1 remains slower for every warp count, and RCCL makes unfused faster from M43."
+  },
+  "full_forward_p50_us_per_site": {
+    "M1_best_w8_pass1": 27.735,
+    "M2_w4": 18.303,
+    "M16_w4": 21.765,
+    "M32_w4_two_pass_mean": 30.938,
+    "M33_w4_two_pass_mean": 32.401,
+    "M42_w4_two_pass_mean": 38.127,
+    "M42_exact_profile_retry": 39.341,
+    "M43_w4_two_pass_mean": 37.964,
+    "M48_w4_two_pass_mean": 41.959,
+    "M64_w4": 57.076
+  },
+  "comparison_pct_vs_unfused": {
+    "M1_best_w8_pass1": 31.35,
+    "M2_w4": -20.91,
+    "M16_w4": -15.61,
+    "M32_w4": -12.89,
+    "M33_w4": -9.53,
+    "M42_w4_forced_mean": -6.38,
+    "M42_exact_profile_retry": -3.4,
+    "M43_w4": 25.55,
+    "M48_w4": 41.55,
+    "M64_w4": 92.88
+  },
+  "M1_stage_decomposition_us_per_site": {
+    "iris_w8": {
+      "entry_barrier": 5.306,
+      "fused_core": 7.001,
+      "exit_barrier": 7.007,
+      "full": 22.921
+    },
+    "triton_w8": {
+      "copy": 1.889,
+      "padded_core_without_sync": 15.95,
+      "in_kernel_entry_sync": 9.587,
+      "lifetime_remainder": -0.087,
+      "full": 27.337
+    },
+    "triton_w4_full": 28.859,
+    "explanation": "At M1 the single triton CTA does not expose enough independent remote-load work. Its no-sync padded core is 8.95 us slower than the Iris fused core. Triton's omitted exit barrier recovers part of that loss but cannot overcome it. Prefix-copy marginals varied across cumulative graphs and are not used for this attribution."
+  },
+  "M2_stage_decomposition_us_per_site": {
+    "iris_w8_full": 23.049,
+    "iris_fused_core": 7.575,
+    "triton_w4_full": 18.25,
+    "triton_padded_core_without_sync": 6.185,
+    "triton_in_kernel_entry_sync": 10.235,
+    "explanation": "The second row launches a second CTA, allowing triton-shmem to overlap remote-load latency; the core falls from 15.95 us at M1 to 6.19 us at M2."
+  },
+  "profile_v2_validation": {
+    "M42_graph_replays": 1000,
+    "transition_replays": 1000,
+    "transition_M_values": [1, 2, 16, 32, 33, 40, 42],
+    "ops_checked_per_rank": 1649,
+    "failed_steps": 0,
+    "M1_path": "ordinary_iris_all_reduce+tokenspeed_residual_rmsnorm",
+    "M2_to_M42_path": "oneshot_wholerow_padded"
+  },
+  "M1_dynamic_specialization_fix": {
+    "change": "@triton.jit(do_not_specialize=[\"M\"])",
+    "compile_only_w4": {
+      "specialized_assembly_bytes": 209467,
+      "dynamic_assembly_bytes": 62124,
+      "specialized_buffer_loads": 208,
+      "dynamic_buffer_loads": 8,
+      "specialized_scalar_branches": 202,
+      "dynamic_scalar_branches": 2
+    },
+    "runtime_ws4_156_site_p50_us_per_site": {
+      "triton_specialized": 15.639,
+      "triton_dynamic": 12.225,
+      "upstream_unfused": 11.764,
+      "iris_fused": 13.732
+    },
+    "dynamic_vs_specialized_pct": -21.83,
+    "dynamic_vs_unfused_pct": 3.92,
+    "dynamic_vs_iris_pct": -10.97,
+    "integration_sanity": {
+      "world_size": 4,
+      "physical_gpus": [7, 4, 6, 5],
+      "transition_replays": 70,
+      "M_values": [1, 2, 42],
+      "ops_checked_per_rank": 143,
+      "failed_steps": 0
+    },
+    "full_model_sanity": "A TP4 GLM server was bounded to five minutes and stopped at 62% checkpoint loading before readiness. No request was issued.",
+    "profile_policy": "Keep M1 ordinary fallback until the dynamic kernel is measured at qualified WS8."
+  },
+  "retained_incidents": [
+    "The first exact-profile M42 graph run entered a high-tail performance mode (90.89 us p50); an isolated retry measured 39.34 us p50. Both artifacts are retained.",
+    "The eight-warp padded M192 run remained active without progress and was terminated; four warps was already the winner and M192 was outside the profitable region."
+  ]
+}

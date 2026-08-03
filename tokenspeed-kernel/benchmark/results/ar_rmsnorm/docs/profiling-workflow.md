@@ -1,6 +1,6 @@
 # AR+RMSNorm profiling workflow
 
-Updated: 2026-08-01
+Updated: 2026-08-03
 
 Pre-rebase traces remain legacy. New runs must record the resolved ordinary AR
 backend, fused backend, rank-side selected-backend log, kernel signatures, and
@@ -17,12 +17,12 @@ runtime:   system HIP 7.2.53211 / ROCm 7.2.4
 tracing:   system roctracer 4.1.70204 / rocprofiler-sdk 1.1.0
 ```
 
-This is the only supported image for both serving and profiling. The historical
-`jeremwan/tokenspeed:rocm7.2.4-torch2.11` tag was retired on 2026-07-24. It had
-the same Docker configuration and package sets, but `libtorch_hip.so` still
-resolved torch's bundled ROCm 7.2.0 `libroctracer64.so`; that mixed tracing stack
-is known to crash. Do not recreate or use the old tag as a supposedly leaner
-serving image.
+This is the GPT-OSS qualified image identity. Every campaign must record its
+actual image ID and package layer; tag equality is not qualification. The GLM
+baseline used a different local image ID and therefore carries its own runtime
+audit. The historical `jeremwan/tokenspeed:rocm7.2.4-torch2.11` tag was retired
+on 2026-07-24 because `libtorch_hip.so` resolved torch's bundled ROCm 7.2.0
+`libroctracer64.so`; do not recreate that mixed tracing stack.
 
 The upstream rebase outgrew the image's original Python packages. The qualified
 2026-07-30 writable layer uses source-tree `PYTHONPATH`, Transformers 5.12,
@@ -108,6 +108,10 @@ Zero disables the additional gate. The value 256 proved dispatch mechanics but
 timed out under the stable repeatability control; do not rerun it without a
 transition-safe fallback redesign.
 
+`TS_TRITON_SHMEM_FUSION_MIN_M` is a separate lower performance gate. GLM
+profile v2 sets it to 2 so M1 captures complete ordinary fallback; its
+shared-state transition probe covers both sides of that boundary.
+
 TP=4 matched unfused:
 
 ```text
@@ -157,11 +161,11 @@ window identical.
 - Model profiles: `benchmark/profiles/ar_rmsnorm/`
 
 The GLM-5.2-FP8 profile is
-`benchmark/profiles/ar_rmsnorm/glm_5_2_fp8_mi350x.env`. Its current WS=8
-serving controls are diagnostic and model-specific; see the
-[GLM status](glm-5.2-fp8-status.md). The generic repeatability and reproducer
-paths derive model, artifact root, world size, device set, and fusion cap from
-the sourced profile.
+`benchmark/profiles/ar_rmsnorm/glm_5_2_fp8_mi350x.env`. It retains ideal graph
+serving defaults; eager/health/KVStore controls from the historical bring-up
+are not encoded. See the [GLM status](glm-5.2-fp8-status.md). The generic
+repeatability and reproducer paths derive model, artifact root, world size,
+device set, and fusion cap from the sourced profile.
 
 The generic serve, benchmark, profile, and teardown paths accept `CONTAINER` or
 `TOKENSPEED_CONTAINER`; the qualified lab value is
@@ -288,6 +292,30 @@ separate/in-kernel/folded diagnostics.
 BENCH_WS=4 BENCH_N=<hidden> BENCH_M=<tokens> \
   python3 -m benchmark.probe_ar_rmsnorm_graph_perf
 ```
+
+Set `BENCH_MAX_TOKEN_NUM` when the actual M is smaller than the model profile's
+allocation cap. Consolidate repeated per-site/full-site sweeps with
+`benchmark/analyze_ar_rmsnorm_graph_sweep.py`; it preserves pass-level p50
+values and emits compact JSON/CSV comparisons keyed by world size, hidden size,
+site count, and M.
+
+The predeclared GLM WS=2/4/8 campaign is in the
+[definitive sweep study](../studies/mi350x/2026-08-glm-5.2-fp8-definitive-sweep/README.md).
+Inspect its complete schedule without launching a benchmark:
+
+```bash
+source benchmark/profiles/ar_rmsnorm/glm_5_2_fp8_mi350x.env
+PYTHONPATH=. python3 benchmark/run_ar_rmsnorm_graph_sweep.py \
+  --spec benchmark/results/ar_rmsnorm/studies/mi350x/\
+2026-08-glm-5.2-fp8-definitive-sweep/campaign.json \
+  --devices 2=<two-idle-devices> \
+  --devices 4=<four-idle-devices> \
+  --devices 8=0,1,2,3,4,5,6,7 \
+  --dry-run
+```
+
+Device sets are launch-time identity, not defaults in the campaign
+specification. Freeze them only after the shared-host and topology preflight.
 
 4. Shared-state graph transition gate:
 

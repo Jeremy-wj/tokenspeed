@@ -7,7 +7,7 @@ Date: 2026-07-31
 **Historical restricted configuration only.** This campaign used eager
 prefill, C32-only decode capture, 0.90 HBM, overlap off, and passive health.
 Default-compatible requalification supersedes its deployment conclusion; the
-sole live policy record is
+live GPT-OSS policy record is
 [GPT-OSS-120B status](../../../docs/gpt-oss-120b-status.md).
 
 Profile `gpt-oss-120b-mi350x-triton-core-v3` was promoted for the **capacity

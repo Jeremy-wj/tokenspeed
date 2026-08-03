@@ -40,6 +40,7 @@ logger = logging.getLogger(__file__)
 #   "iris"         -- force Iris only.
 #   "symm_mem"     -- force the native torch symmetric-memory kernel only.
 _ARNORM_BACKEND_ENV = "TS_ARNORM_BACKEND"
+_TRITON_SHMEM_FUSION_MIN_M_ENV = "TS_TRITON_SHMEM_FUSION_MIN_M"
 _TRITON_SHMEM_FUSION_MAX_M_ENV = "TS_TRITON_SHMEM_FUSION_MAX_M"
 
 
@@ -56,6 +57,11 @@ def _arnorm_backend() -> str:
 def _triton_shmem_fusion_max_m() -> int:
     """Optional performance gate independent of the allocated workspace cap."""
     return max(0, int(os.environ.get(_TRITON_SHMEM_FUSION_MAX_M_ENV, "0")))
+
+
+def _triton_shmem_fusion_min_m() -> int:
+    """Optional lower performance gate; zero keeps all positive M eligible."""
+    return max(0, int(os.environ.get(_TRITON_SHMEM_FUSION_MIN_M_ENV, "0")))
 
 
 __all__ = [
@@ -1622,9 +1628,14 @@ def allreduce_residual_rmsnorm(
         # --- Explicit experimental triton_shmem path. Upstream's default is
         # Iris; retaining this backend behind an explicit selector preserves the
         # local research implementation without overriding upstream behavior.
+        triton_shmem_min_m = _triton_shmem_fusion_min_m()
         triton_shmem_max_m = _triton_shmem_fusion_max_m()
         triton_shmem_gate_declined = (
-            eligible and triton_shmem_max_m > 0 and token_num > triton_shmem_max_m
+            eligible
+            and (
+                (triton_shmem_min_m > 0 and token_num < triton_shmem_min_m)
+                or (triton_shmem_max_m > 0 and token_num > triton_shmem_max_m)
+            )
         )
         triton_shmem_eligible = eligible and not triton_shmem_gate_declined
         if backend == "triton_shmem" and triton_shmem_eligible:

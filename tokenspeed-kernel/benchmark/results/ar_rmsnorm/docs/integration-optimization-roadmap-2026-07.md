@@ -1,12 +1,13 @@
 # AR+RMSNorm integration roadmap
 
-Updated: 2026-08-01
+Updated: 2026-08-03
 
 This document records remaining engineering directions and their dependencies.
-Deployment policy and execution priority belong only in
-[GPT-OSS-120B status](gpt-oss-120b-status.md).
+Deployment policy remains in the model status pages:
+[GPT-OSS-120B](gpt-oss-120b-status.md) and
+[GLM-5.2-FP8](glm-5.2-fp8-status.md).
 
-## Current baseline
+## GPT-OSS-120B baseline
 
 Core-v3 is the qualified triton baseline for GPT-OSS-120B TP=4 on HIP
 `1,2,5,6`. It combines:
@@ -34,7 +35,24 @@ correct but produced fresh-server performance mode variance; overlap
 disablement is a reversible measurement policy. Explicit unfused remains the
 deployment default. See the dated default-compatibility study.
 
-## Closed work
+## GLM-5.2-FP8 baseline
+
+Profile v2 is a diagnostic TP=8/N=6144 operator candidate:
+
+- four-warp padded whole-row Triton for M=2-42;
+- ordinary fallback at M=1 and M>=43;
+- 156 graph-stable input and output sites;
+- 1,000-replay M-boundary transition coverage on all eight ranks.
+
+The M43 boundary is structural for the current comparison: unfused switches
+from ordinary Iris to RCCL above 512 KiB. Captured operator graphs are
+qualified; model graph serving and end-to-end performance are not. The
+[baseline study](../studies/mi350x/2026-08-glm-5.2-fp8-baseline/README.md)
+owns the current evidence, and the
+[definitive sweep](../studies/mi350x/2026-08-glm-5.2-fp8-definitive-sweep/README.md)
+owns the pending WS=2/4/8 campaign contract.
+
+## GPT-OSS-120B closed work
 
 Do not repeat these local searches without a changed mechanism or precondition:
 
@@ -54,7 +72,7 @@ The [realignment](../studies/mi350x/2026-07-triton-shmem-realignment/README.md)
 and [decomposition](../studies/mi350x/2026-07-triton-shmem-decomposition/README.md)
 studies contain the closure evidence.
 
-## Remaining work
+## GPT-OSS-120B remaining work
 
 ### 1. Rank-set and world-size qualification
 
@@ -112,6 +130,19 @@ insufficient. See the
 
 Stop if the design replaces one staging copy with another, cannot support both
 dense and active MoE paths, or requires weaker fallback/lifetime semantics.
+
+## GLM-5.2-FP8 remaining work
+
+1. Run the definitive operator campaign without changing its predeclared
+   matrix; retain failures and report WS=2/4 as scaling evidence only.
+2. Resolve the AMD block-FP8 GEMM/MoE serving baseline and bounded graph
+   startup before another AR+RMSNorm end-to-end campaign.
+3. Capture `tokenspeed.model_forward.v1` markers and compare executed decode M
+   with the M=2-42 operator window.
+4. Re-run the shared-state transition gate after any profile, topology, cap, or
+   site-count change.
+5. Require a restart-randomized serving campaign before changing the explicit
+   unfused deployment default.
 
 ## State and dispatch requirements
 
