@@ -149,6 +149,12 @@ Require:
 Fifteen successful pairs are the minimum performance sample. A safety failure
 can reject a candidate earlier.
 
+A predeclared three- or five-triplet current-machine screen may establish a
+clear loss, justify further work, or remain inconclusive. It cannot promote a
+deployment. Shared unfused controls are valid for simultaneous Iris and Triton
+contrasts when every triplet shares seed, workload, restart block, and server
+policy; each candidate still requires its own paired analysis.
+
 ## Objective and workload separation
 
 Declare one primary objective before running:

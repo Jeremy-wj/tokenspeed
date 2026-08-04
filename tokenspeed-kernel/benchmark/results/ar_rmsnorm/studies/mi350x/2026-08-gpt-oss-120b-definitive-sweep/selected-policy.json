@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "status": "pending_microbenchmark",
+  "selection_rule": "Freeze one allowed actual-M gate per world size from complete eager, graph, transition, and marker evidence before serving.",
+  "allowed_fusion_max_m": [
+    0,
+    64,
+    91,
+    384
+  ],
+  "world_sizes": {
+    "2": {
+      "fusion_max_m": null,
+      "evidence": null
+    },
+    "4": {
+      "fusion_max_m": null,
+      "evidence": null
+    },
+    "8": {
+      "fusion_max_m": null,
+      "evidence": null
+    }
+  }
+}

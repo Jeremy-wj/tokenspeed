@@ -1,0 +1,201 @@
+{
+  "schema_version": 1,
+  "campaign_id": "gpt-oss-120b-mi350x-definitive-v1",
+  "status": "planned",
+  "model": "gpt-oss-120b",
+  "model_path": "/data/models/openai-gpt-oss-120b",
+  "hardware": "mi350x",
+  "hidden_size": 2880,
+  "dtype": "bf16",
+  "world_sizes": [
+    2,
+    4,
+    8
+  ],
+  "profiles": {
+    "2": "benchmark/profiles/ar_rmsnorm/gpt_oss_120b_mi350x_definitive_ws2.env",
+    "4": "benchmark/profiles/ar_rmsnorm/gpt_oss_120b_mi350x_definitive_ws4.env",
+    "8": "benchmark/profiles/ar_rmsnorm/gpt_oss_120b_mi350x_definitive_ws8.env"
+  },
+  "workspace_cap": 2048,
+  "process_timeout_seconds": 600,
+  "cooldown_seconds_between_blocks": 120,
+  "e2e_world_timeout_seconds": 21600,
+  "cap_policy": {
+    "selected_policy_file": "selected-policy.json",
+    "allowed_fusion_max_m": [
+      0,
+      64,
+      91,
+      384
+    ],
+    "selection_precedes_serving": true,
+    "end_to_end_cap_variants": 1
+  },
+  "arms": {
+    "upstream_unfused": {
+      "bench_impl": "production_unfused"
+    },
+    "iris_fused": {
+      "bench_impl": "auto"
+    },
+    "triton_profile": {
+      "bench_impl": "triton_shmem"
+    }
+  },
+  "microbenchmark": {
+    "graph": {
+      "calls_per_graph": 72,
+      "warmups": 50,
+      "replays": 1000,
+      "blocks": [
+        {
+          "name": "graph-pass1",
+          "arm_order": [
+            "upstream_unfused",
+            "iris_fused",
+            "triton_profile"
+          ],
+          "m_values": [
+            1,
+            32,
+            64,
+            65,
+            91,
+            92,
+            128,
+            256,
+            384,
+            385,
+            512
+          ]
+        },
+        {
+          "name": "graph-pass2",
+          "arm_order": [
+            "triton_profile",
+            "iris_fused",
+            "upstream_unfused"
+          ],
+          "m_values": [
+            32,
+            64,
+            65,
+            91,
+            92,
+            384,
+            385
+          ]
+        }
+      ]
+    },
+    "eager": {
+      "warmups": 30,
+      "iterations": 150,
+      "blocks": [
+        {
+          "name": "eager-pass1",
+          "arm_order": [
+            "upstream_unfused",
+            "iris_fused",
+            "triton_profile"
+          ],
+          "m_values": [
+            1,
+            32,
+            64,
+            65,
+            91,
+            92,
+            128,
+            256,
+            384,
+            385,
+            512,
+            1024,
+            2048
+          ]
+        },
+        {
+          "name": "eager-pass2",
+          "arm_order": [
+            "triton_profile",
+            "iris_fused",
+            "upstream_unfused"
+          ],
+          "m_values": [
+            2048,
+            1024,
+            512,
+            385,
+            384,
+            256,
+            128,
+            92,
+            91,
+            65,
+            64,
+            32,
+            1
+          ]
+        }
+      ]
+    },
+    "transition_m_values": [
+      1,
+      32,
+      64,
+      65,
+      91,
+      92,
+      384,
+      385,
+      512,
+      2048
+    ]
+  },
+  "end_to_end": {
+    "core_triplets_per_world_size": 3,
+    "extension_triplets_per_world_size": 5,
+    "promotion_triplets_per_world_size": 15,
+    "arm_order_seed": 20260803,
+    "disable_overlap_schedule": true,
+    "workload": {
+      "input_len": 128,
+      "output_len": 512,
+      "prompts": 128,
+      "concurrency": 32,
+      "request_rate": "infinite",
+      "temperature": 0,
+      "ignore_eos": true
+    },
+    "first_triplet_diagnostics": {
+      "concurrency_64": true,
+      "direct_prefill_m": 512,
+      "authoritative_forward_markers": true
+    }
+  },
+  "expected_counts": {
+    "graph_processes": 162,
+    "eager_processes": 18,
+    "transition_processes": 3,
+    "core_server_lifecycles": 27,
+    "extension_additional_server_lifecycles": 18,
+    "extended_total_server_lifecycles": 45,
+    "promotion_additional_server_lifecycles": 90,
+    "promotion_total_server_lifecycles": 135
+  },
+  "reporting": {
+    "tracked_outputs": [
+      "reporting-schema.json",
+      "selected-policy.json",
+      "summary.json",
+      "graph-sweep.csv",
+      "graph-sweep-summary.json",
+      "eager-sweep.csv",
+      "eager-sweep-summary.json",
+      "forward-cohorts.json",
+      "end-to-end-summary.json"
+    ]
+  }
+}

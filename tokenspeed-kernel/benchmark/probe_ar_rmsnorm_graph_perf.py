@@ -16,6 +16,7 @@ Examples:
 ``BENCH_MAX_TOKEN_NUM`` defaults to ``BENCH_M``. Set it to a larger profile
 workspace cap when screening a smaller actual M against exact profile identity.
 """
+
 from __future__ import annotations
 
 import json
@@ -29,7 +30,6 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 
 from benchmark.shape_axes import default_hidden_size
-
 
 _ORDINARY_AR_MAX_BYTES = 512 * 1024
 _FUSED_IMPLS = {"auto", "iris", "symm_mem", "triton_shmem"}
@@ -114,8 +114,7 @@ def _check_outputs(
             + epoch * epoch_stride * world_size
         )
         reference_residual = (
-            torch.full_like(residual, rank_sum, dtype=torch.float32)
-            + residual.float()
+            torch.full_like(residual, rank_sum, dtype=torch.float32) + residual.float()
         )
         reference_norm = reference_residual * torch.rsqrt(
             reference_residual.pow(2).mean(dim=-1, keepdim=True) + eps
@@ -166,10 +165,9 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
     repeat = _env_int("BENCH_N_REPEAT", 1000)
     if repeat < 1000:
         raise ValueError("BENCH_N_REPEAT must be at least 1000 for graph screening")
-    double_buffer_input = (
-        os.environ.get("TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT", "0")
-        not in ("0", "false", "False")
-    )
+    double_buffer_input = os.environ.get(
+        "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT", "0"
+    ) not in ("0", "false", "False")
     eps = 1e-6
     epoch_stride = ws + calls_per_graph + 1
 
@@ -192,7 +190,8 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
     ordinary_state = None
     ordinary_uses_iris = False
     scratches: list[torch.Tensor] = []
-    if impl == "production_unfused":
+    fallback_used = False
+    if impl in ("production_unfused", "triton_shmem"):
         if xs[0].numel() * xs[0].element_size() <= _ORDINARY_AR_MAX_BYTES:
             ordinary_state = tri.create_state(
                 group=group,
@@ -203,27 +202,32 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
             ordinary_uses_iris = tri.all_reduce_can_run(ordinary_state, xs[0])
         scratches = [torch.empty_like(x) for x in xs]
 
-        def launch():
-            outputs = []
-            for x, scratch in zip(xs, scratches):
-                scratch.copy_(x)
-                if ordinary_uses_iris:
-                    tri.all_reduce(ordinary_state, scratch)
-                else:
-                    dist.all_reduce(scratch, group=group)
-                result = triton_rmsnorm(
-                    scratch,
-                    weight,
-                    eps,
-                    residual=residual,
-                )
-                if not isinstance(result, tuple):
-                    raise RuntimeError("residual RMSNorm did not return both outputs")
-                outputs.append(result)
-            return outputs
+    def launch_ordinary():
+        outputs = []
+        for x, scratch in zip(xs, scratches):
+            scratch.copy_(x)
+            if ordinary_uses_iris:
+                tri.all_reduce(ordinary_state, scratch)
+            else:
+                dist.all_reduce(scratch, group=group)
+            result = triton_rmsnorm(
+                scratch,
+                weight,
+                eps,
+                residual=residual,
+            )
+            if not isinstance(result, tuple):
+                raise TypeError("residual RMSNorm did not return both outputs")
+            outputs.append(result)
+        return outputs
+
+    if impl == "production_unfused":
+        launch = launch_ordinary
 
     else:
+
         def launch():
+            nonlocal fallback_used
             outputs = []
             for x in xs:
                 norm_out, residual_out, _, _ = tri.allreduce_residual_rmsnorm(
@@ -236,9 +240,12 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
                     max_token_num=max_token_num,
                 )
                 if norm_out is None or residual_out is None:
-                    raise RuntimeError(
-                        f"production fused dispatcher declined BENCH_IMPL={impl}"
-                    )
+                    if impl != "triton_shmem":
+                        raise RuntimeError(
+                            f"production fused dispatcher declined BENCH_IMPL={impl}"
+                        )
+                    fallback_used = True
+                    return launch_ordinary()
                 outputs.append((norm_out, residual_out))
             return outputs
 
@@ -259,25 +266,9 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
     )
     dist.barrier(group=group)
 
-    if impl == "production_unfused":
-        expected_backend = "iris" if ordinary_uses_iris else "rccl"
-        expected_path = (
-            "ordinary_iris_all_reduce+triton_residual_rmsnorm"
-            if ordinary_uses_iris
-            else "rccl_all_reduce+triton_residual_rmsnorm"
-        )
-        path_details = {}
-    elif impl in ("auto", "iris"):
-        expected_backend = "iris"
-        expected_path = "fused_iris_allreduce_residual_rmsnorm"
-        path_details = {}
-    elif impl == "symm_mem":
-        expected_backend = "symm_mem"
-        expected_path = "fused_native_symm_mem"
-        path_details = {}
-    else:
-        # Keep all triton_shmem-specific state inspection inside its explicit
-        # arm; Iris and native production paths must not depend on local state.
+    graph_decline_expected = False
+    triton_shmem_state = None
+    if impl == "triton_shmem" and not fallback_used:
         from tokenspeed_kernel.ops.communication import triton_shmem as ts
 
         state_key = ts.triton_shmem_state_cache_key(
@@ -289,6 +280,33 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
         triton_shmem_state = ts.TRITON_SHMEM_AR_RMSNORM_STATES.get(state_key)
         if triton_shmem_state is None:
             raise RuntimeError("triton_shmem dispatcher state was not precreated")
+        graph_decline_expected = (
+            triton_shmem_state._output_ring_size == 0
+            or m > triton_shmem_state._output_ring_max_m
+        )
+
+    if impl == "production_unfused" or fallback_used or graph_decline_expected:
+        expected_backend = "iris" if ordinary_uses_iris else "rccl"
+        expected_path = (
+            "ordinary_iris_all_reduce+triton_residual_rmsnorm"
+            if ordinary_uses_iris
+            else "rccl_all_reduce+triton_residual_rmsnorm"
+        )
+        path_details = {
+            "requested_impl": impl,
+            "dispatcher_declined": fallback_used or graph_decline_expected,
+        }
+    elif impl in ("auto", "iris"):
+        expected_backend = "iris"
+        expected_path = "fused_iris_allreduce_residual_rmsnorm"
+        path_details = {}
+    elif impl == "symm_mem":
+        expected_backend = "symm_mem"
+        expected_path = "fused_native_symm_mem"
+        path_details = {}
+    else:
+        # Keep all triton_shmem-specific state inspection inside its explicit
+        # arm; Iris and native production paths must not depend on local state.
         uses_oneshot = (not triton_shmem_state._is_twoshot) or (
             triton_shmem_state._oneshot_max_m > 0
             and m <= triton_shmem_state._oneshot_max_m
@@ -301,18 +319,17 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
         )
         path_details = {
             "coarse": bool(triton_shmem_state._coarse),
-            "double_buffer_input": bool(
-                triton_shmem_state._double_buffer_input
-            ),
+            "double_buffer_input": bool(triton_shmem_state._double_buffer_input),
             "input_ring_size": len(triton_shmem_state._input_ring),
             "oneshot_block_n": triton_shmem_state._oneshot_block_n,
         }
 
     capture_stream = torch.cuda.Stream()
     capture_stream.wait_stream(torch.cuda.current_stream())
+    warmup_launch = launch_ordinary if graph_decline_expected else launch
     with torch.cuda.stream(capture_stream):
         for _ in range(warmup):
-            warmup_outputs = launch()
+            warmup_launch()
     torch.cuda.current_stream().wait_stream(capture_stream)
     torch.cuda.synchronize()
     dist.barrier(group=group)
@@ -361,12 +378,35 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
     )
     dist.barrier(group=group)
 
+    reset_rank_samples_us = None
+    if impl == "production_unfused" or fallback_used or graph_decline_expected:
+        reset_graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(reset_graph, stream=capture_stream):
+            for x, scratch in zip(xs, scratches):
+                scratch.copy_(x)
+        reset_starts = [torch.cuda.Event(enable_timing=True) for _ in range(repeat)]
+        reset_ends = [torch.cuda.Event(enable_timing=True) for _ in range(repeat)]
+        for start, end in zip(reset_starts, reset_ends):
+            start.record()
+            reset_graph.replay()
+            end.record()
+        torch.cuda.synchronize()
+        reset_rank_samples_us = [
+            start.elapsed_time(end) * 1000
+            for start, end in zip(reset_starts, reset_ends)
+        ]
+
     rank_samples_us = [
-        start.elapsed_time(end) * 1000
-        for start, end in zip(starts, ends)
+        start.elapsed_time(end) * 1000 for start, end in zip(starts, ends)
     ]
     all_rank_samples_us = [None] * ws
     dist.all_gather_object(all_rank_samples_us, rank_samples_us, group=group)
+    all_reset_rank_samples_us = [None] * ws
+    dist.all_gather_object(
+        all_reset_rank_samples_us,
+        reset_rank_samples_us,
+        group=group,
+    )
     rank_path_identity = {
         "rank": rank,
         "expected_backend": expected_backend,
@@ -395,8 +435,7 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
         }
         if len(path_signatures) != 1:
             raise RuntimeError(
-                f"backend/path identity differs across ranks: "
-                f"{rank_path_identities}"
+                f"backend/path identity differs across ranks: {rank_path_identities}"
             )
         max_rank_samples_us = [
             max(samples[idx] for samples in all_rank_samples_us)
@@ -406,6 +445,18 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
             statistics.median(samples) for samples in all_rank_samples_us
         ]
         max_rank_stats = _stats(max_rank_samples_us)
+        reset_stats = None
+        serving_faithful_stats = None
+        if reset_rank_samples_us is not None:
+            max_rank_reset_samples_us = [
+                max(samples[idx] for samples in all_reset_rank_samples_us)
+                for idx in range(repeat)
+            ]
+            reset_stats = _stats(max_rank_reset_samples_us)
+            serving_faithful_stats = {
+                key: max(0.0, value - reset_stats[key])
+                for key, value in max_rank_stats.items()
+            }
         result = {
             "impl": requested_impl,
             "resolved_impl": impl,
@@ -419,9 +470,7 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
             "payload_bytes": xs[0].numel() * xs[0].element_size(),
             "ordinary_all_reduce_max_bytes": _ORDINARY_AR_MAX_BYTES,
             "calls_per_graph": calls_per_graph,
-            "calls_per_graph_parity": (
-                "even" if calls_per_graph % 2 == 0 else "odd"
-            ),
+            "calls_per_graph_parity": ("even" if calls_per_graph % 2 == 0 else "odd"),
             "double_buffer_input": double_buffer_input,
             "warmup": warmup,
             "repeat": repeat,
@@ -429,9 +478,25 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
             "block_n_override": block_n_override,
             "max_rank_samples_stats_us": max_rank_stats,
             "max_rank_samples_per_call_stats_us": {
-                key: value / calls_per_graph
-                for key, value in max_rank_stats.items()
+                key: value / calls_per_graph for key, value in max_rank_stats.items()
             },
+            "benchmark_reset_copy_stats_us": reset_stats,
+            "benchmark_reset_copy_per_call_stats_us": (
+                None
+                if reset_stats is None
+                else {
+                    key: value / calls_per_graph for key, value in reset_stats.items()
+                }
+            ),
+            "serving_faithful_estimate_stats_us": serving_faithful_stats,
+            "serving_faithful_estimate_per_call_stats_us": (
+                None
+                if serving_faithful_stats is None
+                else {
+                    key: value / calls_per_graph
+                    for key, value in serving_faithful_stats.items()
+                }
+            ),
             "max_rank_samples_us": max_rank_samples_us,
             "rank_samples_us": all_rank_samples_us,
             "rank_path_identities": rank_path_identities,
@@ -439,9 +504,7 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
             # comparisons should use max_rank_samples_stats_us, which takes the
             # max rank per iteration before computing percentiles.
             "max_rank_median_us": max(rank_medians_us),
-            "max_rank_median_per_call_us": (
-                max(rank_medians_us) / calls_per_graph
-            ),
+            "max_rank_median_per_call_us": (max(rank_medians_us) / calls_per_graph),
             "rank_medians_us": rank_medians_us,
         }
         if impl == "triton_shmem":

@@ -35,11 +35,11 @@ import subprocess
 import sys
 import threading
 import time
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Sequence
-
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BENCHMARK_DIR = REPO_ROOT / "benchmark"
@@ -100,7 +100,7 @@ def _upstream_unfused_arm() -> Arm:
     )
 
 
-def comparison_arms(name: str) -> tuple[Arm, Arm]:
+def comparison_arms(name: str) -> tuple[Arm, ...]:
     if name == "gate256":
         return ARMS
     if name == "iris":
@@ -120,6 +120,24 @@ def comparison_arms(name: str) -> tuple[Arm, Arm]:
             Arm(
                 "triton_shmem",
                 0,
+                fusion_enabled=1,
+                backend="triton_shmem",
+                signature_family="triton_shmem_fused",
+            ),
+        )
+    if name == "three_backend":
+        return (
+            _upstream_unfused_arm(),
+            Arm(
+                "iris_fused",
+                0,
+                fusion_enabled=1,
+                backend="auto",
+                signature_family="iris_fused",
+            ),
+            Arm(
+                "triton_profile",
+                int(os.environ.get("TS_TRITON_SHMEM_FUSION_MAX_M", "0")),
                 fusion_enabled=1,
                 backend="triton_shmem",
                 signature_family="triton_shmem_fused",
@@ -189,11 +207,12 @@ def build_schedule(
     blocks: int,
     seeds: Sequence[int],
     order_seed: int,
+    block_offset: int = 0,
 ) -> list[dict[str, Any]]:
     """Return a deterministic block schedule with randomized arm/seed order."""
     rng = random.Random(order_seed)
     schedule = []
-    for block in range(blocks):
+    for block in range(block_offset, block_offset + blocks):
         arm_order = [arm.name for arm in ARMS]
         rng.shuffle(arm_order)
         seed_order = list(seeds)
@@ -487,6 +506,8 @@ def _git_metadata() -> dict[str, Any]:
                 / "python/tokenspeed_kernel/ops/communication/triton_shmem.py",
                 REPO_ROOT
                 / "python/tokenspeed_kernel/ops/communication/_triton_shmem_kernels.py",
+                REPO_ROOT
+                / "python/tokenspeed_kernel/ops/communication/_triton_shmem_profile.py",
             )
         },
     }
@@ -855,6 +876,7 @@ def validate_trace_signatures(
     world_size: int,
     arm: Arm,
     require_captured_prefill_fallback: bool = True,
+    require_fused_decode: bool = True,
 ) -> dict[str, Any]:
     traces = sorted(trace_dir.glob("*.trace.json*"))
     if len(traces) != world_size:
@@ -890,7 +912,7 @@ def validate_trace_signatures(
                     f"Iris arm entered triton_shmem in {trace}: {counts}"
                 )
         elif arm.signature_family == "triton_shmem_fused":
-            if counts["oneshot"] == 0:
+            if require_fused_decode and counts["oneshot"] == 0:
                 raise RuntimeError(
                     f"missing triton_shmem fused decode signature in {trace}"
                 )
@@ -1135,11 +1157,9 @@ def _arm_environment(
             "ENABLE_ALLREDUCE_FUSION": str(arm.fusion_enabled),
             "TS_TRITON_SHMEM_FUSION_MAX_M": str(arm.fusion_max_m),
             "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT": str(
-                (
-                    arm.double_buffer_input
-                    if arm.double_buffer_input is not None
-                    else args.double_buffer_input
-                )
+                arm.double_buffer_input
+                if arm.double_buffer_input is not None
+                else args.double_buffer_input
             ),
             "TS_TRITON_SHMEM_BARRIER_GRID": str(args.barrier_grid),
             "TS_TRITON_SHMEM_INKERNEL_BARRIER": str(args.inkernel_barrier),
@@ -1214,10 +1234,12 @@ def _start_phase(
             world_size=args.world_size,
             cap=args.cap,
         )
-        if (
-            os.environ.get("AR_NORM_PROFILE_ID")
-            == "gpt-oss-120b-mi350x-triton-core-v3"
-            and args.comparison in ("unfused", "iris", "triton_shmem")
+        if os.environ.get(
+            "AR_NORM_PROFILE_ID"
+        ) == "gpt-oss-120b-mi350x-triton-core-v3" and args.comparison in (
+            "unfused",
+            "iris",
+            "triton_shmem",
         ):
             profile_proof["qualified_profile"] = _qualified_profile_proof(
                 phase_dir / f"serve-{label}.log",
@@ -1371,6 +1393,7 @@ def _run_arm(
     try:
         produced_results = []
         serve_proofs: dict[str, Any] = {}
+        definitive_trace_proofs: dict[str, Any] = {}
 
         # Every decode seed gets a fresh server. Reusing one server across long
         # benchmark clients has independently reproduced scheduler/GPU stalls,
@@ -1466,6 +1489,63 @@ def _run_arm(
                     selected_gpus=args.selected_physical_gpus,
                     physical_to_kfd_id=args.physical_to_kfd_id,
                 )
+            if args.definitive_diagnostics and block == 0 and seed == seed_order[0]:
+                diagnostics = (
+                    (
+                        "decode-c64",
+                        Workload("decode-c64", 128, 128, 128, 64, "diagnostic"),
+                        30000,
+                    ),
+                    (
+                        "direct-m512",
+                        Workload("direct-m512", 512, 8, 8, 1, "signature"),
+                        31000,
+                    ),
+                )
+                for diagnostic_name, workload, diagnostic_seed in diagnostics:
+                    trace_dir = decode_dir / "traces" / diagnostic_name
+                    profile_id = f"{decode_label}-{diagnostic_name}"
+                    _guard_phase(args, decode_dir)
+                    _run_guarded_benchmark(
+                        _bench_command(
+                            profile_id,
+                            workload,
+                            diagnostic_seed + block,
+                            ready_check=False,
+                            extra=(
+                                "--profile",
+                                "--profile-num-steps",
+                                "8",
+                                "--profile-base-url",
+                                f"http://127.0.0.1:{args.control_port}",
+                                "--profile-output-dir",
+                                str(trace_dir),
+                                "--profile-id",
+                                profile_id,
+                                "--no-profile-with-stack",
+                                "--profile-record-shapes",
+                                "--profile-activities",
+                                "CPU",
+                                "GPU",
+                            ),
+                        ),
+                        args=args,
+                        phase_dir=decode_dir,
+                        env=active_env,
+                        log=active_log,
+                    )
+                    if not args.dry_run:
+                        definitive_trace_proofs[diagnostic_name] = (
+                            validate_trace_signatures(
+                                trace_dir,
+                                world_size=args.world_size,
+                                arm=arm,
+                                require_captured_prefill_fallback=(
+                                    diagnostic_name == "direct-m512"
+                                ),
+                                require_fused_decode=(diagnostic_name == "decode-c64"),
+                            )
+                        )
             _teardown(env=active_env, log=active_log, dry_run=args.dry_run)
             active_env = None
             active_log = None
@@ -1481,7 +1561,7 @@ def _run_arm(
                     "status": "complete",
                     "completed_at": _utc_now(),
                     "results": produced_results,
-                    "trace_proof": None,
+                    "trace_proof": definitive_trace_proofs or None,
                     "serve_proofs": serve_proofs,
                 }
             )
@@ -1675,9 +1755,11 @@ def _run_arm(
             )
 
 
-def _collect_pairs(run_root: Path) -> dict[str, dict[str, dict[int, list[float]]]]:
+def _collect_pairs(
+    run_root: Path,
+) -> dict[str, dict[str, dict[str, dict[int, list[float]]]]]:
     records: dict[tuple[int, str, int, str], dict[str, Any]] = {}
-    for summary_path in sorted(run_root.glob("block-*/*/arm-summary.json")):
+    for summary_path in sorted(run_root.rglob("block-*/*/arm-summary.json")):
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
         if summary.get("status") != "complete":
             continue
@@ -1693,24 +1775,25 @@ def _collect_pairs(run_root: Path) -> dict[str, dict[str, dict[int, list[float]]
                 result_path.read_text(encoding="utf-8")
             )
 
-    paired: dict[str, dict[str, dict[int, list[float]]]] = {}
+    paired: dict[str, dict[str, dict[str, dict[int, list[float]]]]] = {}
     for block, workload, seed, arm in sorted(records):
         if arm != ARMS[0].name:
             continue
         baseline = records[(block, workload, seed, ARMS[0].name)]
-        candidate_key = (block, workload, seed, ARMS[1].name)
-        if candidate_key not in records:
-            continue
-        candidate = records[candidate_key]
-        for metric in METRICS:
-            if metric not in baseline or metric not in candidate:
+        for candidate_arm in ARMS[1:]:
+            candidate_key = (block, workload, seed, candidate_arm.name)
+            if candidate_key not in records:
                 continue
-            baseline_value = float(baseline[metric])
-            candidate_value = float(candidate[metric])
-            change = (candidate_value / baseline_value - 1.0) * 100.0
-            paired.setdefault(workload, {}).setdefault(metric, {}).setdefault(
-                block, []
-            ).append(change)
+            candidate = records[candidate_key]
+            for metric in METRICS:
+                if metric not in baseline or metric not in candidate:
+                    continue
+                baseline_value = float(baseline[metric])
+                candidate_value = float(candidate[metric])
+                change = (candidate_value / baseline_value - 1.0) * 100.0
+                paired.setdefault(candidate_arm.name, {}).setdefault(
+                    workload, {}
+                ).setdefault(metric, {}).setdefault(block, []).append(change)
     return paired
 
 
@@ -1720,80 +1803,97 @@ def analyze_campaign(
     bootstrap_samples: int,
     bootstrap_seed: int,
 ) -> dict[str, Any]:
-    paired = _collect_pairs(run_root)
-    analyses: dict[str, Any] = {}
-    for workload, metrics in paired.items():
-        analyses[workload] = {}
-        for metric, values_by_block in metrics.items():
-            analyses[workload][metric] = hierarchical_bootstrap(
-                values_by_block,
-                samples=bootstrap_samples,
-                seed=bootstrap_seed
-                + sum(ord(character) for character in workload + metric),
-            )
+    paired_by_candidate = _collect_pairs(run_root)
+    comparisons = {}
+    for candidate_name, paired in paired_by_candidate.items():
+        analyses: dict[str, Any] = {}
+        for workload, metrics in paired.items():
+            analyses[workload] = {}
+            for metric, values_by_block in metrics.items():
+                analyses[workload][metric] = hierarchical_bootstrap(
+                    values_by_block,
+                    samples=bootstrap_samples,
+                    seed=bootstrap_seed
+                    + sum(
+                        ord(character)
+                        for character in candidate_name + workload + metric
+                    ),
+                )
 
-    reasons = []
-    decode_sample = analyses.get("decode", {}).get("median_tpot_ms")
-    sample_sufficient = not (
-        decode_sample is None
-        or decode_sample["n_blocks"] < 3
-        or decode_sample["n_pairs"] < 15
-    )
-    if not sample_sufficient:
-        reasons.append(
-            "insufficient paired evidence: require >=3 blocks and >=15 pairs"
+        reasons = []
+        decode_sample = analyses.get("decode", {}).get("median_tpot_ms")
+        sample_sufficient = not (
+            decode_sample is None
+            or decode_sample["n_blocks"] < 3
+            or decode_sample["n_pairs"] < 15
         )
-    decode_tpot = analyses.get("decode", {}).get("median_tpot_ms")
-    decode_throughput = analyses.get("decode", {}).get("output_throughput")
-    latency_gate = bool(
-        decode_tpot is not None
-        and decode_throughput is not None
-        and decode_tpot["mean"] <= -1.5
-        and decode_tpot["ci95_high"] < 0
-        and decode_throughput["ci95_low"] >= -0.5
-    )
-    capacity_gate = bool(
-        decode_tpot is not None
-        and decode_throughput is not None
-        and decode_throughput["mean"] >= 1.0
-        and decode_throughput["ci95_low"] > 0
-        and decode_tpot["ci95_high"] <= 1.0
-    )
-    if sample_sufficient and not (latency_gate or capacity_gate):
-        reasons.append("neither latency nor capacity promotion threshold was cleared")
+        if not sample_sufficient:
+            reasons.append(
+                "insufficient paired evidence: require >=3 blocks and >=15 pairs"
+            )
+        decode_tpot = analyses.get("decode", {}).get("median_tpot_ms")
+        decode_throughput = analyses.get("decode", {}).get("output_throughput")
+        latency_gate = bool(
+            decode_tpot is not None
+            and decode_throughput is not None
+            and decode_tpot["mean"] <= -1.5
+            and decode_tpot["ci95_high"] < 0
+            and decode_throughput["ci95_low"] >= -0.5
+        )
+        capacity_gate = bool(
+            decode_tpot is not None
+            and decode_throughput is not None
+            and decode_throughput["mean"] >= 1.0
+            and decode_throughput["ci95_low"] > 0
+            and decode_tpot["ci95_high"] <= 1.0
+        )
+        if sample_sufficient and not (latency_gate or capacity_gate):
+            reasons.append(
+                "neither latency nor capacity promotion threshold was cleared"
+            )
+        comparisons[candidate_name] = {
+            "comparison": {
+                "baseline": ARMS[0].name,
+                "candidate": candidate_name,
+                "change_definition": "(candidate / baseline - 1) * 100",
+            },
+            "workloads": analyses,
+            "promotion": {
+                "eligible": sample_sufficient and (latency_gate or capacity_gate),
+                "reasons": reasons,
+                "objectives": {
+                    "latency": {"eligible": latency_gate},
+                    "capacity": {"eligible": capacity_gate},
+                },
+                "criteria": {
+                    "latency": (
+                        "paired TPOT mean <= -1.5%, CI95 high < 0, and "
+                        "throughput CI95 low >= -0.5%"
+                    ),
+                    "capacity": (
+                        "paired throughput mean >= +1.0%, CI95 low > 0, and "
+                        "TPOT CI95 high <= +1.0%"
+                    ),
+                    "sample_size": ">=3 restart blocks and >=15 paired observations",
+                },
+            },
+        }
 
+    primary_name = (
+        "triton_profile" if "triton_profile" in comparisons else next(iter(comparisons))
+    )
+    primary = comparisons[primary_name]
     summary = {
         "generated_at": _utc_now(),
-        "comparison": {
-            "baseline": ARMS[0].name,
-            "candidate": ARMS[1].name,
-            "change_definition": "(candidate / baseline - 1) * 100",
-        },
+        "comparison": primary["comparison"],
         "bootstrap": {
             "method": "paired hierarchical restart-block bootstrap",
             "samples": bootstrap_samples,
             "seed": bootstrap_seed,
         },
-        "workloads": analyses,
-        "promotion": {
-            "eligible": sample_sufficient and (latency_gate or capacity_gate),
-            "reasons": reasons,
-            "objectives": {
-                "latency": {"eligible": latency_gate},
-                "capacity": {"eligible": capacity_gate},
-            },
-            "criteria": {
-                "latency": (
-                    "paired TPOT mean <= -1.5%, CI95 high < 0, and "
-                    "throughput CI95 low >= -0.5%"
-                ),
-                "capacity": (
-                    "paired throughput mean >= +1.0%, CI95 low > 0, and "
-                    "TPOT CI95 high <= +1.0%"
-                ),
-                "sample_size": ">=3 restart blocks and >=15 paired observations",
-            },
-        },
+        "workloads": primary["workloads"],
+        "promotion": primary["promotion"],
+        "comparisons": comparisons,
     }
     _write_json(run_root / "campaign-summary.json", summary)
     _write_summary_markdown(run_root / "campaign-summary.md", summary)
@@ -1943,6 +2043,7 @@ def _manifest(
             "control_port": args.control_port,
             "benchmark_timeout": args.benchmark_timeout,
             "blocks": args.blocks,
+            "block_offset": args.block_offset,
             "seeds": args.seeds,
             "order_seed": args.order_seed,
             "bootstrap_samples": args.bootstrap_samples,
@@ -1953,6 +2054,7 @@ def _manifest(
             "selected_physical_gpus": sorted(args.selected_physical_gpus),
             "skip_profiles": args.skip_profiles,
             "decode_only": args.decode_only,
+            "definitive_diagnostics": args.definitive_diagnostics,
             "stability_only": args.stability_only,
             "dry_run": args.dry_run,
         },
@@ -1966,11 +2068,13 @@ def _manifest(
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--blocks", type=int, default=3)
+    parser.add_argument("--block-offset", type=int, default=0)
     parser.add_argument(
         "--comparison",
         choices=(
             "iris",
             "triton_shmem",
+            "three_backend",
             "gate256",
             "unfused",
             "input_ring",
@@ -2061,6 +2165,11 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--skip-profiles", action="store_true")
     parser.add_argument("--decode-only", action="store_true")
     parser.add_argument(
+        "--definitive-diagnostics",
+        action="store_true",
+        help="Capture first-block C64 and direct-M512 marker traces.",
+    )
+    parser.add_argument(
         "--stability-only",
         action="store_true",
         help=(
@@ -2091,6 +2200,8 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         parser.error(f"AR_NORM_PROFILE_FILE does not exist: {PROFILE_ENV}")
     if args.blocks < 1:
         parser.error("--blocks must be positive")
+    if args.block_offset < 0:
+        parser.error("--block-offset must be non-negative")
     if args.bootstrap_samples < 100:
         parser.error("--bootstrap-samples must be at least 100")
     if args.benchmark_timeout < 1:
@@ -2132,7 +2243,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.comparison,
         stability_only=args.stability_only,
     )
-    schedule = build_schedule(args.blocks, args.seeds, args.order_seed)
+    schedule = build_schedule(
+        args.blocks,
+        args.seeds,
+        args.order_seed,
+        block_offset=args.block_offset,
+    )
     args.run_root.mkdir(parents=True, exist_ok=True)
     manifest_path = args.run_root / "campaign-manifest.json"
     if manifest_path.exists():

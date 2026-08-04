@@ -108,6 +108,12 @@ Zero disables the additional gate. The value 256 proved dispatch mechanics but
 timed out under the stable repeatability control; do not rerun it without a
 transition-safe fallback redesign.
 
+The planned GPT definitive campaign does not reuse M256. It keeps the 2048
+workspace identity and permits only predeclared actual-M gates at 64, 91, or
+384 after two graph passes, eager evidence, and serving-M markers agree. The
+selected gate is encoded in a fail-closed profile ID and requalified before any
+end-to-end comparison.
+
 `TS_TRITON_SHMEM_FUSION_MIN_M` is a separate lower performance gate. GLM
 profile v2 sets it to 2 so M1 captures complete ordinary fallback; its
 shared-state transition probe covers both sides of that boundary.
@@ -157,6 +163,9 @@ window identical.
 - Generic serving: `benchmark/e2e_arnorm_serve.sh`
 - Generic benchmark: `benchmark/e2e_arnorm_bench.sh`
 - Generic profiling wrapper: `benchmark/e2e_arnorm_profile_serve.sh`
+- Graph campaign runner: `benchmark/run_ar_rmsnorm_graph_sweep.py`
+- Eager campaign runner: `benchmark/run_ar_rmsnorm_eager_sweep.py`
+- GPT three-WS serving orchestrator: `benchmark/run_gpt_oss_definitive_e2e.py`
 - gpt-oss compatibility wrappers: `benchmark/e2e_gptoss_*.sh`
 - Model profiles: `benchmark/profiles/ar_rmsnorm/`
 
@@ -166,6 +175,12 @@ serving defaults; eager/health/KVStore controls from the historical bring-up
 are not encoded. See the [GLM status](glm-5.2-fp8-status.md). The generic
 repeatability and reproducer paths derive model, artifact root, world size,
 device set, and fusion cap from the sourced profile.
+
+GPT definitive wrappers are
+`benchmark/profiles/ar_rmsnorm/gpt_oss_120b_mi350x_definitive_ws{2,4,8}.env`.
+They use `/data/models/openai-gpt-oss-120b` and require explicit current-machine
+device sets. The old core-v3 image, path, and HIP mapping remain historical
+identity and must not be copied without a topology audit.
 
 The generic serve, benchmark, profile, and teardown paths accept `CONTAINER` or
 `TOKENSPEED_CONTAINER`; the qualified lab value is
@@ -316,6 +331,11 @@ PYTHONPATH=. python3 benchmark/run_ar_rmsnorm_graph_sweep.py \
 
 Device sets are launch-time identity, not defaults in the campaign
 specification. Freeze them only after the shared-host and topology preflight.
+
+The [GPT definitive study](../studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/README.md)
+uses 72-site graph sweeps plus a separate fresh-process eager sweep. Its graph
+summary preserves both raw replay and reset-copy-adjusted unfused values; never
+mix those columns or merge eager and graph rows.
 
 4. Shared-state graph transition gate:
 

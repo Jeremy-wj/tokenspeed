@@ -22,7 +22,8 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ORDINARY_AR_MAX_BYTES = 512 * 1024
-KNOWN_ARMS = ("upstream_unfused", "iris_fused", "triton_forced")
+CONTROL_ARMS = {"upstream_unfused", "iris_fused"}
+CANDIDATE_ARMS = {"triton_forced", "triton_profile"}
 
 
 @dataclass(frozen=True)
@@ -50,9 +51,13 @@ def _read_spec(path: Path) -> dict[str, Any]:
     world_sizes = [int(value) for value in spec["world_sizes"]]
     if world_sizes != [2, 4, 8]:
         raise ValueError("definitive campaign world_sizes must be [2, 4, 8]")
-    if set(spec["arms"]) != set(KNOWN_ARMS):
-        raise ValueError(f"campaign arms must be {KNOWN_ARMS}")
-    names = [block["name"] for block in spec["blocks"]]
+    arms = set(spec["arms"])
+    if not CONTROL_ARMS.issubset(arms) or len(arms & CANDIDATE_ARMS) != 1:
+        raise ValueError(
+            "campaign requires upstream_unfused, iris_fused, and one Triton arm"
+        )
+    graph = spec.get("microbenchmark", {}).get("graph", spec)
+    names = [block["name"] for block in graph["blocks"]]
     if len(names) != len(set(names)):
         raise ValueError("campaign block names must be unique")
     return spec
@@ -79,10 +84,12 @@ def _parse_devices(values: Sequence[str]) -> dict[int, str]:
 def build_schedule(spec: dict[str, Any]) -> list[Run]:
     schedule = []
     hidden_size = int(spec["hidden_size"])
-    profile_cap = int(spec["profile_cap"])
-    for block in spec["blocks"]:
+    profile_cap = int(spec.get("workspace_cap", spec.get("profile_cap", 0)))
+    graph = spec.get("microbenchmark", {}).get("graph", spec)
+    graph_calls = graph.get("calls_per_graph")
+    for block in graph["blocks"]:
         arm_order = block["arm_order"]
-        if set(arm_order) != set(KNOWN_ARMS):
+        if set(arm_order) != set(spec["arms"]):
             raise ValueError(
                 f"{block['name']} arm_order must contain every campaign arm"
             )
@@ -92,13 +99,19 @@ def build_schedule(spec: dict[str, Any]) -> list[Run]:
                     schedule.append(
                         Run(
                             block=block["name"],
-                            calls_per_graph=int(block["calls_per_graph"]),
+                            calls_per_graph=int(
+                                block.get("calls_per_graph", graph_calls)
+                            ),
                             world_size=int(ws),
                             hidden_size=hidden_size,
                             m=int(m),
                             arm=arm,
                             bench_impl=spec["arms"][arm]["bench_impl"],
-                            max_token_num=max(profile_cap, int(m)),
+                            max_token_num=(
+                                profile_cap
+                                if "workspace_cap" in spec
+                                else max(profile_cap, int(m))
+                            ),
                         )
                     )
     return schedule
@@ -116,16 +129,29 @@ def _result_path(root: Path, run: Run) -> Path:
     )
 
 
-def _expected_backend(run: Run) -> str:
-    if run.arm == "triton_forced":
-        return "triton_shmem"
-    if run.arm == "iris_fused":
-        return "iris"
+def _ordinary_backend(run: Run) -> str:
     payload_bytes = 2 * run.m * run.hidden_size
     return "iris" if payload_bytes <= ORDINARY_AR_MAX_BYTES else "rccl"
 
 
-def _validate_result(path: Path, run: Run, replays: int) -> None:
+def _expected_backend(spec: dict[str, Any], run: Run) -> str:
+    if run.arm == "triton_forced":
+        return "triton_shmem"
+    if run.arm == "iris_fused":
+        return "iris"
+    if run.arm == "triton_profile":
+        fusion_max_m = 0
+        eligible_max = min(384, fusion_max_m) if fusion_max_m > 0 else 384
+        return "triton_shmem" if run.m <= eligible_max else _ordinary_backend(run)
+    return _ordinary_backend(run)
+
+
+def _validate_result(
+    path: Path,
+    spec: dict[str, Any],
+    run: Run,
+    replays: int,
+) -> None:
     payload = json.loads(path.read_text(encoding="utf-8"))
     expected = {
         "world_size": run.world_size,
@@ -135,7 +161,7 @@ def _validate_result(path: Path, run: Run, replays: int) -> None:
         "max_token_num": run.max_token_num,
         "repeat": replays,
         "resolved_impl": run.bench_impl,
-        "expected_backend": _expected_backend(run),
+        "expected_backend": _expected_backend(spec, run),
     }
     mismatches = {
         key: (payload.get(key), value)
@@ -164,8 +190,16 @@ def _run_env(
             "BENCH_M": str(run.m),
             "BENCH_MAX_TOKEN_NUM": str(run.max_token_num),
             "BENCH_CALLS_PER_GRAPH": str(run.calls_per_graph),
-            "BENCH_N_WARMUP": str(spec["warmup"]),
-            "BENCH_N_REPEAT": str(spec["replays"]),
+            "BENCH_N_WARMUP": str(
+                spec.get("microbenchmark", {})
+                .get("graph", {})
+                .get("warmups", spec.get("warmup"))
+            ),
+            "BENCH_N_REPEAT": str(
+                spec.get("microbenchmark", {})
+                .get("graph", {})
+                .get("replays", spec.get("replays"))
+            ),
             "BENCH_IMPL": run.bench_impl,
             "BENCH_JSON": str(output),
             "PYTHONPATH": f"{REPO_ROOT / 'python'}:{REPO_ROOT}",
@@ -186,12 +220,19 @@ def _run_env(
                 "TS_TRITON_SHMEM_PADDED_MAX_M": cap,
             }
         )
+    elif run.arm == "triton_profile":
+        env["GPT_OSS_DEFINITIVE_FUSION_MAX_M"] = "0"
     return env
 
 
-def _command(spec: dict[str, Any]) -> list[str]:
-    profile = (REPO_ROOT / spec["profile_env"]).resolve()
-    module = shlex.quote(spec["benchmark_module"])
+def _command(spec: dict[str, Any], run: Run) -> list[str]:
+    profile_path = spec.get("profile_env")
+    if "profiles" in spec:
+        profile_path = spec["profiles"][str(run.world_size)]
+    profile = (REPO_ROOT / profile_path).resolve()
+    module = shlex.quote(
+        spec.get("benchmark_module", "benchmark.probe_ar_rmsnorm_graph_perf")
+    )
     shell = f"source {shlex.quote(str(profile))} && exec python3 -m {module}"
     return ["bash", "-lc", shell]
 
@@ -277,7 +318,7 @@ def run_campaign(
         "spec_sha256": hashlib.sha256(spec_bytes).hexdigest(),
         "devices": {str(key): value for key, value in devices.items()},
         "processes": len(schedule),
-        "command": _command(spec),
+        "command_template": "profile selected per world size",
     }
     _write_json(output_root / "campaign-manifest.json", manifest)
 
@@ -293,7 +334,9 @@ def run_campaign(
         result_path.parent.mkdir(parents=True, exist_ok=True)
         if resume and result_path.exists():
             try:
-                _validate_result(result_path, run, int(spec["replays"]))
+                graph = spec.get("microbenchmark", {}).get("graph", {})
+                replays = int(graph.get("replays", spec.get("replays")))
+                _validate_result(result_path, spec, run, replays)
             except (ValueError, KeyError, json.JSONDecodeError):
                 invalid = result_path.with_suffix(f".invalid-{int(time.time())}.json")
                 result_path.replace(invalid)
@@ -303,7 +346,7 @@ def run_campaign(
 
         log_path = result_path.with_suffix(f".attempt-{time.time_ns()}.log")
         run_started = time.monotonic()
-        command = _command(spec)
+        command = _command(spec, run)
         status: dict[str, Any] = {
             "index": index,
             "run": asdict(run),
@@ -327,7 +370,9 @@ def run_campaign(
             status["returncode"] = returncode
             if returncode != 0:
                 raise RuntimeError(f"benchmark exited {returncode}")
-            _validate_result(result_path, run, int(spec["replays"]))
+            graph = spec.get("microbenchmark", {}).get("graph", {})
+            replays = int(graph.get("replays", spec.get("replays")))
+            _validate_result(result_path, spec, run, replays)
         except (OSError, RuntimeError, subprocess.TimeoutExpired, ValueError) as exc:
             failed += 1
             status["status"] = "failed"

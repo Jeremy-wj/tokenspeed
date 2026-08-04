@@ -1,6 +1,6 @@
 # GPT-OSS-120B fused AR+RMSNorm status
 
-Updated: 2026-08-01
+Updated: 2026-08-03
 
 This is the live deployment decision and priority page for GPT-OSS-120B,
 TP=4, on MI350X (gfx950). Dated study conclusions remain historical evidence
@@ -92,6 +92,18 @@ Historical restricted-configuration graph and serving evidence:
 Safety qualification is limited to HIP `1,2,5,6`. Requalify every other TP=4
 rank set independently. WS=8 remains deferred and unqualified.
 
+## Pending definitive campaign
+
+The [current-machine definitive campaign](../studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/README.md)
+predeclares comparable eager, 72-site graph, and end-to-end evidence for
+WS=2/4/8. It uses the current model path `/data/models/openai-gpt-oss-120b`,
+three arms, topology-specific fail-closed profiles, and a microbenchmark-driven
+actual-M fusion gate selected before serving.
+
+The campaign has **not been run**. Existing WS4 policy and percentages remain
+live until its retained result set is complete. WS2/8 results will be
+independently qualified and must not inherit the old rank-set identity.
+
 ## Evidence
 
 - [Default compatibility and requalification](../studies/mi350x/2026-07-default-compatibility/README.md)
@@ -99,6 +111,7 @@ rank set independently. WS=8 remains deferred and unqualified.
 - [Three-backend decomposition](../studies/mi350x/2026-07-triton-shmem-decomposition/README.md)
 - [Profile-v2 realignment](../studies/mi350x/2026-07-triton-shmem-realignment/README.md)
 - [Post-rebase baseline reset](../studies/mi350x/2026-07-post-rebase-baseline/README.md)
+- [Definitive current-machine campaign](../studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/README.md)
 - [Benchmark and promotion methodology](benchmark-methodology-recommendations-2026-07.md)
 
 ## Engineering highlights
@@ -160,8 +173,8 @@ live decision record.
 7. Keep `all_reduce_two` separate and retain its initial correctness incident.
 8. Preserve graph-stable lifetime, sink padding, complete fallback, and
    explicit synchronization contracts in every candidate.
-9. Reopen GPT-OSS optimization only with a changed mechanism, topology, or
-   producer contract; the current integration effort is finalized.
+9. Use the planned current-machine topology campaign as the only active
+   performance restart point; do not reopen closed local kernel searches.
 
 Technical contracts:
 [backend design](backend-design-and-safety.md),

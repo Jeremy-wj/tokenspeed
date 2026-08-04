@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import benchmark.run_ar_rmsnorm_repeatability as repeatability
 from benchmark.run_ar_rmsnorm_repeatability import (
     ARMS,
     METRICS,
@@ -45,6 +46,11 @@ def test_schedule_is_deterministic_and_balanced():
         assert sorted(spec["seed_order"]) == [0, 1, 2, 3, 4]
 
 
+def test_schedule_block_offset_supports_additive_stages():
+    schedule = build_schedule(2, [0], 1234, block_offset=3)
+    assert [block["block"] for block in schedule] == [3, 4]
+
+
 def test_gpu_campaign_lock_rejects_overlap(tmp_path):
     path = tmp_path / "gpu.lock"
     first = _acquire_gpu_campaign_lock(path)
@@ -73,6 +79,12 @@ def test_comparison_arms_are_unconfounded():
         "triton_shmem",
         "triton_shmem_fused",
     )
+    triplet = comparison_arms("three_backend")
+    assert [arm.name for arm in triplet] == [
+        "upstream_unfused",
+        "iris_fused",
+        "triton_profile",
+    ]
     single, double = comparison_arms("input_ring")
     assert single.double_buffer_input == 0
     assert double.double_buffer_input == 1
@@ -520,8 +532,10 @@ def _write_arm(
     position: int,
     arm: str,
     multiplier: float,
+    stage: str | None = None,
 ) -> None:
-    arm_dir = root / f"block-{block:02d}" / f"p{position}-{arm}"
+    stage_root = root / stage if stage else root
+    arm_dir = stage_root / f"block-{block:02d}" / f"p{position}-{arm}"
     results = arm_dir / "results"
     results.mkdir(parents=True)
     (arm_dir / "arm-summary.json").write_text(
@@ -581,4 +595,63 @@ def test_campaign_analysis_uses_paired_blocks(tmp_path):
         for reason in summary["promotion"]["reasons"]
     )
     assert not summary["promotion"]["objectives"]["latency"]["eligible"]
+
+
+def test_three_arm_analysis_reuses_one_unfused_control(tmp_path, monkeypatch):
+    arms = comparison_arms("three_backend")
+    monkeypatch.setattr(repeatability, "ARMS", arms)
+    for block in range(3):
+        for position, (arm, multiplier) in enumerate(zip(arms, (1.0, 1.02, 0.98))):
+            _write_arm(
+                tmp_path,
+                block=block,
+                position=position,
+                arm=arm.name,
+                multiplier=multiplier,
+            )
+
+    summary = analyze_campaign(
+        tmp_path,
+        bootstrap_samples=500,
+        bootstrap_seed=9,
+    )
+
+    assert set(summary["comparisons"]) == {"iris_fused", "triton_profile"}
+    assert (
+        summary["comparisons"]["triton_profile"]["workloads"]["decode"][
+            "median_tpot_ms"
+        ]["n_pairs"]
+        == 6
+    )
+    assert summary["comparison"]["candidate"] == "triton_profile"
+
+
+def test_three_arm_analysis_combines_additive_stage_directories(
+    tmp_path,
+    monkeypatch,
+):
+    arms = comparison_arms("three_backend")
+    monkeypatch.setattr(repeatability, "ARMS", arms)
+    for stage, block in (("core", 0), ("extension", 3)):
+        for position, (arm, multiplier) in enumerate(zip(arms, (1.0, 1.02, 0.98))):
+            _write_arm(
+                tmp_path,
+                stage=stage,
+                block=block,
+                position=position,
+                arm=arm.name,
+                multiplier=multiplier,
+            )
+
+    summary = analyze_campaign(
+        tmp_path,
+        bootstrap_samples=500,
+        bootstrap_seed=9,
+    )
+
+    result = summary["comparisons"]["triton_profile"]["workloads"]["decode"][
+        "median_tpot_ms"
+    ]
+    assert result["n_blocks"] == 2
+    assert result["n_pairs"] == 4
     assert not summary["promotion"]["objectives"]["capacity"]["eligible"]

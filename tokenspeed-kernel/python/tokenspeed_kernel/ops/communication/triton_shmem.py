@@ -20,9 +20,8 @@
 
 """``triton_shmem`` fused all-reduce + residual + RMSNorm backend (symm_mem).
 
-The fused kernels originate in the external ``triton-shmem`` repo (hence the
-name); this module vendors them (see :mod:`._triton_shmem_kernels`) and drives
-them over **PyTorch symmetric memory** (``torch.distributed._symmetric_memory``)
+The fused kernels are embedded in :mod:`._triton_shmem_kernels` and run over
+**PyTorch symmetric memory** (``torch.distributed._symmetric_memory``)
 rather than the rocSHMEM heap they used upstream. That rocSHMEM->symm_mem
 re-backing IS the migration: zero new runtime deps (symm_mem ships in ``torch``;
 rocSHMEM is not pip-installable) and a graph-capture-safe in-kernel signal-pad
@@ -83,6 +82,7 @@ from tokenspeed_kernel.platform import current_platform
 from tokenspeed_kernel.profiling import kernel_scope
 
 from . import _triton_shmem_kernels as _k
+from . import _triton_shmem_profile as _p
 from ._coarse_shmem import CoarseSymmBuffer, alloc_coarse_symm
 from .triton import _alloc_symm, _peer_ptrs_dev
 
@@ -90,6 +90,11 @@ logger = logging.getLogger(__file__)
 
 _platform = current_platform()
 _CORE_V3_PROFILE = "gpt-oss-120b-mi350x-triton-core-v3"
+_GPT_DEFINITIVE_PROFILES = {
+    f"gpt-oss-120b-mi350x-definitive-ws{ws}-cap{cap}-v1": (ws, cap)
+    for ws in (2, 4, 8)
+    for cap in (0, 64, 91, 384)
+}
 _GLM52_V1_PROFILE = "glm-5.2-fp8-mi350x-triton-v1"
 _GLM52_V2_PROFILE = "glm-5.2-fp8-mi350x-triton-v2"
 _STATE_ENV_KEYS = (
@@ -336,7 +341,13 @@ def _profile_validation_errors(
     """Return profile mismatches without allocating communication state."""
     if not profile_id or profile_id == "unqualified-manual":
         return []
-    if profile_id not in {_CORE_V3_PROFILE, _GLM52_V1_PROFILE, _GLM52_V2_PROFILE}:
+    known_profiles = {
+        _CORE_V3_PROFILE,
+        _GLM52_V1_PROFILE,
+        _GLM52_V2_PROFILE,
+        *_GPT_DEFINITIVE_PROFILES,
+    }
+    if profile_id not in known_profiles:
         return [f"unknown AR_NORM_PROFILE_ID={profile_id!r}"]
 
     errors: list[str] = []
@@ -377,6 +388,48 @@ def _profile_validation_errors(
             "TS_TRITON_SHMEM_BARRIER_GRID": "0",
             "TS_TRITON_SHMEM_FUSION_MIN_M": "0",
             "TS_TRITON_SHMEM_FUSION_MAX_M": "0",
+            "TS_TRITON_SHMEM_PROFILE_PURE_TP": "1",
+        }
+    elif profile_id in _GPT_DEFINITIVE_PROFILES:
+        expected_ws, expected_cap = _GPT_DEFINITIVE_PROFILES[profile_id]
+        expected_devices = os.environ.get("AR_NORM_DEVICES", "")
+        if not expected_devices:
+            errors.append("AR_NORM_DEVICES must identify the qualified rank set")
+        elif len(expected_devices.split(",")) != expected_ws:
+            errors.append(
+                f"AR_NORM_DEVICES={expected_devices!r} does not contain "
+                f"{expected_ws} devices"
+            )
+        grid_cap = "128" if expected_ws == 4 else "0"
+        grid_cap_min_m = "256" if expected_ws == 4 else "0"
+        expected = {
+            "arch": "gfx950",
+            "world_size": expected_ws,
+            "max_token_num": 2048,
+            "hidden_dim": 2880,
+            "dtype": torch.bfloat16,
+            "visible_devices": expected_devices,
+        }
+        expected_env = {
+            "TS_TRITON_SHMEM_COARSE": "1",
+            "TS_TRITON_SHMEM_INKERNEL_BARRIER": "1",
+            "TS_TRITON_SHMEM_FOLD_COPYIN": "0",
+            "TS_TRITON_SHMEM_WORKGROUP_SYNC": "1",
+            "TS_TRITON_SHMEM_OUTPUT_RING": "72",
+            "TS_TRITON_SHMEM_INPUT_SITE_RING": "72",
+            "TS_TRITON_SHMEM_BORROW_TWOSHOT_OUTPUT": "1",
+            "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT": "0",
+            "TS_TRITON_SHMEM_ONESHOT_MAX_M": "384",
+            "TS_TRITON_SHMEM_ONESHOT_BLOCK_N": "0",
+            "TS_TRITON_SHMEM_ONESHOT_VARIANT": "padded",
+            "TS_TRITON_SHMEM_PADDED_MAX_M": "64",
+            "TS_TRITON_SHMEM_ONESHOT_NUM_WARPS": "4",
+            "TS_TRITON_SHMEM_TWOSHOT_BLOCK_N": "0",
+            "TS_TRITON_SHMEM_GRID_CAP": grid_cap,
+            "TS_TRITON_SHMEM_GRID_CAP_MIN_M": grid_cap_min_m,
+            "TS_TRITON_SHMEM_BARRIER_GRID": "0",
+            "TS_TRITON_SHMEM_FUSION_MIN_M": "0",
+            "TS_TRITON_SHMEM_FUSION_MAX_M": str(expected_cap),
             "TS_TRITON_SHMEM_PROFILE_PURE_TP": "1",
         }
     elif profile_id == _GLM52_V1_PROFILE:
@@ -589,7 +642,7 @@ class TritonShmemAllReduceResidualRMSNorm:
 
         # The (ws, hidden) pair is fixed for this state's lifetime, so the tuned
         # kernel variant is chosen once here.
-        self.kernel = _k.recommended_kernel(self.world_size, hidden_dim)
+        self.kernel = _p.recommended_kernel(self.world_size, hidden_dim)
         self._is_twoshot = self.kernel == "twoshot_blocked"
         self._num_cus = _num_cus(self.device)
 
@@ -749,11 +802,11 @@ class TritonShmemAllReduceResidualRMSNorm:
         self._oneshot_variant = _oneshot_variant()
         self._padded_max_m = _padded_max_m()
         configured_oneshot_block_n = _oneshot_block_n()
-        self._oneshot_block_n = configured_oneshot_block_n or _k.recommended_block_n(
+        self._oneshot_block_n = configured_oneshot_block_n or _p.recommended_block_n(
             self.dtype, hidden_dim
         )
         configured_twoshot_block_n = _twoshot_block_n()
-        self._twoshot_block_n = configured_twoshot_block_n or _k.recommended_block_n(
+        self._twoshot_block_n = configured_twoshot_block_n or _p.recommended_block_n(
             self.dtype, hidden_dim
         )
         self._dynamic_grid_cap = max(0, _dynamic_grid_cap())
@@ -821,7 +874,7 @@ class TritonShmemAllReduceResidualRMSNorm:
             if self._oneshot_kernel == "oneshot_wholerow"
             else 4
             if self._oneshot_kernel == "oneshot_wholerow_padded"
-            else _k.recommended_num_warps(self._oneshot_kernel)
+            else _p.recommended_num_warps(self._oneshot_kernel)
         )
         self._oneshot_padded_block_n = triton.next_power_of_2(hidden_dim)
 
@@ -969,7 +1022,7 @@ class TritonShmemAllReduceResidualRMSNorm:
         the legacy M-dependent ``min(cap, work_rows, num_cus)``."""
         if inkernel and self._barrier_grid > 0:
             return max(1, min(self._barrier_grid, self._num_cus))
-        grid = _k.recommended_grid(kern, ws, work_rows, self._num_cus)
+        grid = _p.recommended_grid(kern, ws, work_rows, self._num_cus)
         if (
             self._dynamic_grid_cap > 0
             and kern.startswith("oneshot")
@@ -1220,7 +1273,7 @@ class TritonShmemAllReduceResidualRMSNorm:
         work_rows = triton.cdiv(m, ws)
         inkernel = self._inkernel and self._barrier_grid > 0
         grid_sms = self._grid_width("twoshot_blocked", ws, work_rows, inkernel)
-        num_warps = _k.recommended_num_warps("twoshot_blocked")
+        num_warps = _p.recommended_num_warps("twoshot_blocked")
         grid = (grid_sms,)
         if borrow_twoshot_output:
             output_slot = self._twoshot_output_index

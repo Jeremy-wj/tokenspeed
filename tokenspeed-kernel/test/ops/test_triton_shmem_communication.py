@@ -25,7 +25,7 @@ A near-1:1 clone of ``test_iris_communication.py`` Suite 3, retargeted at the
 ``triton_shmem_allreduce_residual_rmsnorm``). Same mp.spawn / fp32-reference /
 non-identity linspace-weight design and 2e-2 tolerances.
 
-World sizes and hidden dims are chosen to cover all three vendored kernel
+World sizes and hidden dims are chosen to cover all three embedded kernel
 variants via the ``recommended_kernel`` dispatch (``oneshot_max_ws=2`` on
 MI300X/MI350X):
 
@@ -59,6 +59,23 @@ def test_padded_kernel_keeps_m_dynamic():
     )
 
     assert "M" in fused_ar_rmsnorm_oneshot_wholerow_padded_kernel.do_not_specialize
+
+
+def test_arch_profile_is_separate_from_device_kernels():
+    from tokenspeed_kernel.ops.communication import _triton_shmem_profile as profile
+
+    assert profile.recommended_kernel(2, 2880, profile="gfx950") == "oneshot_blocked"
+    assert profile.recommended_kernel(4, 2880, profile="gfx950") == "twoshot_blocked"
+    assert (
+        profile.recommended_grid(
+            "oneshot_wholerow",
+            8,
+            128,
+            256,
+            profile="gfx950",
+        )
+        == 64
+    )
 
 
 def _get_open_port() -> int:
@@ -148,6 +165,67 @@ def test_core_v3_profile_validation_is_explicit(monkeypatch):
     assert _profile_validation_errors(**kwargs) == []
     kwargs["world_size"] = 2
     assert "world_size=2 expected 4" in _profile_validation_errors(**kwargs)
+
+
+@pytest.mark.parametrize(
+    ("world_size", "devices", "cap", "grid_cap", "grid_cap_min_m"),
+    [
+        (2, "4,5", 64, "0", "0"),
+        (4, "4,5,6,7", 91, "128", "256"),
+        (8, "0,1,2,3,4,5,6,7", 384, "0", "0"),
+    ],
+)
+def test_gpt_definitive_profiles_bind_world_size_devices_and_cap(
+    monkeypatch,
+    world_size,
+    devices,
+    cap,
+    grid_cap,
+    grid_cap_min_m,
+):
+    _skip_if_unsupported(1)
+    from tokenspeed_kernel.ops.communication.triton_shmem import (
+        _profile_validation_errors,
+    )
+
+    profile_env = {
+        "AR_NORM_DEVICES": devices,
+        "TS_TRITON_SHMEM_COARSE": "1",
+        "TS_TRITON_SHMEM_INKERNEL_BARRIER": "1",
+        "TS_TRITON_SHMEM_FOLD_COPYIN": "0",
+        "TS_TRITON_SHMEM_WORKGROUP_SYNC": "1",
+        "TS_TRITON_SHMEM_OUTPUT_RING": "72",
+        "TS_TRITON_SHMEM_INPUT_SITE_RING": "72",
+        "TS_TRITON_SHMEM_BORROW_TWOSHOT_OUTPUT": "1",
+        "TS_TRITON_SHMEM_DOUBLE_BUFFER_INPUT": "0",
+        "TS_TRITON_SHMEM_ONESHOT_MAX_M": "384",
+        "TS_TRITON_SHMEM_ONESHOT_BLOCK_N": "0",
+        "TS_TRITON_SHMEM_ONESHOT_VARIANT": "padded",
+        "TS_TRITON_SHMEM_PADDED_MAX_M": "64",
+        "TS_TRITON_SHMEM_ONESHOT_NUM_WARPS": "4",
+        "TS_TRITON_SHMEM_TWOSHOT_BLOCK_N": "0",
+        "TS_TRITON_SHMEM_GRID_CAP": grid_cap,
+        "TS_TRITON_SHMEM_GRID_CAP_MIN_M": grid_cap_min_m,
+        "TS_TRITON_SHMEM_BARRIER_GRID": "0",
+        "TS_TRITON_SHMEM_FUSION_MIN_M": "0",
+        "TS_TRITON_SHMEM_FUSION_MAX_M": str(cap),
+        "TS_TRITON_SHMEM_PROFILE_PURE_TP": "1",
+    }
+    for name, value in profile_env.items():
+        monkeypatch.setenv(name, value)
+
+    kwargs = {
+        "profile_id": (f"gpt-oss-120b-mi350x-definitive-ws{world_size}-cap{cap}-v1"),
+        "arch": "gfx950",
+        "world_size": world_size,
+        "max_token_num": 2048,
+        "hidden_dim": 2880,
+        "dtype": torch.bfloat16,
+        "visible_devices": devices,
+    }
+    assert _profile_validation_errors(**kwargs) == []
+    kwargs["visible_devices"] = devices + ",9"
+    assert "visible_devices=" in _profile_validation_errors(**kwargs)[-1]
 
 
 def test_glm52_v2_profile_validation_is_explicit(monkeypatch):

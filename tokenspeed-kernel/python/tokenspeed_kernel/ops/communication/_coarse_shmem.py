@@ -32,7 +32,7 @@ P2P library (rocSHMEM, MSCCL++, vLLM custom all-reduce): allocate the *data*
 buffers as ordinary **coarse-grained** ``torch.empty`` tensors (cached HBM, full
 bandwidth) and expose them peer-to-peer through **HIP IPC**
 (``hipIpcGetMemHandle`` / ``hipIpcOpenMemHandle``), building the same
-``buffer_ptrs_dev``-style uint64 peer-pointer table the vendored Triton kernels
+``buffer_ptrs_dev``-style uint64 peer-pointer table the embedded Triton kernels
 already consume. The signal pad stays a (small) fine-grained symm_mem
 allocation, because barrier atomics genuinely need fine-grained coherence.
 
@@ -124,7 +124,7 @@ class CoarseSymmBuffer:
     ``tensor`` is ordinary coarse-grained device memory (full HBM bandwidth).
     ``peer_ptrs_dev`` is a ``(world_size,)`` uint64 device tensor of per-peer
     pointers to the same logical buffer (this rank's entry is its own pointer),
-    matching the ``buffer_ptrs_dev`` contract the vendored kernels consume.
+    matching the ``buffer_ptrs_dev`` contract the embedded kernels consume.
     """
 
     tensor: torch.Tensor

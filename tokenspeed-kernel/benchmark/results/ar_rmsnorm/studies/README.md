@@ -8,18 +8,21 @@ Studies are dated evidence. Live deployment decisions are model-scoped:
 
 Read these newest-to-oldest:
 
-1. [Default compatibility](mi350x/2026-07-default-compatibility/README.md) —
+1. [Definitive current-machine sweep](mi350x/2026-08-gpt-oss-120b-definitive-sweep/README.md)
+   — planned WS=2/4/8 eager, graph, and three-arm serving comparison. The
+   campaign has not been run.
+2. [Default compatibility](mi350x/2026-07-default-compatibility/README.md) —
    restored base TokenSpeed defaults, final Perfetto traces, and the clean
    matched no-overlap non-promotion decision on HIP `1,2,5,6`.
-2. [Core-v3 tuning](mi350x/2026-07-triton-shmem-core-tuning/README.md) —
+3. [Core-v3 tuning](mi350x/2026-07-triton-shmem-core-tuning/README.md) —
    scratch-free padded decode core and historical restricted-configuration
    capacity promotion.
-3. [Backend decomposition](mi350x/2026-07-triton-shmem-decomposition/README.md)
+4. [Backend decomposition](mi350x/2026-07-triton-shmem-decomposition/README.md)
    — captured/eager stage accounting and closed optimization paths.
-4. [Profile-v2 realignment](mi350x/2026-07-triton-shmem-realignment/README.md) —
+5. [Profile-v2 realignment](mi350x/2026-07-triton-shmem-realignment/README.md) —
    graph-stable input sites, borrowed two-shot outputs, and the lifetime
    baseline inherited by core-v3.
-5. [Post-rebase baseline](mi350x/2026-07-post-rebase-baseline/README.md) —
+6. [Post-rebase baseline](mi350x/2026-07-post-rebase-baseline/README.md) —
    explicit upstream-unfused control and initial Iris/triton reset.
 
 ## MI350X: GLM-5.2-FP8

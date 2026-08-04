@@ -274,6 +274,7 @@ def _launch_triton_oneshot_core(
 
 def _launch_triton_twoshot_core(
     kernels,
+    profiles,
     state,
     x_view: torch.Tensor,
     input_bases: torch.Tensor,
@@ -317,7 +318,7 @@ def _launch_triton_twoshot_core(
         RANK=state.my_pe,
         INKERNEL_BARRIER=False,
         WORKGROUP_SYNC=state._workgroup_sync,
-        num_warps=kernels.recommended_num_warps("twoshot_blocked"),
+        num_warps=profiles.recommended_num_warps("twoshot_blocked"),
     )
 
 
@@ -412,6 +413,7 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
     device = torch.device(f"cuda:{rank}")
 
     from tokenspeed_kernel.ops.communication import _triton_shmem_kernels as tk
+    from tokenspeed_kernel.ops.communication import _triton_shmem_profile as tp
     from tokenspeed_kernel.ops.communication import iris as iris_mod
     from tokenspeed_kernel.ops.communication import triton as tri
     from tokenspeed_kernel.ops.communication import triton_shmem as ts
@@ -475,9 +477,7 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
         scratch = torch.empty_like(x)
         unfused_norm = torch.empty_like(x)
         unfused_residual = torch.empty_like(x)
-        use_ordinary_iris = (
-            x.numel() * x.element_size() <= _TRITON_AR_MAX_BYTES
-        )
+        use_ordinary_iris = x.numel() * x.element_size() <= _TRITON_AR_MAX_BYTES
         transport = "ordinary_iris" if use_ordinary_iris else "rccl"
 
         def reset_scratch():
@@ -574,13 +574,9 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
                 "stage_sum_ms": t_transport + t_norm,
                 "total_prealloc_ms": t_unfused_prealloc,
                 "total_public_ms": t_unfused_public,
-                "unaccounted_prealloc_ms": (
-                    t_unfused_prealloc - t_transport - t_norm
-                ),
+                "unaccounted_prealloc_ms": (t_unfused_prealloc - t_transport - t_norm),
                 "marginal_transport_ms": t_transport,
-                "marginal_rmsnorm_ms": (
-                    t_unfused_prealloc - t_transport
-                ),
+                "marginal_rmsnorm_ms": (t_unfused_prealloc - t_transport),
                 "marginal_sum_ms": t_unfused_prealloc,
                 "notes": (
                     "benchmark reset copy excluded from op; transport internal "
@@ -693,15 +689,9 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
                 "total_public_ms": t_iris_public,
                 "unaccounted_prealloc_ms": t_iris_prealloc - iris_stage_sum,
                 "marginal_copy_in_ms": t_iris_copy,
-                "marginal_entry_sync_ms": (
-                    t_iris_copy_entry - t_iris_copy
-                ),
-                "marginal_comm_norm_ms": (
-                    t_iris_copy_entry_kernel - t_iris_copy_entry
-                ),
-                "marginal_exit_sync_ms": (
-                    t_iris_prealloc - t_iris_copy_entry_kernel
-                ),
+                "marginal_entry_sync_ms": (t_iris_copy_entry - t_iris_copy),
+                "marginal_comm_norm_ms": (t_iris_copy_entry_kernel - t_iris_copy_entry),
+                "marginal_exit_sync_ms": (t_iris_prealloc - t_iris_copy_entry_kernel),
                 "marginal_sum_ms": t_iris_prealloc,
                 "notes": (
                     "comm, residual add, and RMSNorm are inseparable inside "
@@ -715,18 +705,13 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
         # ------------------------------------------------------------------
         # Realigned triton_shmem.
         # ------------------------------------------------------------------
-        uses_twoshot = (
-            triton_state._is_twoshot and m > triton_state._oneshot_max_m
-        )
+        uses_twoshot = triton_state._is_twoshot and m > triton_state._oneshot_max_m
         triton_norm = torch.empty_like(x)
         triton_residual = torch.empty_like(x)
         if uses_twoshot:
             triton_x = triton_state._x[:m]
             input_bases = triton_state._input_bases
-        elif (
-            triton_state._input_site_ring_size
-            and m <= triton_state._input_site_max_m
-        ):
+        elif triton_state._input_site_ring_size and m <= triton_state._input_site_max_m:
             triton_x = triton_state._input_site_tensor[:m]
             input_bases = triton_state._input_site_bases
         else:
@@ -746,6 +731,7 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
             t_triton_core = _time_gpu(
                 lambda: _launch_triton_twoshot_core(
                     tk,
+                    tp,
                     triton_state,
                     triton_x,
                     input_bases,
@@ -777,6 +763,7 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
                 run_twoshot_copy_entry()
                 _launch_triton_twoshot_core(
                     tk,
+                    tp,
                     triton_state,
                     triton_x,
                     input_bases,
@@ -825,9 +812,7 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
                 ref_norm,
                 ref_residual,
             )
-            triton_stage_sum = (
-                t_triton_copy + 2 * t_triton_barrier + t_triton_core
-            )
+            triton_stage_sum = t_triton_copy + 2 * t_triton_barrier + t_triton_core
             row = _base_row(
                 backend="triton_shmem_realigned",
                 path="twoshot_blocked_borrowed_output",
@@ -851,20 +836,14 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
                     "stage_sum_ms": triton_stage_sum,
                     "total_prealloc_ms": t_triton_prealloc,
                     "total_public_ms": t_triton_public,
-                    "unaccounted_prealloc_ms": (
-                        t_triton_public - triton_stage_sum
-                    ),
+                    "unaccounted_prealloc_ms": (t_triton_public - triton_stage_sum),
                     "marginal_copy_in_ms": t_triton_copy,
-                    "marginal_entry_sync_ms": (
-                        t_twoshot_copy_entry - t_triton_copy
-                    ),
+                    "marginal_entry_sync_ms": (t_twoshot_copy_entry - t_triton_copy),
                     "marginal_comm_norm_ms": (
-                        t_twoshot_copy_entry_kernel
-                        - t_twoshot_copy_entry
+                        t_twoshot_copy_entry_kernel - t_twoshot_copy_entry
                     ),
                     "marginal_exit_sync_ms": (
-                        t_triton_public
-                        - t_twoshot_copy_entry_kernel
+                        t_triton_public - t_twoshot_copy_entry_kernel
                     ),
                     "marginal_sum_ms": t_triton_public,
                     "notes": (
@@ -1012,9 +991,7 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
                     "stage_sum_ms": triton_stage_sum,
                     "total_prealloc_ms": t_triton_prealloc,
                     "total_public_ms": t_triton_public,
-                    "unaccounted_prealloc_ms": (
-                        t_triton_prealloc - triton_stage_sum
-                    ),
+                    "unaccounted_prealloc_ms": (t_triton_prealloc - triton_stage_sum),
                     "sync_derived_ms": entry_derived + exit_derived,
                     "sync_derived_method": (
                         "entry_and_exit_cumulative_kernel_differences"

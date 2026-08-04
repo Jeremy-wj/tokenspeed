@@ -79,10 +79,12 @@ studies contain the closure evidence.
 Requalify each topology independently. A profile must record logical rank, HIP
 index, physical GPU, NUMA placement, and peer-access matrix. Decline the fused
 path unless every rank resolves the same supported profile. WS=8 remains
-deferred.
+unqualified; the planned current-machine WS2/4/8 campaign is its active
+qualification path.
 
-Completion requires the full safety ladder, marker-aligned trace, and 15-pair
-campaign on the target rank set.
+The few-hour campaign provides three-arm eager, graph, marker, and serving
+screens. Promotion still requires the full safety ladder, marker-aligned trace,
+and 15 pairs per contrast on the target rank set.
 
 ### 2. Mixed transport transitions
 

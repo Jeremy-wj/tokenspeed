@@ -11,7 +11,9 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-ARMS = ("upstream_unfused", "iris_fused", "triton_forced")
+CONTROL_ARMS = ("upstream_unfused", "iris_fused")
+CANDIDATE_ARMS = ("triton_forced", "triton_profile")
+ARM_NAMES = {*CONTROL_ARMS, *CANDIDATE_ARMS}
 
 
 def _percent_change(candidate: float, control: float) -> float:
@@ -27,14 +29,17 @@ def _ancestor_value(path: Path, prefix: str) -> int | None:
 
 def _pass_name(path: Path) -> str:
     for parent in path.parents:
-        if parent.name.startswith("pass"):
+        if "pass" in parent.name:
             return parent.name
     raise ValueError(f"missing pass directory in {path}")
 
 
 def _artifact_paths(root: Path) -> Iterable[Path]:
     for path in sorted(root.rglob("m*.json")):
-        if path.parent.name in ARMS and _ancestor_value(path, "calls-") is not None:
+        if (
+            path.parent.name in ARM_NAMES
+            and _ancestor_value(path, "calls-") is not None
+        ):
             yield path
 
 
@@ -68,8 +73,11 @@ def collect(
         list
     )
     pass_arms: dict[tuple[str, int, int, int, int], set[str]] = defaultdict(set)
+    observed_candidates: set[str] = set()
     for path in _artifact_paths(root):
         arm = path.parent.name
+        if arm in CANDIDATE_ARMS:
+            observed_candidates.add(arm)
         payload = json.loads(path.read_text(encoding="utf-8"))
         ws = int(payload["world_size"])
         n = int(payload["N"])
@@ -92,6 +100,8 @@ def collect(
 
         per_site = payload["max_rank_samples_per_call_stats_us"]
         per_graph = payload["max_rank_samples_stats_us"]
+        reset_per_site = payload.get("benchmark_reset_copy_per_call_stats_us")
+        serving_per_site = payload.get("serving_faithful_estimate_per_call_stats_us")
         pass_name = _pass_name(path)
         pass_arms[(pass_name, ws, n, calls, m)].add(arm)
         samples[(ws, n, calls, m, arm)].append(
@@ -108,8 +118,29 @@ def collect(
                 "p99_us_per_site": float(per_site["p99_us"]),
                 "mean_us_per_site": float(per_site["mean_us"]),
                 "p50_us_per_graph": float(per_graph["p50_us"]),
+                "benchmark_reset_copy_p50_us_per_site": (
+                    None if reset_per_site is None else float(reset_per_site["p50_us"])
+                ),
+                "serving_faithful_p50_us_per_site": (
+                    None
+                    if serving_per_site is None
+                    else float(serving_per_site["p50_us"])
+                ),
             }
         )
+
+    if len(observed_candidates) > 1:
+        raise ValueError(
+            f"expected exactly one Triton candidate arm, got {observed_candidates}"
+        )
+    candidate_arm = (
+        next(iter(observed_candidates))
+        if observed_candidates
+        else "triton_profile"
+        if any("graph-pass" in key[0] for key in pass_arms)
+        else "triton_forced"
+    )
+    arms = (*CONTROL_ARMS, candidate_arm)
 
     rows = []
     for (ws, n, calls, m, arm), values in sorted(samples.items()):
@@ -124,6 +155,12 @@ def collect(
         def mean(field: str, pass_values=values) -> float:
             return statistics.fmean(value[field] for value in pass_values)
 
+        def mean_optional(field: str, pass_values=values) -> float | None:
+            present = [
+                value[field] for value in pass_values if value[field] is not None
+            ]
+            return statistics.fmean(present) if present else None
+
         p50_values = [value["p50_us_per_site"] for value in values]
         rows.append(
             {
@@ -132,9 +169,7 @@ def collect(
                 "calls_per_graph": calls,
                 "M": m,
                 "arm": arm,
-                "policy": (
-                    "forced_diagnostic" if arm == "triton_forced" else "control"
-                ),
+                "policy": ("candidate" if arm in CANDIDATE_ARMS else "control"),
                 "expected_backend": next(iter(backends)),
                 "expected_path": next(iter(paths)),
                 "max_token_num": next(iter(max_tokens)),
@@ -148,6 +183,12 @@ def collect(
                 "p99_us_per_site": mean("p99_us_per_site"),
                 "mean_us_per_site": mean("mean_us_per_site"),
                 "p50_us_per_graph": mean("p50_us_per_graph"),
+                "benchmark_reset_copy_p50_us_per_site": mean_optional(
+                    "benchmark_reset_copy_p50_us_per_site"
+                ),
+                "serving_faithful_p50_us_per_site": mean_optional(
+                    "serving_faithful_p50_us_per_site"
+                ),
                 "p50_pass_spread_pct": (
                     _percent_change(max(p50_values), min(p50_values))
                     if len(p50_values) > 1
@@ -174,7 +215,7 @@ def collect(
     )
     incomplete = []
     for (pass_name, ws, n, calls, m), observed in sorted(pass_arms.items()):
-        missing = [arm for arm in ARMS if arm not in observed]
+        missing = [arm for arm in arms if arm not in observed]
         if missing:
             incomplete.append(
                 {
@@ -188,12 +229,22 @@ def collect(
             )
     comparisons = []
     for ws, n, calls, m in case_ids:
-        missing = [arm for arm in ARMS if (ws, n, calls, m, arm) not in by_case]
+        missing = [arm for arm in arms if (ws, n, calls, m, arm) not in by_case]
         if missing:
             continue
         unfused = by_case[(ws, n, calls, m, "upstream_unfused")]
         iris = by_case[(ws, n, calls, m, "iris_fused")]
-        triton = by_case[(ws, n, calls, m, "triton_forced")]
+        triton = by_case[(ws, n, calls, m, candidate_arm)]
+        adjusted_unfused = (
+            unfused["serving_faithful_p50_us_per_site"]
+            if unfused["serving_faithful_p50_us_per_site"] is not None
+            else unfused["p50_us_per_site"]
+        )
+        adjusted_triton = (
+            triton["serving_faithful_p50_us_per_site"]
+            if triton["serving_faithful_p50_us_per_site"] is not None
+            else triton["p50_us_per_site"]
+        )
         comparisons.append(
             {
                 "world_size": ws,
@@ -206,6 +257,9 @@ def collect(
                 "triton_vs_unfused_pct": _percent_change(
                     triton["p50_us_per_site"], unfused["p50_us_per_site"]
                 ),
+                "triton_vs_unfused_adjusted_pct": _percent_change(
+                    adjusted_triton, adjusted_unfused
+                ),
                 "triton_vs_iris_pct": _percent_change(
                     triton["p50_us_per_site"], iris["p50_us_per_site"]
                 ),
@@ -216,6 +270,9 @@ def collect(
                     triton["p50_us_per_graph"] - unfused["p50_us_per_graph"]
                 )
                 / 1000.0,
+                "unfused_benchmark_reset_copy_us_per_site": unfused[
+                    "benchmark_reset_copy_p50_us_per_site"
+                ],
             }
         )
 
@@ -239,6 +296,9 @@ def collect(
                 "N": n,
                 "calls_per_graph": calls,
                 "triton_vs_unfused": _frontier(group, "triton_vs_unfused_pct"),
+                "triton_vs_unfused_adjusted": _frontier(
+                    group, "triton_vs_unfused_adjusted_pct"
+                ),
                 "triton_vs_iris": _frontier(group, "triton_vs_iris_pct"),
             }
         )
@@ -250,7 +310,8 @@ def collect(
             "Arithmetic mean of pass-level max-rank-per-iteration p50 values; "
             "single pass where no confirmation pass exists."
         ),
-        "arms": list(ARMS),
+        "arms": list(arms),
+        "candidate_arm": candidate_arm,
         "rows": rows,
         "comparisons": comparisons,
         "frontiers": frontiers,
@@ -278,6 +339,8 @@ def write_csv(path: Path, summary: dict[str, Any]) -> None:
         "p99_us_per_site",
         "mean_us_per_site",
         "p50_us_per_graph",
+        "benchmark_reset_copy_p50_us_per_site",
+        "serving_faithful_p50_us_per_site",
         "p50_pass_spread_pct",
         "pass_names",
         "pass_p50_us_per_site",

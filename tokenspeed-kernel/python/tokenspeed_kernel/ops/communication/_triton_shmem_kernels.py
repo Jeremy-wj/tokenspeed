@@ -18,17 +18,14 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-"""Vendored fused all-reduce (+ add + residual) + RMSNorm Triton kernels.
+"""Embedded fused all-reduce (+ add + residual) + RMSNorm Triton kernels.
 
-These are copy-pasted (per the migration's "vendor, do not import" guardrail)
-from the external ``triton-shmem`` repo
-(``triton_shmem/ccl/fused_ar_rmsnorm.py``), then re-backed by **PyTorch
-symmetric memory** instead of rocSHMEM. The only device-code change vs. upstream
-is that the two-shot kernel takes **three** per-tensor peer-pointer tables
+These kernels use **PyTorch symmetric memory** instead of rocSHMEM. The
+two-shot kernel takes **three** per-tensor peer-pointer tables
 (input / output / residual_out) instead of one shared rocSHMEM ``heap_bases``
 array, because symm_mem hands out an independent ``buffer_ptrs_dev`` per
-allocation (see the canonical backend design). The one-shot kernels are unchanged apart
-from being vendored: they only translate ``input``, so a single table suffices.
+allocation (see the canonical backend design). The one-shot kernels only
+translate ``input``, so a single table suffices.
 
 ``triton``/``tl`` are imported from ``tokenspeed_kernel._triton`` (the vendored
 ``tokenspeed_triton`` distribution) so these run under the same Triton as the
@@ -41,21 +38,14 @@ dedicated single-block barrier kernel by the caller (see ``triton_shmem.py``).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-import torch
-
 from tokenspeed_kernel._triton import tl, triton
 
 from .triton import symm_mem_barrier
 
-KERNELS = ("twoshot_blocked", "oneshot_blocked", "oneshot_wholerow")
-
 
 # ---------------------------------------------------------------------------
-# Device-side symmetric pointer translation (vendored from
-# triton_shmem/utils/symmetric.py). Given a per-tensor peer-pointer table
-# ``bases`` (rocSHMEM ``heap_bases`` OR symm_mem ``buffer_ptrs_dev`` -- the math
+# Device-side symmetric pointer translation. Given a per-tensor peer-pointer
+# table ``bases`` (rocSHMEM ``heap_bases`` OR symm_mem ``buffer_ptrs_dev`` -- the math
 # is identical; see the canonical backend design), translate ``local_ptr`` from my rank's
 # address space into ``peer``'s.
 # ---------------------------------------------------------------------------
@@ -83,112 +73,6 @@ def symm_grid_barrier_kernel(
     WORLD_SIZE: tl.constexpr,
 ):
     symm_mem_barrier(signal_pad_ptrs_dev, tl.program_id(0), RANK, WORLD_SIZE)
-
-
-# ===========================================================================
-# Host-side launch tuning (vendored verbatim from triton-shmem).
-# ===========================================================================
-@dataclass(frozen=True)
-class ArchProfile:
-    """Host-side launch tuning for one GPU architecture (perf-only knobs)."""
-
-    name: str
-    grid_caps: dict
-    num_warps: dict
-    oneshot_max_ws: int
-    block_n_bytes: int = 1024
-    block_n_min: int = 128
-    default_num_warps: int = 4
-    tuned: bool = True
-
-    def grid_cap(self, kernel: str, ws: int) -> int:
-        caps = self.grid_caps.get(kernel) or self.grid_caps["twoshot_blocked"]
-        return caps.get(ws) or caps[min(caps, key=lambda w: abs(w - ws))]
-
-    def warps(self, kernel: str) -> int:
-        return self.num_warps.get(kernel, self.default_num_warps)
-
-
-# Empirically tuned on MI300X (gfx942, 304 CU / 8 XCD), bf16, single node.
-_MI300X = ArchProfile(
-    name="MI300X (gfx942)",
-    grid_caps={
-        "twoshot_blocked": {2: 256, 4: 152, 8: 128},
-        "oneshot_blocked": {2: 128, 4: 128, 8: 192},
-        "oneshot_wholerow": {2: 32, 4: 32, 8: 32},
-    },
-    num_warps={"twoshot_blocked": 8, "oneshot_blocked": 4, "oneshot_wholerow": 8},
-    oneshot_max_ws=2,
-)
-
-# Measured on MI350X (gfx950, CDNA4, 256 CU / 8 XCD), same bf16 workload.
-_MI350X = ArchProfile(
-    name="MI350X (gfx950)",
-    grid_caps={
-        "twoshot_blocked": {2: 256, 4: 256, 8: 256},
-        "oneshot_blocked": {2: 128, 4: 256, 8: 256},
-        "oneshot_wholerow": {2: 64, 4: 64, 8: 64},
-    },
-    num_warps={"twoshot_blocked": 4, "oneshot_blocked": 4, "oneshot_wholerow": 8},
-    oneshot_max_ws=2,
-)
-
-# Fallback for un-tuned architectures (MI300X prior).
-_DEFAULT_PROFILE = ArchProfile(
-    name="generic (untuned; MI300X prior)",
-    grid_caps=_MI300X.grid_caps,
-    num_warps=_MI300X.num_warps,
-    oneshot_max_ws=_MI300X.oneshot_max_ws,
-    tuned=False,
-)
-
-_PROFILES: dict = {
-    "gfx942": _MI300X,
-    "gfx950": _MI350X,
-}
-
-
-def detect_arch(device: int | None = None) -> str:
-    """Base ``gfxNNN`` token for a CUDA/HIP device (e.g. ``"gfx942"``)."""
-    idx = torch.cuda.current_device() if device is None else device
-    return torch.cuda.get_device_properties(idx).gcnArchName.split(":")[0]
-
-
-def get_arch_profile(arch=None) -> ArchProfile:
-    """Resolve the active :class:`ArchProfile` (auto-detect on ``None``)."""
-    if isinstance(arch, ArchProfile):
-        return arch
-    if arch is None:
-        try:
-            arch = detect_arch()
-        except Exception:
-            return _DEFAULT_PROFILE
-    return _PROFILES.get(arch, _DEFAULT_PROFILE)
-
-
-def recommended_grid(kernel: str, ws: int, work_rows: int, num_cus: int, *,
-                     profile=None) -> int:
-    """Tuned persistent-grid width, capped by fabric limit, work, and CU count."""
-    cap = get_arch_profile(profile).grid_cap(kernel, ws)
-    return max(1, min(cap, work_rows, num_cus))
-
-
-def recommended_num_warps(kernel: str, *, profile=None) -> int:
-    """Tuned launch ``num_warps`` for a fused AR+RMSNorm kernel (default 4)."""
-    return get_arch_profile(profile).warps(kernel)
-
-
-def recommended_block_n(dtype: torch.dtype, N: int, *, profile=None) -> int:
-    """Tuned ``BLOCK_N`` for the N-blocked kernels (~1 KiB/block on MI300X)."""
-    p = get_arch_profile(profile)
-    return min(N, max(p.block_n_min, p.block_n_bytes // dtype.itemsize))
-
-
-def recommended_kernel(ws: int, N: int, *, profile=None) -> str:
-    """Best fused variant for ``(ws, N)`` (see upstream docstring)."""
-    if ws <= get_arch_profile(profile).oneshot_max_ws:
-        return "oneshot_wholerow" if (N & (N - 1)) == 0 else "oneshot_blocked"
-    return "twoshot_blocked"
 
 
 # ===========================================================================
@@ -268,7 +152,7 @@ def fused_ar_rmsnorm_oneshot_wholerow_kernel(
 
     for row_id in range(pid, M, NUM_SMS):
         offsets_io = offsets_n + (N * row_id)
-        acc = tl.zeros((N, ), tl.float32)
+        acc = tl.zeros((N,), tl.float32)
         for peer in tl.static_range(0, ws):
             peer_ptr = symmetric_ptr(input, my_pe, peer, heap_bases)
             acc += tl.load(peer_ptr + offsets_io).to(tl.float32)
@@ -362,7 +246,7 @@ def fused_ar_rmsnorm_twoshot_blocked_kernel(
                 cols = blk * BLOCK_N + col
                 mask = cols < N
                 offs = row_io_off + cols
-                acc = tl.zeros((BLOCK_N, ), tl.float32)
+                acc = tl.zeros((BLOCK_N,), tl.float32)
                 for peer in tl.static_range(0, ws):
                     peer_ptr = symmetric_ptr(input, my_pe, peer, input_bases)
                     acc += tl.load(peer_ptr + offs, mask=mask, other=0.0).to(tl.float32)
@@ -374,7 +258,9 @@ def fused_ar_rmsnorm_twoshot_blocked_kernel(
                     tl.store(residual_out + offs, res, mask=mask)
                     for peer in tl.static_range(0, ws):
                         if peer != my_pe:
-                            peer_ptr = symmetric_ptr(residual_out, my_pe, peer, residual_out_bases)
+                            peer_ptr = symmetric_ptr(
+                                residual_out, my_pe, peer, residual_out_bases
+                            )
                             tl.store(peer_ptr + offs, res, mask=mask)
                 sum_squares += tl.sum(acc * acc, axis=0)
                 tl.store(scratch + scratch_off + cols, acc, mask=mask)
@@ -474,13 +360,9 @@ def fused_ar_rmsnorm_oneshot_wholerow_padded_kernel(
             ).to(tl.float32)
 
         if HAS_ADD:
-            acc += tl.load(add_in + offsets, mask=mask, other=0.0).to(
-                tl.float32
-            )
+            acc += tl.load(add_in + offsets, mask=mask, other=0.0).to(tl.float32)
         if HAS_RESIDUAL:
-            acc += tl.load(residual + offsets, mask=mask, other=0.0).to(
-                tl.float32
-            )
+            acc += tl.load(residual + offsets, mask=mask, other=0.0).to(tl.float32)
             tl.store(
                 residual_out + offsets,
                 acc.to(residual_out.dtype.element_ty),
@@ -558,7 +440,11 @@ def fused_ar_rmsnorm_oneshot_blocked_kernel(
                 cols = blk * BLOCK_N + col
                 mask = cols < N
                 offs = row_io_off + cols
-                tl.store(input + offs, tl.load(local_src + offs, mask=mask, other=0.0), mask=mask)
+                tl.store(
+                    input + offs,
+                    tl.load(local_src + offs, mask=mask, other=0.0),
+                    mask=mask,
+                )
 
     if INKERNEL_BARRIER:
         # See the whole-row variant: the scalar system release/acquire must be
@@ -578,7 +464,7 @@ def fused_ar_rmsnorm_oneshot_blocked_kernel(
             cols = blk * BLOCK_N + col
             mask = cols < N
             offs = row_io_off + cols
-            acc = tl.zeros((BLOCK_N, ), tl.float32)
+            acc = tl.zeros((BLOCK_N,), tl.float32)
             for peer in tl.static_range(0, ws):
                 peer_ptr = symmetric_ptr(input, my_pe, peer, heap_bases)
                 acc += tl.load(peer_ptr + offs, mask=mask, other=0.0).to(tl.float32)
@@ -586,7 +472,11 @@ def fused_ar_rmsnorm_oneshot_blocked_kernel(
                 acc += tl.load(add_in + offs, mask=mask, other=0.0).to(tl.float32)
             if HAS_RESIDUAL:
                 acc += tl.load(residual + offs, mask=mask, other=0.0).to(tl.float32)
-                tl.store(residual_out + offs, acc.to(residual_out.dtype.element_ty), mask=mask)
+                tl.store(
+                    residual_out + offs,
+                    acc.to(residual_out.dtype.element_ty),
+                    mask=mask,
+                )
             sum_squares += tl.sum(acc * acc, axis=0)
             tl.store(scratch + scratch_off + cols, acc, mask=mask)
 

@@ -8,6 +8,8 @@ import pytest
 
 from benchmark.analyze_ar_rmsnorm_forwards import (
     _kernel_breakdown,
+)
+from benchmark.analyze_ar_rmsnorm_forwards import (
     analyze as analyze_marked,
 )
 from benchmark.analyze_graph_replay import _aligned_aggregate, _summarize
@@ -63,9 +65,7 @@ def test_merges_split_and_whole_fused_decode_forwards(tmp_path):
         decode_m=32,
         prefill_m=None,
     )
-    decode = [
-        forward for forward in result["forwards"] if forward["mode"] == "decode"
-    ]
+    decode = [forward for forward in result["forwards"] if forward["mode"] == "decode"]
     assert len(decode) == 2
     assert decode[0]["correlations"] == [10, 11]
     assert decode[0]["oneshot_count"] == 4
@@ -108,9 +108,7 @@ def test_segments_unfused_decode_and_prefill(tmp_path):
         decode_m=32,
         prefill_m=512,
     )
-    decode = [
-        forward for forward in result["forwards"] if forward["mode"] == "decode"
-    ]
+    decode = [forward for forward in result["forwards"] if forward["mode"] == "decode"]
     prefill = [
         forward for forward in result["forwards"] if forward["mode"] == "prefill"
     ]
@@ -154,7 +152,12 @@ def test_aligned_aggregate_uses_max_rank_per_forward(tmp_path):
     assert aggregate["aligned_forwards"][0]["max_rank_period_us"] == 110
 
 
-def _write_marked(path: Path, rank: int, duration: float) -> None:
+def _write_marked(
+    path: Path,
+    rank: int,
+    duration: float,
+    kernel: str = "fused_ar_rmsnorm_oneshot_blocked_kernel",
+) -> None:
     marker = (
         "tokenspeed.model_forward.v1|id=0|mode=decode|actual_m=32"
         "|executed_m=32|bs=32|padded_bs=32|num_extends=0"
@@ -186,7 +189,7 @@ def _write_marked(path: Path, rank: int, duration: float) -> None:
             {
                 "ph": "X",
                 "cat": "kernel",
-                "name": "fused_ar_rmsnorm_oneshot_blocked_kernel",
+                "name": kernel,
                 "pid": 2,
                 "tid": 20,
                 "ts": 1000,
@@ -217,6 +220,61 @@ def test_marker_analyzer_aligns_forward_ids_across_ranks(tmp_path):
     assert result["cohorts"][0]["count"] == 1
 
 
+def test_marker_analyzer_rejects_cross_rank_backend_disagreement(tmp_path):
+    paths = []
+    for rank, kernel in (
+        (0, "fused_ar_rmsnorm_oneshot_blocked_kernel"),
+        (1, "iris_allreduce_residual_rmsnorm_kernel"),
+    ):
+        path = tmp_path / f"trace-rank{rank}.json.gz"
+        _write_marked(path, rank, 10.0, kernel)
+        paths.append(path)
+
+    with pytest.raises(ValueError, match="backend path differs across ranks"):
+        analyze_marked(paths, expected_world_size=2, mode="decode")
+
+
+def test_marker_analyzer_links_graph_microbenchmark_rows(tmp_path):
+    paths = []
+    for rank in (0, 1):
+        path = tmp_path / f"trace-rank{rank}.json.gz"
+        _write_marked(path, rank, 10.0)
+        paths.append(path)
+    graph_summary = {
+        "mode": "graph",
+        "rows": [
+            {
+                "world_size": 2,
+                "M": 32,
+                "arm": "triton_profile",
+                "expected_path": "oneshot_blocked",
+                "p50_us_per_site": 15.0,
+            }
+        ],
+        "comparisons": [
+            {
+                "world_size": 2,
+                "M": 32,
+                "triton_vs_unfused_adjusted_pct": -5.0,
+            }
+        ],
+    }
+
+    result = analyze_marked(
+        paths,
+        expected_world_size=2,
+        mode="decode",
+        graph_summary=graph_summary,
+        arm="triton_profile",
+    )
+
+    assert result["cohorts"][0]["microbenchmark"]["p50_us_per_site"] == 15.0
+    assert (
+        result["microbenchmark_linkage"]["forward_weighted_candidate_vs_unfused_pct"]
+        == -5.0
+    )
+
+
 def test_marker_analyzer_rejects_legacy_trace(tmp_path):
     path = tmp_path / "legacy-rank0.json.gz"
     _write(path, [_event("amd_all_reduce_kernel", 1, 0)])
@@ -225,9 +283,7 @@ def test_marker_analyzer_rejects_legacy_trace(tmp_path):
 
 
 def test_marker_analyzer_classifies_post_rebase_iris_paths():
-    fused = _kernel_breakdown(
-        [_event("iris_allreduce_residual_rmsnorm_kernel", 1, 0)]
-    )
+    fused = _kernel_breakdown([_event("iris_allreduce_residual_rmsnorm_kernel", 1, 0)])
     assert fused["primary"] == "iris_fused"
     assert fused["counts"]["standalone_rmsnorm"] == 0
 

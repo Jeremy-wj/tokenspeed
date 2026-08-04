@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
 import pytest
 
 from benchmark.analyze_ar_rmsnorm_graph_sweep import collect
 from benchmark.run_ar_rmsnorm_graph_sweep import (
+    Run,
+    _expected_backend,
     _parse_devices,
     _result_path,
     build_schedule,
@@ -22,8 +25,10 @@ def _write_case(
     n: int = 6144,
     m: int = 2,
     block: str = "pass1",
+    calls: int = 156,
+    reset_us: float | None = None,
 ) -> None:
-    path = root / block / "calls-156" / f"ws-{ws}" / f"n-{n}" / arm / f"m{m}.json"
+    path = root / block / f"calls-{calls}" / f"ws-{ws}" / f"n-{n}" / arm / f"m{m}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     stats = {
         "min_us": per_site_us,
@@ -33,7 +38,13 @@ def _write_case(
         "max_us": per_site_us + 3,
         "mean_us": per_site_us + 0.5,
     }
-    backend = "triton_shmem" if arm == "triton_forced" else "iris"
+    backend = "triton_shmem" if arm.startswith("triton_") else "iris"
+    reset_stats = None if reset_us is None else {key: reset_us for key in stats}
+    serving_stats = (
+        None
+        if reset_us is None
+        else {key: value - reset_us for key, value in stats.items()}
+    )
     payload = {
         "impl": arm,
         "resolved_impl": arm,
@@ -42,12 +53,16 @@ def _write_case(
         "world_size": ws,
         "M": m,
         "N": n,
-        "calls_per_graph": 156,
+        "calls_per_graph": calls,
         "max_token_num": max(42, m),
         "payload_bytes": 2 * m * n,
         "repeat": 1000,
         "max_rank_samples_per_call_stats_us": stats,
-        "max_rank_samples_stats_us": {key: value * 156 for key, value in stats.items()},
+        "max_rank_samples_stats_us": {
+            key: value * calls for key, value in stats.items()
+        },
+        "benchmark_reset_copy_per_call_stats_us": reset_stats,
+        "serving_faithful_estimate_per_call_stats_us": serving_stats,
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
 
@@ -88,6 +103,32 @@ def test_collect_reports_measured_profitability_frontier(tmp_path):
     assert frontier["first_profitable_m"] == 2
     assert frontier["last_profitable_m"] == 42
     assert frontier["first_measured_loss_after_profit"] == 43
+
+
+def test_collect_supports_profile_candidate_and_reset_adjustment(tmp_path):
+    for arm, value in (
+        ("upstream_unfused", 16.0),
+        ("iris_fused", 19.0),
+        ("triton_profile", 15.0),
+    ):
+        _write_case(
+            tmp_path,
+            arm=arm,
+            per_site_us=value,
+            ws=4,
+            n=2880,
+            m=32,
+            block="graph-pass1",
+            calls=72,
+            reset_us=2.0 if arm == "upstream_unfused" else None,
+        )
+
+    summary = collect(tmp_path, max_m=64)
+
+    assert summary["candidate_arm"] == "triton_profile"
+    comparison = summary["comparisons"][0]
+    assert comparison["triton_vs_unfused_pct"] == pytest.approx(-6.25)
+    assert comparison["triton_vs_unfused_adjusted_pct"] == pytest.approx(7.142857)
 
 
 def test_collect_rejects_incomplete_arm_triples(tmp_path):
@@ -177,6 +218,42 @@ def test_definitive_schedule_has_315_fresh_processes(tmp_path):
         "upstream_unfused",
         "m0.json",
     )
+
+
+def test_gpt_definitive_graph_schedule_has_162_processes():
+    spec_path = (
+        Path(__file__).parents[1]
+        / "benchmark/results/ar_rmsnorm/studies/mi350x"
+        / "2026-08-gpt-oss-120b-definitive-sweep/campaign.json"
+    )
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+
+    schedule = build_schedule(spec)
+
+    assert len(schedule) == 162
+    assert {run.max_token_num for run in schedule} == {2048}
+    assert {run.calls_per_graph for run in schedule} == {72}
+    assert {run.arm for run in schedule} == {
+        "upstream_unfused",
+        "iris_fused",
+        "triton_profile",
+    }
+
+
+def test_gpt_graph_candidate_expects_complete_fallback_above_m384():
+    spec = {"model": "gpt-oss-120b"}
+    base = {
+        "block": "graph-pass1",
+        "calls_per_graph": 72,
+        "world_size": 8,
+        "hidden_size": 2880,
+        "arm": "triton_profile",
+        "bench_impl": "triton_shmem",
+        "max_token_num": 2048,
+    }
+
+    assert _expected_backend(spec, Run(m=384, **base)) == "triton_shmem"
+    assert _expected_backend(spec, Run(m=385, **base)) == "rccl"
 
 
 def test_device_map_requires_unique_count():

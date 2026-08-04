@@ -1,4 +1,5 @@
 """Analyze AR+RMSNorm by authoritative TokenSpeed model-forward markers."""
+
 from __future__ import annotations
 
 import argparse
@@ -175,9 +176,7 @@ def _analyze_trace(path: Path) -> dict[str, Any]:
                 f"forward {metadata['id']} rank {rank} has no GPU activities"
             )
         gpu_start = min(float(event["ts"]) for event in gpu_events)
-        gpu_end = max(
-            float(event["ts"]) + float(event["dur"]) for event in gpu_events
-        )
+        gpu_end = max(float(event["ts"]) + float(event["dur"]) for event in gpu_events)
         forwards.append(
             {
                 **metadata,
@@ -190,11 +189,7 @@ def _analyze_trace(path: Path) -> dict[str, Any]:
                 ),
                 "runtime_correlation_count": len(correlations),
                 "path": _kernel_breakdown(
-                    [
-                        event
-                        for event in gpu_events
-                        if event.get("cat") == "kernel"
-                    ]
+                    [event for event in gpu_events if event.get("cat") == "kernel"]
                 ),
             }
         )
@@ -215,11 +210,55 @@ def _stats(values: list[float]) -> dict[str, float]:
     }
 
 
+def _micro_link(
+    summary: dict[str, Any] | None,
+    *,
+    world_size: int | None,
+    executed_m: int,
+    arm: str | None,
+) -> dict[str, Any] | None:
+    if summary is None or world_size is None or arm is None:
+        return None
+    row = next(
+        (
+            value
+            for value in summary.get("rows", [])
+            if int(value["world_size"]) == world_size
+            and int(value["M"]) == executed_m
+            and value["arm"] == arm
+        ),
+        None,
+    )
+    comparison = next(
+        (
+            value
+            for value in summary.get("comparisons", [])
+            if int(value["world_size"]) == world_size and int(value["M"]) == executed_m
+        ),
+        None,
+    )
+    if row is None:
+        return None
+    p50 = row.get("p50_us_per_site", row.get("p50_us"))
+    return {
+        "mode": summary.get("mode", "graph"),
+        "world_size": world_size,
+        "M": executed_m,
+        "arm": arm,
+        "expected_path": row.get("expected_path"),
+        "p50_us_per_site": p50,
+        "comparison": comparison,
+    }
+
+
 def analyze(
     paths: list[Path],
     *,
     expected_world_size: int | None,
     mode: str,
+    graph_summary: dict[str, Any] | None = None,
+    eager_summary: dict[str, Any] | None = None,
+    arm: str | None = None,
 ) -> dict[str, Any]:
     traces = [_analyze_trace(path) for path in paths]
     ranks = [trace["rank"] for trace in traces]
@@ -260,6 +299,12 @@ def analyze(
             records,
             key=lambda record: record["path"]["target_kernel_sum_us"],
         )
+        primary_paths = sorted({record["path"]["primary"] for record in records})
+        if len(primary_paths) != 1:
+            raise ValueError(
+                f"forward {forward_id} backend path differs across ranks: "
+                f"{primary_paths}"
+            )
         forwards.append(
             {
                 "forward_id": forward_id,
@@ -269,9 +314,7 @@ def analyze(
                 "batch_size": records[0]["bs"],
                 "padded_batch_size": records[0]["padded_bs"],
                 "execution": records[0]["execution"],
-                "primary_paths": sorted(
-                    {record["path"]["primary"] for record in records}
-                ),
+                "primary_paths": primary_paths,
                 "ranks": records,
                 "max_rank": {
                     "gpu_period_us": {
@@ -295,36 +338,64 @@ def analyze(
         )
         cohorts[key].append(forward)
     cohort_rows = []
+    weighted_micro_changes = []
     for key, records in cohorts.items():
-        cohort_rows.append(
-            {
-                "mode": key[0],
-                "executed_m": key[1],
-                "primary_paths": list(key[2]),
-                "count": len(records),
-                "max_rank_gpu_period_us": _stats(
-                    [
-                        record["max_rank"]["gpu_period_us"]["value"]
-                        for record in records
-                    ]
-                ),
-                "max_rank_target_kernel_sum_us": _stats(
-                    [
-                        record["max_rank"]["target_kernel_sum_us"]["value"]
-                        for record in records
-                    ]
-                ),
-            }
+        execution = records[0]["execution"]
+        micro_summary = graph_summary if "graph" in execution else eager_summary
+        micro = _micro_link(
+            micro_summary,
+            world_size=expected_world_size,
+            executed_m=key[1],
+            arm=arm,
         )
+        cohort = {
+            "mode": key[0],
+            "execution": execution,
+            "executed_m": key[1],
+            "primary_paths": list(key[2]),
+            "count": len(records),
+            "max_rank_gpu_period_us": _stats(
+                [record["max_rank"]["gpu_period_us"]["value"] for record in records]
+            ),
+            "max_rank_target_kernel_sum_us": _stats(
+                [
+                    record["max_rank"]["target_kernel_sum_us"]["value"]
+                    for record in records
+                ]
+            ),
+            "microbenchmark": micro,
+        }
+        cohort_rows.append(cohort)
+        if micro and micro["comparison"]:
+            field = (
+                "iris_vs_unfused_pct"
+                if arm == "iris_fused"
+                else "triton_vs_unfused_adjusted_pct"
+                if "graph" in execution
+                else "triton_vs_unfused_pct"
+            )
+            change = micro["comparison"].get(field)
+            if change is not None:
+                weighted_micro_changes.extend([float(change)] * len(records))
     return {
         "schema_version": 1,
         "analysis": "tokenspeed.ar_rmsnorm_model_forwards",
         "validation": {"status": "ok", "warnings": []},
-        "inputs": [
-            {"path": trace["path"], "rank": trace["rank"]} for trace in traces
-        ],
+        "inputs": [{"path": trace["path"], "rank": trace["rank"]} for trace in traces],
         "forwards": forwards,
         "cohorts": cohort_rows,
+        "microbenchmark_linkage": {
+            "arm": arm,
+            "linked_cohorts": sum(
+                cohort["microbenchmark"] is not None for cohort in cohort_rows
+            ),
+            "total_cohorts": len(cohort_rows),
+            "forward_weighted_candidate_vs_unfused_pct": (
+                statistics.fmean(weighted_micro_changes)
+                if weighted_micro_changes
+                else None
+            ),
+        },
     }
 
 
@@ -338,12 +409,21 @@ def main() -> None:
         default="all",
     )
     parser.add_argument("--expected-world-size", type=int)
+    parser.add_argument(
+        "--arm",
+        choices=("upstream_unfused", "iris_fused", "triton_profile"),
+    )
+    parser.add_argument("--graph-summary", type=Path)
+    parser.add_argument("--eager-summary", type=Path)
     parser.add_argument("--summary-only", action="store_true")
     args = parser.parse_args()
     result = analyze(
         args.traces,
         expected_world_size=args.expected_world_size,
         mode=args.mode,
+        graph_summary=_load(args.graph_summary) if args.graph_summary else None,
+        eager_summary=_load(args.eager_summary) if args.eager_summary else None,
+        arm=args.arm,
     )
     if args.summary_only:
         result.pop("forwards", None)

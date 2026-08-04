@@ -13,7 +13,9 @@ override those pages.
 The [GPT-OSS-120B status](docs/gpt-oss-120b-status.md) owns TP=4 policy on
 MI350X. Core-v3 is safe on HIP `1,2,5,6`, but its default-compatible campaign
 did not clear the latency or capacity promotion gates. Explicit
-upstream-unfused remains the deployment default and WS=8 remains unqualified.
+upstream-unfused remains the deployment default. A
+[current-machine definitive campaign](studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/README.md)
+is planned for WS=2/4/8; it has not been run and WS=8 remains unqualified.
 
 ### GLM-5.2-FP8
 
@@ -39,6 +41,8 @@ is specified but has not been run.
   upstream-unfused, Iris, and initial explicit-triton reset.
 - [Repeatability and incident study](studies/mi350x/2026-07-repeatability/README.md)
   — pre-rebase graph-lifetime root causes and qualification.
+- [GPT-OSS-120B definitive sweep](studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/README.md)
+  — unrun current-machine WS=2/4/8 eager, graph, and serving contract.
 - [GLM-5.2-FP8 baseline](studies/mi350x/2026-08-glm-5.2-fp8-baseline/README.md)
   — WS=8/N=6144 profile-v2 characterization and validation.
 - [GLM-5.2-FP8 definitive sweep](studies/mi350x/2026-08-glm-5.2-fp8-definitive-sweep/README.md)

@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "status": "report_contract_only",
+  "summary": {
+    "required_sections": [
+      "identity",
+      "topology",
+      "attempts",
+      "selected_policy",
+      "microbenchmark",
+      "forward_linkage",
+      "end_to_end",
+      "failures",
+      "decision"
+    ],
+    "decision_values": [
+      "not_run",
+      "failed_qualification",
+      "definitive_screen_loss",
+      "definitive_screen_inconclusive",
+      "definitive_screen_promising",
+      "promotion_eligible"
+    ]
+  },
+  "microbenchmark": {
+    "separate_modes": [
+      "eager",
+      "graph"
+    ],
+    "required_dimensions": [
+      "world_size",
+      "N",
+      "M",
+      "arm",
+      "pass",
+      "expected_backend",
+      "expected_path"
+    ],
+    "graph_required_metrics": [
+      "p50_us_per_site",
+      "p95_us_per_site",
+      "p99_us_per_site",
+      "benchmark_reset_copy_p50_us_per_site",
+      "serving_faithful_p50_us_per_site",
+      "p50_pass_spread_pct"
+    ],
+    "eager_required_metrics": [
+      "p50_us",
+      "p95_us",
+      "p99_us",
+      "p50_pass_spread_pct"
+    ]
+  },
+  "forward_linkage": {
+    "required_dimensions": [
+      "world_size",
+      "arm",
+      "mode",
+      "execution",
+      "actual_m",
+      "executed_m",
+      "primary_path"
+    ],
+    "required_metrics": [
+      "cohort_count",
+      "microbenchmark_p50_us_per_site",
+      "microbenchmark_candidate_vs_unfused_pct",
+      "max_rank_target_kernel_sum_us",
+      "max_rank_gpu_period_us"
+    ]
+  },
+  "end_to_end": {
+    "contrasts": [
+      "iris_fused_vs_upstream_unfused",
+      "triton_profile_vs_upstream_unfused"
+    ],
+    "required_metrics": [
+      "output_throughput",
+      "median_tpot_ms",
+      "mean_tpot_ms",
+      "median_ttft_ms",
+      "attempted_triplets",
+      "completed_triplets",
+      "restart_blocks",
+      "paired_values",
+      "confidence_interval"
+    ],
+    "promotion_minimum_pairs_per_contrast": 15
+  }
+}
