@@ -524,7 +524,7 @@ def _profile_is_eligible(
     ).replace(" ", "")
     local_errors = _profile_validation_errors(
         profile_id=profile_id,
-        arch=_k.detect_arch(device.index),
+        arch=_p.detect_arch(device.index),
         world_size=group.size(),
         max_token_num=max_token_num,
         hidden_dim=hidden_dim,
@@ -549,7 +549,7 @@ def _profile_is_eligible(
         "triton_shmem profile resolved: id=%s arch=%s ws=%d hidden=%d "
         "dtype=%s max_tokens=%d visible_devices=%s",
         profile_id or "unqualified-manual",
-        _k.detect_arch(device.index),
+        _p.detect_arch(device.index),
         group.size(),
         hidden_dim,
         dtype,
@@ -867,6 +867,10 @@ class TritonShmemAllReduceResidualRMSNorm:
             )
         else:
             self._oneshot_kernel = self.kernel  # ws<=2 is already one-shot
+            if self._oneshot_variant == "blocked":
+                self._oneshot_kernel = "oneshot_blocked"
+            elif self._oneshot_variant == "padded":
+                self._oneshot_kernel = "oneshot_wholerow_padded"
             self._oneshot_scratch = self._scratch
         configured_oneshot_num_warps = _oneshot_num_warps()
         self._oneshot_num_warps = configured_oneshot_num_warps or (

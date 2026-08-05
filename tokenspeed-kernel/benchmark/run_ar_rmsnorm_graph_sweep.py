@@ -146,6 +146,29 @@ def _expected_backend(spec: dict[str, Any], run: Run) -> str:
     return _ordinary_backend(run)
 
 
+def _expected_path(spec: dict[str, Any], run: Run) -> str | None:
+    if run.arm == "iris_fused":
+        return "fused_iris_allreduce_residual_rmsnorm"
+    if run.arm == "upstream_unfused":
+        backend = _ordinary_backend(run)
+        return (
+            "ordinary_iris_all_reduce+triton_residual_rmsnorm"
+            if backend == "iris"
+            else "rccl_all_reduce+triton_residual_rmsnorm"
+        )
+    if run.arm == "triton_forced":
+        variant = (
+            spec["arms"][run.arm]
+            .get("overrides", {})
+            .get("TS_TRITON_SHMEM_ONESHOT_VARIANT")
+        )
+        return {
+            "blocked": "oneshot_blocked",
+            "padded": "oneshot_wholerow_padded",
+        }.get(variant)
+    return None
+
+
 def _validate_result(
     path: Path,
     spec: dict[str, Any],
@@ -163,6 +186,9 @@ def _validate_result(
         "resolved_impl": run.bench_impl,
         "expected_backend": _expected_backend(spec, run),
     }
+    expected_path = _expected_path(spec, run)
+    if expected_path is not None:
+        expected["expected_path"] = expected_path
     mismatches = {
         key: (payload.get(key), value)
         for key, value in expected.items()

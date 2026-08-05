@@ -24,6 +24,14 @@ audit. The historical `jeremwan/tokenspeed:rocm7.2.4-torch2.11` tag was retired
 on 2026-07-24 because `libtorch_hip.so` resolved torch's bundled ROCm 7.2.0
 `libroctracer64.so`; do not recreate that mixed tracing stack.
 
+The 2026-08-05 GLM definitive sweep ran on 8x MI355X with image
+`sha256:554132d539e81c68245026124b99c296806213926a543b0816c8dcc38cef9114`
+and container `jeremwan-ar-rmsnorm-profiler-mi355x-6e788124`. Its independent
+runtime, loader, profiler, communication, transition, topology, and model audit
+is under `raw/current/glm-5.2-fp8/mi355x/2026-08-05T0135Z/`. MI355X remains
+gfx950-compatible, but its measurements do not inherit or replace MI350X
+performance qualification.
+
 The upstream rebase outgrew the image's original Python packages. The qualified
 2026-07-30 writable layer uses source-tree `PYTHONPATH`, Transformers 5.12,
 SMG 1.8.0.post20260728, gRPC proto 0.4.14.post20260728, gRPC servicer
@@ -314,9 +322,9 @@ allocation cap. Consolidate repeated per-site/full-site sweeps with
 values and emits compact JSON/CSV comparisons keyed by world size, hidden size,
 site count, and M.
 
-The predeclared GLM WS=2/4/8 campaign is in the
+The completed MI355X execution of the predeclared GLM WS=2/4/8 campaign is in the
 [definitive sweep study](../studies/mi350x/2026-08-glm-5.2-fp8-definitive-sweep/README.md).
-Inspect its complete schedule without launching a benchmark:
+The immutable schedule remains inspectable without launching a benchmark:
 
 ```bash
 source benchmark/profiles/ar_rmsnorm/glm_5_2_fp8_mi350x.env

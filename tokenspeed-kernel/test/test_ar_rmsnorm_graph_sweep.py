@@ -10,6 +10,7 @@ from benchmark.analyze_ar_rmsnorm_graph_sweep import collect
 from benchmark.run_ar_rmsnorm_graph_sweep import (
     Run,
     _expected_backend,
+    _expected_path,
     _parse_devices,
     _result_path,
     build_schedule,
@@ -254,6 +255,57 @@ def test_gpt_graph_candidate_expects_complete_fallback_above_m384():
 
     assert _expected_backend(spec, Run(m=384, **base)) == "triton_shmem"
     assert _expected_backend(spec, Run(m=385, **base)) == "rccl"
+
+
+def test_definitive_expected_paths_include_forced_variant():
+    spec = {
+        "arms": {
+            "triton_forced": {
+                "overrides": {
+                    "TS_TRITON_SHMEM_ONESHOT_VARIANT": "padded",
+                }
+            }
+        }
+    }
+    base = {
+        "block": "pass1",
+        "calls_per_graph": 156,
+        "world_size": 8,
+        "hidden_size": 6144,
+        "bench_impl": "triton_shmem",
+        "max_token_num": 42,
+    }
+
+    assert (
+        _expected_path(spec, Run(m=42, arm="triton_forced", **base))
+        == "oneshot_wholerow_padded"
+    )
+    assert (
+        _expected_path(
+            spec,
+            Run(
+                m=42,
+                arm="upstream_unfused",
+                **{**base, "bench_impl": "production_unfused"},
+            ),
+        )
+        == "ordinary_iris_all_reduce+triton_residual_rmsnorm"
+    )
+    assert (
+        _expected_path(
+            spec,
+            Run(
+                m=43,
+                arm="upstream_unfused",
+                **{
+                    **base,
+                    "bench_impl": "production_unfused",
+                    "max_token_num": 43,
+                },
+            ),
+        )
+        == "rccl_all_reduce+triton_residual_rmsnorm"
+    )
 
 
 def test_device_map_requires_unique_count():

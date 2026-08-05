@@ -19,6 +19,7 @@ workspace cap when screening a smaller actual M against exact profile identity.
 
 from __future__ import annotations
 
+import gc
 import json
 import os
 import socket
@@ -378,6 +379,7 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
     )
     dist.barrier(group=group)
 
+    reset_graph = None
     reset_rank_samples_us = None
     if impl == "production_unfused" or fallback_used or graph_decline_expected:
         reset_graph = torch.cuda.CUDAGraph()
@@ -510,6 +512,15 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
         if impl == "triton_shmem":
             result["signal_zero_status"] = "not_exposed_by_safe_public_api"
         out.append(result)
+    # RCCL graph work must be released before its process group. Keeping a
+    # captured collective graph alive during communicator teardown can leave
+    # watchdog threads waiting on graph-owned events.
+    del graph
+    if reset_graph is not None:
+        del reset_graph
+    gc.collect()
+    torch.cuda.synchronize()
+    dist.barrier(group=group)
     dist.destroy_process_group()
 
 
