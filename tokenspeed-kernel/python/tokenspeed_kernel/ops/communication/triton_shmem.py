@@ -524,7 +524,7 @@ def _profile_is_eligible(
     ).replace(" ", "")
     local_errors = _profile_validation_errors(
         profile_id=profile_id,
-        arch=_k.detect_arch(device.index),
+        arch=_p.detect_arch(device.index),
         world_size=group.size(),
         max_token_num=max_token_num,
         hidden_dim=hidden_dim,
@@ -549,7 +549,7 @@ def _profile_is_eligible(
         "triton_shmem profile resolved: id=%s arch=%s ws=%d hidden=%d "
         "dtype=%s max_tokens=%d visible_devices=%s",
         profile_id or "unqualified-manual",
-        _k.detect_arch(device.index),
+        _p.detect_arch(device.index),
         group.size(),
         hidden_dim,
         dtype,

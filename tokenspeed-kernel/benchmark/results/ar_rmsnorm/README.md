@@ -15,7 +15,9 @@ MI350X. Core-v3 is safe on HIP `1,2,5,6`, but its default-compatible campaign
 did not clear the latency or capacity promotion gates. Explicit
 upstream-unfused remains the deployment default. A
 [current-machine definitive campaign](studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/README.md)
-is planned for WS=2/4/8; it has not been run and WS=8 remains unqualified.
+completed its five-triplet screen: WS4 is promising at +1.27% throughput,
+WS2 is inconclusive, and WS8 loses. Promotion was not run, so deployment policy
+is unchanged.
 
 ### GLM-5.2-FP8
 
@@ -42,7 +44,8 @@ is specified but has not been run.
 - [Repeatability and incident study](studies/mi350x/2026-07-repeatability/README.md)
   — pre-rebase graph-lifetime root causes and qualification.
 - [GPT-OSS-120B definitive sweep](studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/README.md)
-  — unrun current-machine WS=2/4/8 eager, graph, and serving contract.
+  — complete current-machine WS=2/4/8 eager, graph, transition, marker, and
+  five-triplet serving screen.
 - [GLM-5.2-FP8 baseline](studies/mi350x/2026-08-glm-5.2-fp8-baseline/README.md)
   — WS=8/N=6144 profile-v2 characterization and validation.
 - [GLM-5.2-FP8 definitive sweep](studies/mi350x/2026-08-glm-5.2-fp8-definitive-sweep/README.md)

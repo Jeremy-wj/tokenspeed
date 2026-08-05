@@ -1,0 +1,2115 @@
+{
+  "all_valid": true,
+  "analyses": [
+    {
+      "arm": "upstream_unfused",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 128,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 24102.44384765625,
+            "median": 24102.44384765625,
+            "min": 24102.44384765625,
+            "p95": 24102.44384765625
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 363.009,
+            "median": 363.009,
+            "min": 363.009,
+            "p95": 363.009
+          },
+          "microbenchmark": {
+            "M": 128,
+            "arm": "upstream_unfused",
+            "comparison": {
+              "M": 128,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": -27.2080939556112,
+              "triton_path": "oneshot_blocked",
+              "triton_vs_iris_pct": 6.485851188726954,
+              "triton_vs_unfused_adjusted_pct": -16.31642305914267,
+              "triton_vs_unfused_forward_delta_ms": -0.49392449855804443,
+              "triton_vs_unfused_pct": -22.486919252134207,
+              "unfused_benchmark_reset_copy_us_per_site": 2.249458390805456,
+              "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "world_size": 2
+            },
+            "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 30.506902270846897,
+            "world_size": 2
+          },
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 1,
+          "executed_m": 8000,
+          "execution": "eager",
+          "max_rank_gpu_period_us": {
+            "max": 136546.751953125,
+            "median": 136546.751953125,
+            "min": 136546.751953125,
+            "p95": 136546.751953125
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 2424.988,
+            "median": 2424.988,
+            "min": 2424.988,
+            "p95": 2424.988
+          },
+          "microbenchmark": null,
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 6,
+          "executed_m": 64,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 15926.0537109375,
+            "median": 15389.28955078125,
+            "min": 14745.12255859375,
+            "p95": 15926.0537109375
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 1432.703,
+            "median": 1369.5439999999999,
+            "min": 1326.382,
+            "p95": 1432.703
+          },
+          "microbenchmark": {
+            "M": 64,
+            "arm": "upstream_unfused",
+            "comparison": {
+              "M": 64,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 2.322774095053348,
+              "triton_path": "oneshot_blocked",
+              "triton_vs_iris_pct": 6.19575297955155,
+              "triton_vs_unfused_adjusted_pct": 25.477990589731235,
+              "triton_vs_unfused_forward_delta_ms": 0.09767064452171326,
+              "triton_vs_unfused_pct": 8.662440419807439,
+              "unfused_benchmark_reset_copy_us_per_site": 2.0986249049504595,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 2
+            },
+            "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 15.659983373350567,
+            "world_size": 2
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "unfused_iris"
+          ]
+        }
+      ],
+      "diagnostic": "decode-c64",
+      "microbenchmark_linkage": {
+        "arm": "upstream_unfused",
+        "forward_weighted_candidate_vs_unfused_pct": 19.507360068463534,
+        "linked_cohorts": 2,
+        "total_cohorts": 3
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws2-upstream_unfused-decode-c64.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 2
+    },
+    {
+      "arm": "upstream_unfused",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 512,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 30363.85595703125,
+            "median": 30363.85595703125,
+            "min": 30363.85595703125,
+            "p95": 30363.85595703125
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 406.734,
+            "median": 406.734,
+            "min": 406.734,
+            "p95": 406.734
+          },
+          "microbenchmark": {
+            "M": 512,
+            "arm": "upstream_unfused",
+            "comparison": {
+              "M": 512,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": -11.574505157734505,
+              "triton_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "triton_vs_iris_pct": 12.964072869314958,
+              "triton_vs_unfused_adjusted_pct": -0.128268172412771,
+              "triton_vs_unfused_forward_delta_ms": -0.005499839782714844,
+              "triton_vs_unfused_pct": -0.11095957133087087,
+              "unfused_benchmark_reset_copy_us_per_site": 3.2366944683922663,
+              "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "world_size": 2
+            },
+            "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 68.84188784493341,
+            "world_size": 2
+          },
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 7,
+          "executed_m": 1,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 11573.85400390625,
+            "median": 11465.53564453125,
+            "min": 11282.89501953125,
+            "p95": 11573.85400390625
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 1269.547,
+            "median": 1155.311,
+            "min": 950.702,
+            "p95": 1269.547
+          },
+          "microbenchmark": {
+            "M": 1,
+            "arm": "upstream_unfused",
+            "comparison": {
+              "M": 1,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 29.904340983738376,
+              "triton_path": "oneshot_blocked",
+              "triton_vs_iris_pct": 24.078649744343437,
+              "triton_vs_unfused_adjusted_pct": 113.93618266632939,
+              "triton_vs_unfused_forward_delta_ms": 0.33378350734710693,
+              "triton_vs_unfused_pct": 61.18355225191032,
+              "unfused_benchmark_reset_copy_us_per_site": 1.8683471199538972,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 2
+            },
+            "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 7.577007015546163,
+            "world_size": 2
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "unfused_iris"
+          ]
+        }
+      ],
+      "diagnostic": "direct-m512",
+      "microbenchmark_linkage": {
+        "arm": "upstream_unfused",
+        "forward_weighted_candidate_vs_unfused_pct": 99.67812631148662,
+        "linked_cohorts": 2,
+        "total_cohorts": 2
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws2-upstream_unfused-direct-m512.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 2
+    },
+    {
+      "arm": "iris_fused",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 128,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 23063.1337890625,
+            "median": 23063.1337890625,
+            "min": 23063.1337890625,
+            "p95": 23063.1337890625
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 1124.176,
+            "median": 1124.176,
+            "min": 1124.176,
+            "p95": 1124.176
+          },
+          "microbenchmark": {
+            "M": 128,
+            "arm": "iris_fused",
+            "comparison": {
+              "M": 128,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": -27.2080939556112,
+              "triton_path": "oneshot_blocked",
+              "triton_vs_iris_pct": 6.485851188726954,
+              "triton_vs_unfused_adjusted_pct": -16.31642305914267,
+              "triton_vs_unfused_forward_delta_ms": -0.49392449855804443,
+              "triton_vs_unfused_pct": -22.486919252134207,
+              "unfused_benchmark_reset_copy_us_per_site": 2.249458390805456,
+              "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "world_size": 2
+            },
+            "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 22.206555638048386,
+            "world_size": 2
+          },
+          "mode": "extend",
+          "primary_paths": [
+            "iris_fused"
+          ]
+        },
+        {
+          "count": 1,
+          "executed_m": 8000,
+          "execution": "eager",
+          "max_rank_gpu_period_us": {
+            "max": 774174.3828125,
+            "median": 774174.3828125,
+            "min": 774174.3828125,
+            "p95": 774174.3828125
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 2449.067,
+            "median": 2449.067,
+            "min": 2449.067,
+            "p95": 2449.067
+          },
+          "microbenchmark": null,
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 6,
+          "executed_m": 64,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 16114.494140625,
+            "median": 15780.34033203125,
+            "min": 14966.28515625,
+            "p95": 16114.494140625
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 871.656,
+            "median": 765.215,
+            "min": 687.969,
+            "p95": 871.656
+          },
+          "microbenchmark": {
+            "M": 64,
+            "arm": "iris_fused",
+            "comparison": {
+              "M": 64,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 2.322774095053348,
+              "triton_path": "oneshot_blocked",
+              "triton_vs_iris_pct": 6.19575297955155,
+              "triton_vs_unfused_adjusted_pct": 25.477990589731235,
+              "triton_vs_unfused_forward_delta_ms": 0.09767064452171326,
+              "triton_vs_unfused_pct": 8.662440419807439,
+              "unfused_benchmark_reset_copy_us_per_site": 2.0986249049504595,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 2
+            },
+            "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 16.023729410436417,
+            "world_size": 2
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "iris_fused"
+          ]
+        }
+      ],
+      "diagnostic": "decode-c64",
+      "microbenchmark_linkage": {
+        "arm": "iris_fused",
+        "forward_weighted_candidate_vs_unfused_pct": -1.895921340755873,
+        "linked_cohorts": 2,
+        "total_cohorts": 3
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws2-iris_fused-decode-c64.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 2
+    },
+    {
+      "arm": "iris_fused",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 512,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 29276.642578125,
+            "median": 29276.642578125,
+            "min": 29276.642578125,
+            "p95": 29276.642578125
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 3835.44,
+            "median": 3835.44,
+            "min": 3835.44,
+            "p95": 3835.44
+          },
+          "microbenchmark": {
+            "M": 512,
+            "arm": "iris_fused",
+            "comparison": {
+              "M": 512,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": -11.574505157734505,
+              "triton_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "triton_vs_iris_pct": 12.964072869314958,
+              "triton_vs_unfused_adjusted_pct": -0.128268172412771,
+              "triton_vs_unfused_forward_delta_ms": -0.005499839782714844,
+              "triton_vs_unfused_pct": -0.11095957133087087,
+              "unfused_benchmark_reset_copy_us_per_site": 3.2366944683922663,
+              "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "world_size": 2
+            },
+            "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 60.873779985639786,
+            "world_size": 2
+          },
+          "mode": "extend",
+          "primary_paths": [
+            "iris_fused"
+          ]
+        },
+        {
+          "count": 7,
+          "executed_m": 1,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 12158.1396484375,
+            "median": 11800.81103515625,
+            "min": 11540.13623046875,
+            "p95": 12158.1396484375
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 918.7339999999999,
+            "median": 768.294,
+            "min": 752.334,
+            "p95": 918.7339999999999
+          },
+          "microbenchmark": {
+            "M": 1,
+            "arm": "iris_fused",
+            "comparison": {
+              "M": 1,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 29.904340983738376,
+              "triton_path": "oneshot_blocked",
+              "triton_vs_iris_pct": 24.078649744343437,
+              "triton_vs_unfused_adjusted_pct": 113.93618266632939,
+              "triton_vs_unfused_forward_delta_ms": 0.33378350734710693,
+              "triton_vs_unfused_pct": 61.18355225191032,
+              "unfused_benchmark_reset_copy_us_per_site": 1.8683471199538972,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 2
+            },
+            "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 9.842861029836866,
+            "world_size": 2
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "iris_fused"
+          ]
+        }
+      ],
+      "diagnostic": "direct-m512",
+      "microbenchmark_linkage": {
+        "arm": "iris_fused",
+        "forward_weighted_candidate_vs_unfused_pct": 24.719485216054267,
+        "linked_cohorts": 2,
+        "total_cohorts": 2
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws2-iris_fused-direct-m512.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 2
+    },
+    {
+      "arm": "triton_profile",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 128,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 22575.8330078125,
+            "median": 22575.8330078125,
+            "min": 22575.8330078125,
+            "p95": 22575.8330078125
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 2215.469,
+            "median": 2215.469,
+            "min": 2215.469,
+            "p95": 2215.469
+          },
+          "microbenchmark": {
+            "M": 128,
+            "arm": "triton_profile",
+            "comparison": {
+              "M": 128,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": -27.2080939556112,
+              "triton_path": "oneshot_blocked",
+              "triton_vs_iris_pct": 6.485851188726954,
+              "triton_vs_unfused_adjusted_pct": -16.31642305914267,
+              "triton_vs_unfused_forward_delta_ms": -0.49392449855804443,
+              "triton_vs_unfused_pct": -22.486919252134207,
+              "unfused_benchmark_reset_copy_us_per_site": 2.249458390805456,
+              "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "world_size": 2
+            },
+            "expected_path": "oneshot_blocked",
+            "mode": "graph",
+            "p50_us_per_site": 23.646839790874058,
+            "world_size": 2
+          },
+          "mode": "extend",
+          "primary_paths": [
+            "triton_shmem_fused_oneshot"
+          ]
+        },
+        {
+          "count": 1,
+          "executed_m": 8000,
+          "execution": "eager",
+          "max_rank_gpu_period_us": {
+            "max": 135189.0732421875,
+            "median": 135189.0732421875,
+            "min": 135189.0732421875,
+            "p95": 135189.0732421875
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 2445.67,
+            "median": 2445.67,
+            "min": 2445.67,
+            "p95": 2445.67
+          },
+          "microbenchmark": null,
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 6,
+          "executed_m": 64,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 16336.5390625,
+            "median": 15405.662109375,
+            "min": 14674.00390625,
+            "p95": 16336.5390625
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 1526.098,
+            "median": 1244.018,
+            "min": 1213.734,
+            "p95": 1526.098
+          },
+          "microbenchmark": {
+            "M": 64,
+            "arm": "triton_profile",
+            "comparison": {
+              "M": 64,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 2.322774095053348,
+              "triton_path": "oneshot_blocked",
+              "triton_vs_iris_pct": 6.19575297955155,
+              "triton_vs_unfused_adjusted_pct": 25.477990589731235,
+              "triton_vs_unfused_forward_delta_ms": 0.09767064452171326,
+              "triton_vs_unfused_pct": 8.662440419807439,
+              "unfused_benchmark_reset_copy_us_per_site": 2.0986249049504595,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 2
+            },
+            "expected_path": "oneshot_blocked",
+            "mode": "graph",
+            "p50_us_per_site": 17.01652010281881,
+            "world_size": 2
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "triton_shmem_fused_oneshot"
+          ]
+        }
+      ],
+      "diagnostic": "decode-c64",
+      "microbenchmark_linkage": {
+        "arm": "triton_profile",
+        "forward_weighted_candidate_vs_unfused_pct": 19.507360068463534,
+        "linked_cohorts": 2,
+        "total_cohorts": 3
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws2-triton_profile-decode-c64.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 2
+    },
+    {
+      "arm": "triton_profile",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 512,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 29944.61474609375,
+            "median": 29944.61474609375,
+            "min": 29944.61474609375,
+            "p95": 29944.61474609375
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 396.611,
+            "median": 396.611,
+            "min": 396.611,
+            "p95": 396.611
+          },
+          "microbenchmark": {
+            "M": 512,
+            "arm": "triton_profile",
+            "comparison": {
+              "M": 512,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": -11.574505157734505,
+              "triton_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "triton_vs_iris_pct": 12.964072869314958,
+              "triton_vs_unfused_adjusted_pct": -0.128268172412771,
+              "triton_vs_unfused_forward_delta_ms": -0.005499839782714844,
+              "triton_vs_unfused_pct": -0.11095957133087087,
+              "unfused_benchmark_reset_copy_us_per_site": 3.2366944683922663,
+              "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "world_size": 2
+            },
+            "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 68.76550118128459,
+            "world_size": 2
+          },
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 7,
+          "executed_m": 1,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 11691.97900390625,
+            "median": 11567.33837890625,
+            "min": 11363.90966796875,
+            "p95": 11691.97900390625
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 1300.459,
+            "median": 1101.177,
+            "min": 1011.294,
+            "p95": 1300.459
+          },
+          "microbenchmark": {
+            "M": 1,
+            "arm": "triton_profile",
+            "comparison": {
+              "M": 1,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 29.904340983738376,
+              "triton_path": "oneshot_blocked",
+              "triton_vs_iris_pct": 24.078649744343437,
+              "triton_vs_unfused_adjusted_pct": 113.93618266632939,
+              "triton_vs_unfused_forward_delta_ms": 0.33378350734710693,
+              "triton_vs_unfused_pct": 61.18355225191032,
+              "unfused_benchmark_reset_copy_us_per_site": 1.8683471199538972,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 2
+            },
+            "expected_path": "oneshot_blocked",
+            "mode": "graph",
+            "p50_us_per_site": 12.21288906203376,
+            "world_size": 2
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "triton_shmem_fused_oneshot"
+          ]
+        }
+      ],
+      "diagnostic": "direct-m512",
+      "microbenchmark_linkage": {
+        "arm": "triton_profile",
+        "forward_weighted_candidate_vs_unfused_pct": 99.67812631148662,
+        "linked_cohorts": 2,
+        "total_cohorts": 2
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws2-triton_profile-direct-m512.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 2
+    },
+    {
+      "arm": "upstream_unfused",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 128,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 24495.32568359375,
+            "median": 24495.32568359375,
+            "min": 24495.32568359375,
+            "p95": 24495.32568359375
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 390.41,
+            "median": 390.41,
+            "min": 390.41,
+            "p95": 390.41
+          },
+          "microbenchmark": {
+            "M": 128,
+            "arm": "upstream_unfused",
+            "comparison": {
+              "M": 128,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": -12.012592933256173,
+              "triton_path": "oneshot_blocked",
+              "triton_vs_iris_pct": -3.3662756702628416,
+              "triton_vs_unfused_adjusted_pct": -9.841947655414051,
+              "triton_vs_unfused_forward_delta_ms": -0.425182580947876,
+              "triton_vs_unfused_pct": -14.974491610239093,
+              "unfused_benchmark_reset_copy_us_per_site": 2.2450139125188193,
+              "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "world_size": 4
+            },
+            "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 39.43582044707404,
+            "world_size": 4
+          },
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 1,
+          "executed_m": 8000,
+          "execution": "eager",
+          "max_rank_gpu_period_us": {
+            "max": 112823.2119140625,
+            "median": 112823.2119140625,
+            "min": 112823.2119140625,
+            "p95": 112823.2119140625
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 2438.068,
+            "median": 2438.068,
+            "min": 2438.068,
+            "p95": 2438.068
+          },
+          "microbenchmark": null,
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 6,
+          "executed_m": 64,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 15101.3271484375,
+            "median": 14351.04052734375,
+            "min": 14277.19970703125,
+            "p95": 15101.3271484375
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 2379.357,
+            "median": 1945.7069999999999,
+            "min": 1871.109,
+            "p95": 2379.357
+          },
+          "microbenchmark": {
+            "M": 64,
+            "arm": "upstream_unfused",
+            "comparison": {
+              "M": 64,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 15.433644452989137,
+              "triton_path": "oneshot_wholerow_padded",
+              "triton_vs_iris_pct": -11.10452108986003,
+              "triton_vs_unfused_adjusted_pct": 14.035258071753276,
+              "triton_vs_unfused_forward_delta_ms": 0.040881216526031494,
+              "triton_vs_unfused_pct": 2.6152910599129164,
+              "unfused_benchmark_reset_copy_us_per_site": 2.1741874516010284,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 4
+            },
+            "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 21.71057297123803,
+            "world_size": 4
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "unfused_iris"
+          ]
+        }
+      ],
+      "diagnostic": "decode-c64",
+      "microbenchmark_linkage": {
+        "arm": "upstream_unfused",
+        "forward_weighted_candidate_vs_unfused_pct": 10.624228682157945,
+        "linked_cohorts": 2,
+        "total_cohorts": 3
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws4-upstream_unfused-decode-c64.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 4
+    },
+    {
+      "arm": "upstream_unfused",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 512,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 25377.853515625,
+            "median": 25377.853515625,
+            "min": 25377.853515625,
+            "p95": 25377.853515625
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 403.01,
+            "median": 403.01,
+            "min": 403.01,
+            "p95": 403.01
+          },
+          "microbenchmark": {
+            "M": 512,
+            "arm": "upstream_unfused",
+            "comparison": {
+              "M": 512,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 111.68857489019342,
+              "triton_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "triton_vs_iris_pct": -52.851694835284846,
+              "triton_vs_unfused_adjusted_pct": -0.19161604870656657,
+              "triton_vs_unfused_forward_delta_ms": -0.0072574615478515625,
+              "triton_vs_unfused_pct": -0.1924247119350242,
+              "unfused_benchmark_reset_copy_us_per_site": 3.2544652413990764,
+              "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "world_size": 4
+            },
+            "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 52.38312482833862,
+            "world_size": 4
+          },
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 7,
+          "executed_m": 1,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 11250.05419921875,
+            "median": 11098.8134765625,
+            "min": 11027.9208984375,
+            "p95": 11250.05419921875
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 1612.9470000000001,
+            "median": 1484.028,
+            "min": 1441.31,
+            "p95": 1612.9470000000001
+          },
+          "microbenchmark": {
+            "M": 1,
+            "arm": "upstream_unfused",
+            "comparison": {
+              "M": 1,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 23.283297883922227,
+              "triton_path": "oneshot_wholerow_padded",
+              "triton_vs_iris_pct": -19.110519340154873,
+              "triton_vs_unfused_adjusted_pct": 18.935694038167927,
+              "triton_vs_unfused_forward_delta_ms": -0.0023199915885925293,
+              "triton_vs_unfused_pct": -0.2767806013654672,
+              "unfused_benchmark_reset_copy_us_per_site": 1.8805693835020065,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 4
+            },
+            "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 11.64174990521537,
+            "world_size": 4
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "unfused_iris"
+          ]
+        }
+      ],
+      "diagnostic": "direct-m512",
+      "microbenchmark_linkage": {
+        "arm": "upstream_unfused",
+        "forward_weighted_candidate_vs_unfused_pct": 16.544780277308615,
+        "linked_cohorts": 2,
+        "total_cohorts": 2
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws4-upstream_unfused-direct-m512.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 4
+    },
+    {
+      "arm": "iris_fused",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 256,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 29688.58203125,
+            "median": 29688.58203125,
+            "min": 29688.58203125,
+            "p95": 29688.58203125
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 3887.4320000000002,
+            "median": 3887.4320000000002,
+            "min": 3887.4320000000002,
+            "p95": 3887.4320000000002
+          },
+          "microbenchmark": {
+            "M": 256,
+            "arm": "iris_fused",
+            "comparison": {
+              "M": 256,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 64.42275920281509,
+              "triton_path": "oneshot_blocked",
+              "triton_vs_iris_pct": -20.815660433106697,
+              "triton_vs_unfused_adjusted_pct": 38.8533638075327,
+              "triton_vs_unfused_forward_delta_ms": 0.8275260925292969,
+              "triton_vs_unfused_pct": 30.197075972412392,
+              "unfused_benchmark_reset_copy_us_per_site": 2.3727915767166348,
+              "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "world_size": 4
+            },
+            "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 62.581539154052734,
+            "world_size": 4
+          },
+          "mode": "extend",
+          "primary_paths": [
+            "iris_fused"
+          ]
+        },
+        {
+          "count": 1,
+          "executed_m": 7872,
+          "execution": "eager",
+          "max_rank_gpu_period_us": {
+            "max": 742923.6020507812,
+            "median": 742923.6020507812,
+            "min": 742923.6020507812,
+            "p95": 742923.6020507812
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 2406.949,
+            "median": 2406.949,
+            "min": 2406.949,
+            "p95": 2406.949
+          },
+          "microbenchmark": null,
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 6,
+          "executed_m": 64,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 15305.00537109375,
+            "median": 14735.460693359375,
+            "min": 14656.2802734375,
+            "p95": 15305.00537109375
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 1242.374,
+            "median": 1091.5549999999998,
+            "min": 1050.173,
+            "p95": 1242.374
+          },
+          "microbenchmark": {
+            "M": 64,
+            "arm": "iris_fused",
+            "comparison": {
+              "M": 64,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 15.433644452989137,
+              "triton_path": "oneshot_wholerow_padded",
+              "triton_vs_iris_pct": -11.10452108986003,
+              "triton_vs_unfused_adjusted_pct": 14.035258071753276,
+              "triton_vs_unfused_forward_delta_ms": 0.040881216526031494,
+              "triton_vs_unfused_pct": 2.6152910599129164,
+              "unfused_benchmark_reset_copy_us_per_site": 2.1741874516010284,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 4
+            },
+            "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 25.06130561232567,
+            "world_size": 4
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "iris_fused"
+          ]
+        }
+      ],
+      "diagnostic": "decode-c64",
+      "microbenchmark_linkage": {
+        "arm": "iris_fused",
+        "forward_weighted_candidate_vs_unfused_pct": 22.432089417249987,
+        "linked_cohorts": 2,
+        "total_cohorts": 3
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws4-iris_fused-decode-c64.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 4
+    },
+    {
+      "arm": "iris_fused",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 512,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 29791.04541015625,
+            "median": 29791.04541015625,
+            "min": 29791.04541015625,
+            "p95": 29791.04541015625
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 7087.588,
+            "median": 7087.588,
+            "min": 7087.588,
+            "p95": 7087.588
+          },
+          "microbenchmark": {
+            "M": 512,
+            "arm": "iris_fused",
+            "comparison": {
+              "M": 512,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 111.68857489019342,
+              "triton_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "triton_vs_iris_pct": -52.851694835284846,
+              "triton_vs_unfused_adjusted_pct": -0.19161604870656657,
+              "triton_vs_unfused_forward_delta_ms": -0.0072574615478515625,
+              "triton_vs_unfused_pct": -0.1924247119350242,
+              "unfused_benchmark_reset_copy_us_per_site": 3.2544652413990764,
+              "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "world_size": 4
+            },
+            "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 110.8890904320611,
+            "world_size": 4
+          },
+          "mode": "extend",
+          "primary_paths": [
+            "iris_fused"
+          ]
+        },
+        {
+          "count": 7,
+          "executed_m": 1,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 11818.49658203125,
+            "median": 11671.83251953125,
+            "min": 11621.33544921875,
+            "p95": 11818.49658203125
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 767.891,
+            "median": 679.769,
+            "min": 632.5319999999999,
+            "p95": 767.891
+          },
+          "microbenchmark": {
+            "M": 1,
+            "arm": "iris_fused",
+            "comparison": {
+              "M": 1,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 23.283297883922227,
+              "triton_path": "oneshot_wholerow_padded",
+              "triton_vs_iris_pct": -19.110519340154873,
+              "triton_vs_unfused_adjusted_pct": 18.935694038167927,
+              "triton_vs_unfused_forward_delta_ms": -0.0023199915885925293,
+              "triton_vs_unfused_pct": -0.2767806013654672,
+              "unfused_benchmark_reset_copy_us_per_site": 1.8805693835020065,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 4
+            },
+            "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 14.3523332145479,
+            "world_size": 4
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "iris_fused"
+          ]
+        }
+      ],
+      "diagnostic": "direct-m512",
+      "microbenchmark_linkage": {
+        "arm": "iris_fused",
+        "forward_weighted_candidate_vs_unfused_pct": 34.333957509706124,
+        "linked_cohorts": 2,
+        "total_cohorts": 2
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws4-iris_fused-direct-m512.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 4
+    },
+    {
+      "arm": "triton_profile",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 64,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 26025.13330078125,
+            "median": 26025.13330078125,
+            "min": 26025.13330078125,
+            "p95": 26025.13330078125
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 9373.407000000001,
+            "median": 9373.407000000001,
+            "min": 9373.407000000001,
+            "p95": 9373.407000000001
+          },
+          "microbenchmark": {
+            "M": 64,
+            "arm": "triton_profile",
+            "comparison": {
+              "M": 64,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 15.433644452989137,
+              "triton_path": "oneshot_wholerow_padded",
+              "triton_vs_iris_pct": -11.10452108986003,
+              "triton_vs_unfused_adjusted_pct": 14.035258071753276,
+              "triton_vs_unfused_forward_delta_ms": 0.040881216526031494,
+              "triton_vs_unfused_pct": 2.6152910599129164,
+              "unfused_benchmark_reset_copy_us_per_site": 2.1741874516010284,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 4
+            },
+            "expected_path": "oneshot_wholerow_padded",
+            "mode": "graph",
+            "p50_us_per_site": 22.27836764521069,
+            "world_size": 4
+          },
+          "mode": "extend",
+          "primary_paths": [
+            "triton_shmem_fused_oneshot"
+          ]
+        },
+        {
+          "count": 1,
+          "executed_m": 8064,
+          "execution": "eager",
+          "max_rank_gpu_period_us": {
+            "max": 347007.67626953125,
+            "median": 347007.67626953125,
+            "min": 347007.67626953125,
+            "p95": 347007.67626953125
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 2443.876,
+            "median": 2443.876,
+            "min": 2443.876,
+            "p95": 2443.876
+          },
+          "microbenchmark": null,
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 6,
+          "executed_m": 64,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 15315.8447265625,
+            "median": 14577.518798828125,
+            "min": 14493.75830078125,
+            "p95": 15315.8447265625
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 2094.902,
+            "median": 1828.5625,
+            "min": 1805.817,
+            "p95": 2094.902
+          },
+          "microbenchmark": {
+            "M": 64,
+            "arm": "triton_profile",
+            "comparison": {
+              "M": 64,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 15.433644452989137,
+              "triton_path": "oneshot_wholerow_padded",
+              "triton_vs_iris_pct": -11.10452108986003,
+              "triton_vs_unfused_adjusted_pct": 14.035258071753276,
+              "triton_vs_unfused_forward_delta_ms": 0.040881216526031494,
+              "triton_vs_unfused_pct": 2.6152910599129164,
+              "unfused_benchmark_reset_copy_us_per_site": 2.1741874516010284,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 4
+            },
+            "expected_path": "oneshot_wholerow_padded",
+            "mode": "graph",
+            "p50_us_per_site": 22.27836764521069,
+            "world_size": 4
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "triton_shmem_fused_oneshot"
+          ]
+        }
+      ],
+      "diagnostic": "decode-c64",
+      "microbenchmark_linkage": {
+        "arm": "triton_profile",
+        "forward_weighted_candidate_vs_unfused_pct": 14.035258071753276,
+        "linked_cohorts": 2,
+        "total_cohorts": 3
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws4-triton_profile-decode-c64.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 4
+    },
+    {
+      "arm": "triton_profile",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 512,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 25670.689453125,
+            "median": 25670.689453125,
+            "min": 25670.689453125,
+            "p95": 25670.689453125
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 408.928,
+            "median": 408.928,
+            "min": 408.928,
+            "p95": 408.928
+          },
+          "microbenchmark": {
+            "M": 512,
+            "arm": "triton_profile",
+            "comparison": {
+              "M": 512,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 111.68857489019342,
+              "triton_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "triton_vs_iris_pct": -52.851694835284846,
+              "triton_vs_unfused_adjusted_pct": -0.19161604870656657,
+              "triton_vs_unfused_forward_delta_ms": -0.0072574615478515625,
+              "triton_vs_unfused_pct": -0.1924247119350242,
+              "unfused_benchmark_reset_copy_us_per_site": 3.2544652413990764,
+              "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "world_size": 4
+            },
+            "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 52.282326751285126,
+            "world_size": 4
+          },
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 7,
+          "executed_m": 1,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 11333.13232421875,
+            "median": 11158.1298828125,
+            "min": 11080.89013671875,
+            "p95": 11333.13232421875
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 1342.576,
+            "median": 1248.255,
+            "min": 1206.616,
+            "p95": 1342.576
+          },
+          "microbenchmark": {
+            "M": 1,
+            "arm": "triton_profile",
+            "comparison": {
+              "M": 1,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 23.283297883922227,
+              "triton_path": "oneshot_wholerow_padded",
+              "triton_vs_iris_pct": -19.110519340154873,
+              "triton_vs_unfused_adjusted_pct": 18.935694038167927,
+              "triton_vs_unfused_forward_delta_ms": -0.0023199915885925293,
+              "triton_vs_unfused_pct": -0.2767806013654672,
+              "unfused_benchmark_reset_copy_us_per_site": 1.8805693835020065,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 4
+            },
+            "expected_path": "oneshot_wholerow_padded",
+            "mode": "graph",
+            "p50_us_per_site": 11.60952779981825,
+            "world_size": 4
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "triton_shmem_fused_oneshot"
+          ]
+        }
+      ],
+      "diagnostic": "direct-m512",
+      "microbenchmark_linkage": {
+        "arm": "triton_profile",
+        "forward_weighted_candidate_vs_unfused_pct": 16.544780277308615,
+        "linked_cohorts": 2,
+        "total_cohorts": 2
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws4-triton_profile-direct-m512.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 4
+    },
+    {
+      "arm": "upstream_unfused",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 256,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 30552.166015625,
+            "median": 30552.166015625,
+            "min": 30552.166015625,
+            "p95": 30552.166015625
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 363.851,
+            "median": 363.851,
+            "min": 363.851,
+            "p95": 363.851
+          },
+          "microbenchmark": {
+            "M": 256,
+            "arm": "upstream_unfused",
+            "comparison": {
+              "M": 256,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 202.66849294691528,
+              "triton_path": "oneshot_blocked",
+              "triton_vs_iris_pct": -31.337127593305702,
+              "triton_vs_unfused_adjusted_pct": 122.6526158818011,
+              "triton_vs_unfused_forward_delta_ms": 2.7581217288970947,
+              "triton_vs_unfused_pct": 107.82088112740493,
+              "unfused_benchmark_reset_copy_us_per_site": 2.3666945182614856,
+              "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "world_size": 8
+            },
+            "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 35.52859690454271,
+            "world_size": 8
+          },
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 1,
+          "executed_m": 7872,
+          "execution": "eager",
+          "max_rank_gpu_period_us": {
+            "max": 140739.6572265625,
+            "median": 140739.6572265625,
+            "min": 140739.6572265625,
+            "p95": 140739.6572265625
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 2397.232,
+            "median": 2397.232,
+            "min": 2397.232,
+            "p95": 2397.232
+          },
+          "microbenchmark": null,
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 6,
+          "executed_m": 64,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 20517.6279296875,
+            "median": 18187.23388671875,
+            "min": 18039.8740234375,
+            "p95": 20517.6279296875
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 5466.381,
+            "median": 3252.0,
+            "min": 3010.881,
+            "p95": 5466.381
+          },
+          "microbenchmark": {
+            "M": 64,
+            "arm": "upstream_unfused",
+            "comparison": {
+              "M": 64,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 11.225578457635743,
+              "triton_path": "oneshot_wholerow_padded",
+              "triton_vs_iris_pct": -5.2366604577273375,
+              "triton_vs_unfused_adjusted_pct": 13.015708352418764,
+              "triton_vs_unfused_forward_delta_ms": 0.12462097406387329,
+              "triton_vs_unfused_pct": 5.401072571666221,
+              "unfused_benchmark_reset_copy_us_per_site": 2.159180533554819,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 8
+            },
+            "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 32.04635447925992,
+            "world_size": 8
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "unfused_iris"
+          ]
+        }
+      ],
+      "diagnostic": "decode-c64",
+      "microbenchmark_linkage": {
+        "arm": "upstream_unfused",
+        "forward_weighted_candidate_vs_unfused_pct": 28.6781237137591,
+        "linked_cohorts": 2,
+        "total_cohorts": 3
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws8-upstream_unfused-decode-c64.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 8
+    },
+    {
+      "arm": "upstream_unfused",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 512,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 27276.7939453125,
+            "median": 27276.7939453125,
+            "min": 27276.7939453125,
+            "p95": 27276.7939453125
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 403.69,
+            "median": 403.69,
+            "min": 403.69,
+            "p95": 403.69
+          },
+          "microbenchmark": {
+            "M": 512,
+            "arm": "upstream_unfused",
+            "comparison": {
+              "M": 512,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 263.34685480513934,
+              "triton_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "triton_vs_iris_pct": -72.36938554328682,
+              "triton_vs_unfused_adjusted_pct": 0.44115293994568816,
+              "triton_vs_unfused_forward_delta_ms": 0.013839960098266602,
+              "triton_vs_unfused_pct": 0.39496859180145893,
+              "unfused_benchmark_reset_copy_us_per_site": 3.270569360918469,
+              "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "world_size": 8
+            },
+            "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 48.66758320066664,
+            "world_size": 8
+          },
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 7,
+          "executed_m": 1,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 11362.13720703125,
+            "median": 11142.21533203125,
+            "min": 11107.73388671875,
+            "p95": 11362.13720703125
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 2135.399,
+            "median": 2031.8220000000001,
+            "min": 1985.069,
+            "p95": 2135.399
+          },
+          "microbenchmark": {
+            "M": 1,
+            "arm": "upstream_unfused",
+            "comparison": {
+              "M": 1,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 26.43655634177835,
+              "triton_path": "oneshot_wholerow_padded",
+              "triton_vs_iris_pct": -16.446666409477718,
+              "triton_vs_unfused_adjusted_pct": 17.397945572672047,
+              "triton_vs_unfused_forward_delta_ms": 0.07694101333618164,
+              "triton_vs_unfused_pct": 5.64195770061473,
+              "unfused_benchmark_reset_copy_us_per_site": 1.8966806431611378,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 8
+            },
+            "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 18.94068055682712,
+            "world_size": 8
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "unfused_iris"
+          ]
+        }
+      ],
+      "diagnostic": "direct-m512",
+      "microbenchmark_linkage": {
+        "arm": "upstream_unfused",
+        "forward_weighted_candidate_vs_unfused_pct": 15.278346493581251,
+        "linked_cohorts": 2,
+        "total_cohorts": 2
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws8-upstream_unfused-direct-m512.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 8
+    },
+    {
+      "arm": "iris_fused",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 320,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 599643.6030273438,
+            "median": 599643.6030273438,
+            "min": 599643.6030273438,
+            "p95": 599643.6030273438
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 7504.034,
+            "median": 7504.034,
+            "min": 7504.034,
+            "p95": 7504.034
+          },
+          "microbenchmark": null,
+          "mode": "extend",
+          "primary_paths": [
+            "iris_fused"
+          ]
+        },
+        {
+          "count": 1,
+          "executed_m": 7808,
+          "execution": "eager",
+          "max_rank_gpu_period_us": {
+            "max": 971351.0688476562,
+            "median": 971351.0688476562,
+            "min": 971351.0688476562,
+            "p95": 971351.0688476562
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 2378.861,
+            "median": 2378.861,
+            "min": 2378.861,
+            "p95": 2378.861
+          },
+          "microbenchmark": null,
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 5,
+          "executed_m": 64,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 19198.2822265625,
+            "median": 18435.435546875,
+            "min": 18362.07421875,
+            "p95": 19198.2822265625
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 1598.581,
+            "median": 1593.818,
+            "min": 1548.94,
+            "p95": 1598.581
+          },
+          "microbenchmark": {
+            "M": 64,
+            "arm": "iris_fused",
+            "comparison": {
+              "M": 64,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 11.225578457635743,
+              "triton_path": "oneshot_wholerow_padded",
+              "triton_vs_iris_pct": -5.2366604577273375,
+              "triton_vs_unfused_adjusted_pct": 13.015708352418764,
+              "triton_vs_unfused_forward_delta_ms": 0.12462097406387329,
+              "triton_vs_unfused_pct": 5.401072571666221,
+              "unfused_benchmark_reset_copy_us_per_site": 2.159180533554819,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 8
+            },
+            "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 35.643743144141304,
+            "world_size": 8
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "iris_fused"
+          ]
+        },
+        {
+          "count": 1,
+          "executed_m": 16,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 18349.48876953125,
+            "median": 18349.48876953125,
+            "min": 18349.48876953125,
+            "p95": 18349.48876953125
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 1074.895,
+            "median": 1074.895,
+            "min": 1074.895,
+            "p95": 1074.895
+          },
+          "microbenchmark": null,
+          "mode": "extend",
+          "primary_paths": [
+            "iris_fused"
+          ]
+        }
+      ],
+      "diagnostic": "decode-c64",
+      "microbenchmark_linkage": {
+        "arm": "iris_fused",
+        "forward_weighted_candidate_vs_unfused_pct": 11.225578457635743,
+        "linked_cohorts": 1,
+        "total_cohorts": 4
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws8-iris_fused-decode-c64.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 8
+    },
+    {
+      "arm": "iris_fused",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 512,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 35992.94482421875,
+            "median": 35992.94482421875,
+            "min": 35992.94482421875,
+            "p95": 35992.94482421875
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 11371.458,
+            "median": 11371.458,
+            "min": 11371.458,
+            "p95": 11371.458
+          },
+          "microbenchmark": {
+            "M": 512,
+            "arm": "iris_fused",
+            "comparison": {
+              "M": 512,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 263.34685480513934,
+              "triton_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "triton_vs_iris_pct": -72.36938554328682,
+              "triton_vs_unfused_adjusted_pct": 0.44115293994568816,
+              "triton_vs_unfused_forward_delta_ms": 0.013839960098266602,
+              "triton_vs_unfused_pct": 0.39496859180145893,
+              "unfused_benchmark_reset_copy_us_per_site": 3.270569360918469,
+              "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "world_size": 8
+            },
+            "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 176.8321328692966,
+            "world_size": 8
+          },
+          "mode": "extend",
+          "primary_paths": [
+            "iris_fused"
+          ]
+        },
+        {
+          "count": 7,
+          "executed_m": 1,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 11799.53857421875,
+            "median": 11591.45703125,
+            "min": 11538.45703125,
+            "p95": 11799.53857421875
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 847.211,
+            "median": 809.136,
+            "min": 774.333,
+            "p95": 847.211
+          },
+          "microbenchmark": {
+            "M": 1,
+            "arm": "iris_fused",
+            "comparison": {
+              "M": 1,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 26.43655634177835,
+              "triton_path": "oneshot_wholerow_padded",
+              "triton_vs_iris_pct": -16.446666409477718,
+              "triton_vs_unfused_adjusted_pct": 17.397945572672047,
+              "triton_vs_unfused_forward_delta_ms": 0.07694101333618164,
+              "triton_vs_unfused_pct": 5.64195770061473,
+              "unfused_benchmark_reset_copy_us_per_site": 1.8966806431611378,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 8
+            },
+            "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 23.94794424374898,
+            "world_size": 8
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "iris_fused"
+          ]
+        }
+      ],
+      "diagnostic": "direct-m512",
+      "microbenchmark_linkage": {
+        "arm": "iris_fused",
+        "forward_weighted_candidate_vs_unfused_pct": 56.050343649698476,
+        "linked_cohorts": 2,
+        "total_cohorts": 2
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws8-iris_fused-direct-m512.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 8
+    },
+    {
+      "arm": "triton_profile",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 256,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 346380.84033203125,
+            "median": 346380.84033203125,
+            "min": 346380.84033203125,
+            "p95": 346380.84033203125
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 36710.598,
+            "median": 36710.598,
+            "min": 36710.598,
+            "p95": 36710.598
+          },
+          "microbenchmark": {
+            "M": 256,
+            "arm": "triton_profile",
+            "comparison": {
+              "M": 256,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 202.66849294691528,
+              "triton_path": "oneshot_blocked",
+              "triton_vs_iris_pct": -31.337127593305702,
+              "triton_vs_unfused_adjusted_pct": 122.6526158818011,
+              "triton_vs_unfused_forward_delta_ms": 2.7581217288970947,
+              "triton_vs_unfused_pct": 107.82088112740493,
+              "unfused_benchmark_reset_copy_us_per_site": 2.3666945182614856,
+              "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "world_size": 8
+            },
+            "expected_path": "oneshot_blocked",
+            "mode": "graph",
+            "p50_us_per_site": 73.83584313922458,
+            "world_size": 8
+          },
+          "mode": "extend",
+          "primary_paths": [
+            "triton_shmem_fused_oneshot"
+          ]
+        },
+        {
+          "count": 1,
+          "executed_m": 7872,
+          "execution": "eager",
+          "max_rank_gpu_period_us": {
+            "max": 376675.59912109375,
+            "median": 376675.59912109375,
+            "min": 376675.59912109375,
+            "p95": 376675.59912109375
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 2404.947,
+            "median": 2404.947,
+            "min": 2404.947,
+            "p95": 2404.947
+          },
+          "microbenchmark": null,
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 6,
+          "executed_m": 64,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 21519.54296875,
+            "median": 18800.2587890625,
+            "min": 18608.7978515625,
+            "p95": 21519.54296875
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 6157.776,
+            "median": 3406.774,
+            "min": 3368.232,
+            "p95": 6157.776
+          },
+          "microbenchmark": {
+            "M": 64,
+            "arm": "triton_profile",
+            "comparison": {
+              "M": 64,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 11.225578457635743,
+              "triton_path": "oneshot_wholerow_padded",
+              "triton_vs_iris_pct": -5.2366604577273375,
+              "triton_vs_unfused_adjusted_pct": 13.015708352418764,
+              "triton_vs_unfused_forward_delta_ms": 0.12462097406387329,
+              "triton_vs_unfused_pct": 5.401072571666221,
+              "unfused_benchmark_reset_copy_us_per_site": 2.159180533554819,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 8
+            },
+            "expected_path": "oneshot_wholerow_padded",
+            "mode": "graph",
+            "p50_us_per_site": 33.777201341258156,
+            "world_size": 8
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "triton_shmem_fused_oneshot"
+          ]
+        }
+      ],
+      "diagnostic": "decode-c64",
+      "microbenchmark_linkage": {
+        "arm": "triton_profile",
+        "forward_weighted_candidate_vs_unfused_pct": 28.6781237137591,
+        "linked_cohorts": 2,
+        "total_cohorts": 3
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws8-triton_profile-decode-c64.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 8
+    },
+    {
+      "arm": "triton_profile",
+      "cohorts": [
+        {
+          "count": 1,
+          "executed_m": 512,
+          "execution": "prefill_graph",
+          "max_rank_gpu_period_us": {
+            "max": 27039.990234375,
+            "median": 27039.990234375,
+            "min": 27039.990234375,
+            "p95": 27039.990234375
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 403.531,
+            "median": 403.531,
+            "min": 403.531,
+            "p95": 403.531
+          },
+          "microbenchmark": {
+            "M": 512,
+            "arm": "triton_profile",
+            "comparison": {
+              "M": 512,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 263.34685480513934,
+              "triton_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "triton_vs_iris_pct": -72.36938554328682,
+              "triton_vs_unfused_adjusted_pct": 0.44115293994568816,
+              "triton_vs_unfused_forward_delta_ms": 0.013839960098266602,
+              "triton_vs_unfused_pct": 0.39496859180145893,
+              "unfused_benchmark_reset_copy_us_per_site": 3.270569360918469,
+              "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+              "world_size": 8
+            },
+            "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+            "mode": "graph",
+            "p50_us_per_site": 48.85980486869812,
+            "world_size": 8
+          },
+          "mode": "extend",
+          "primary_paths": [
+            "unfused_rccl"
+          ]
+        },
+        {
+          "count": 7,
+          "executed_m": 1,
+          "execution": "decode_graph",
+          "max_rank_gpu_period_us": {
+            "max": 11611.13916015625,
+            "median": 11346.255859375,
+            "min": 11279.93603515625,
+            "p95": 11611.13916015625
+          },
+          "max_rank_target_kernel_sum_us": {
+            "max": 2053.142,
+            "median": 1991.422,
+            "min": 1888.579,
+            "p95": 2053.142
+          },
+          "microbenchmark": {
+            "M": 1,
+            "arm": "triton_profile",
+            "comparison": {
+              "M": 1,
+              "N": 2880,
+              "calls_per_graph": 72,
+              "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+              "iris_vs_unfused_pct": 26.43655634177835,
+              "triton_path": "oneshot_wholerow_padded",
+              "triton_vs_iris_pct": -16.446666409477718,
+              "triton_vs_unfused_adjusted_pct": 17.397945572672047,
+              "triton_vs_unfused_forward_delta_ms": 0.07694101333618164,
+              "triton_vs_unfused_pct": 5.64195770061473,
+              "unfused_benchmark_reset_copy_us_per_site": 1.8966806431611378,
+              "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+              "world_size": 8
+            },
+            "expected_path": "oneshot_wholerow_padded",
+            "mode": "graph",
+            "p50_us_per_site": 20.009305742051865,
+            "world_size": 8
+          },
+          "mode": "decode",
+          "primary_paths": [
+            "triton_shmem_fused_oneshot"
+          ]
+        }
+      ],
+      "diagnostic": "direct-m512",
+      "microbenchmark_linkage": {
+        "arm": "triton_profile",
+        "forward_weighted_candidate_vs_unfused_pct": 15.278346493581251,
+        "linked_cohorts": 2,
+        "total_cohorts": 2
+      },
+      "source": "benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/forward-analysis/ws8-triton_profile-direct-m512.json",
+      "validation": {
+        "status": "ok",
+        "warnings": []
+      },
+      "world_size": 8
+    }
+  ],
+  "analysis_count": 18,
+  "campaign_id": "gpt-oss-120b-mi350x-definitive-v1",
+  "schema_version": 1,
+  "status": "complete"
+}

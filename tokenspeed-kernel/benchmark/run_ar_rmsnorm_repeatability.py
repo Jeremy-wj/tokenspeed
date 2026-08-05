@@ -243,6 +243,8 @@ def parse_amd_smi_processes(payload: str) -> dict[int, list[dict[str, Any]]]:
         active = []
         for wrapper in gpu_record.get("process_list", []):
             info = wrapper.get("process_info", {})
+            if not isinstance(info, dict):
+                continue
             vram = info.get("memory_usage", {}).get("vram_mem", {}).get("value", 0)
             occupancy = info.get("cu_occupancy", 0)
             if numeric(vram) > 0 or numeric(occupancy) > 0:
@@ -475,16 +477,29 @@ def _run(
 
 
 def _git_metadata() -> dict[str, Any]:
+    git_root = REPO_ROOT.parent if (REPO_ROOT.parent / ".git").exists() else REPO_ROOT
+    owner = git_root.stat()
+    identity_kwargs = (
+        {"user": owner.st_uid, "group": owner.st_gid}
+        if os.geteuid() == 0 and owner.st_uid != 0
+        else {}
+    )
+    git_env = {**os.environ, "HOME": str(git_root.parent)}
+
     def output(*args: str) -> str:
         return subprocess.check_output(
             ["git", *args],
-            cwd=REPO_ROOT,
+            cwd=git_root,
             text=True,
+            env=git_env,
+            **identity_kwargs,
         ).strip()
 
     diff = subprocess.check_output(
         ["git", "diff", "--binary"],
-        cwd=REPO_ROOT,
+        cwd=git_root,
+        env=git_env,
+        **identity_kwargs,
     )
     return {
         "commit": output("rev-parse", "HEAD"),

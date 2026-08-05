@@ -19,6 +19,7 @@ workspace cap when screening a smaller actual M against exact profile identity.
 
 from __future__ import annotations
 
+import gc
 import json
 import os
 import socket
@@ -249,9 +250,49 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
                 outputs.append((norm_out, residual_out))
             return outputs
 
+    graph_decline_expected = False
+    triton_shmem_state = None
+    if impl == "triton_shmem":
+        # Materialize and inspect the profile state with one eager call before
+        # retaining a full output set. Eager two-shot profiles may borrow only
+        # two output pairs, so retaining calls_per_graph eager outputs would
+        # observe overwritten aliases for captured shapes that must decline.
+        norm_out, residual_out, _, _ = tri.allreduce_residual_rmsnorm(
+            input_tensor=xs[0],
+            residual=residual,
+            weight=weight,
+            rank=rank,
+            group=group,
+            eps=eps,
+            max_token_num=max_token_num,
+        )
+        if norm_out is None or residual_out is None:
+            fallback_used = True
+        else:
+            from tokenspeed_kernel.ops.communication import triton_shmem as ts
+
+            state_key = ts.triton_shmem_state_cache_key(
+                group,
+                max_token_num,
+                n,
+                torch.bfloat16,
+            )
+            triton_shmem_state = ts.TRITON_SHMEM_AR_RMSNORM_STATES.get(state_key)
+            if triton_shmem_state is None:
+                raise RuntimeError("triton_shmem dispatcher state was not precreated")
+            graph_decline_expected = (
+                triton_shmem_state._output_ring_size == 0
+                or m > triton_shmem_state._output_ring_max_m
+            )
+        torch.cuda.synchronize()
+        dist.barrier(group=group)
+
     # Force every lazy allocation, symmetric-memory rendezvous, Iris context,
     # or RCCL communicator setup to happen before stream warmup and capture.
-    eager_outputs = launch()
+    graph_launch = (
+        launch_ordinary if fallback_used or graph_decline_expected else launch
+    )
+    eager_outputs = graph_launch()
     torch.cuda.synchronize()
     dist.barrier(group=group)
     _check_outputs(
@@ -265,25 +306,6 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
         eps=eps,
     )
     dist.barrier(group=group)
-
-    graph_decline_expected = False
-    triton_shmem_state = None
-    if impl == "triton_shmem" and not fallback_used:
-        from tokenspeed_kernel.ops.communication import triton_shmem as ts
-
-        state_key = ts.triton_shmem_state_cache_key(
-            group,
-            max_token_num,
-            n,
-            torch.bfloat16,
-        )
-        triton_shmem_state = ts.TRITON_SHMEM_AR_RMSNORM_STATES.get(state_key)
-        if triton_shmem_state is None:
-            raise RuntimeError("triton_shmem dispatcher state was not precreated")
-        graph_decline_expected = (
-            triton_shmem_state._output_ring_size == 0
-            or m > triton_shmem_state._output_ring_max_m
-        )
 
     if impl == "production_unfused" or fallback_used or graph_decline_expected:
         expected_backend = "iris" if ordinary_uses_iris else "rccl"
@@ -326,17 +348,16 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
 
     capture_stream = torch.cuda.Stream()
     capture_stream.wait_stream(torch.cuda.current_stream())
-    warmup_launch = launch_ordinary if graph_decline_expected else launch
     with torch.cuda.stream(capture_stream):
         for _ in range(warmup):
-            warmup_launch()
+            graph_launch()
     torch.cuda.current_stream().wait_stream(capture_stream)
     torch.cuda.synchronize()
     dist.barrier(group=group)
 
     graph = torch.cuda.CUDAGraph()
     with torch.cuda.graph(graph, stream=capture_stream):
-        captured_outputs = launch()
+        captured_outputs = graph_launch()
     dist.barrier(group=group)
 
     # A value set only after capture proves replay consumes changing source
@@ -510,6 +531,15 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
         if impl == "triton_shmem":
             result["signal_zero_status"] = "not_exposed_by_safe_public_api"
         out.append(result)
+    # ProcessGroupNCCL teardown can wait indefinitely while a live CUDAGraph
+    # still owns captured collective work/events. Release all graph references
+    # before destroying the communicator.
+    del captured_outputs, graph
+    if reset_rank_samples_us is not None:
+        del reset_graph
+    gc.collect()
+    torch.cuda.synchronize()
+    dist.barrier(group=group)
     dist.destroy_process_group()
 
 

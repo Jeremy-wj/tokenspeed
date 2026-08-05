@@ -16,6 +16,7 @@ from benchmark.run_ar_rmsnorm_graph_sweep import (
     REPO_ROOT,
     _parse_devices,
     _run_process,
+    _runtime_pythonpath,
 )
 
 STAGES = {
@@ -63,6 +64,7 @@ def _command(
     block_offset: int,
     stage: str,
     output_root: Path,
+    resume: bool = False,
 ) -> list[str]:
     profile = (REPO_ROOT / spec["profiles"][str(ws)]).resolve()
     args = [
@@ -91,6 +93,8 @@ def _command(
         "--run-root",
         str(output_root / f"ws-{ws}" / stage),
     ]
+    if resume:
+        args.append("--resume")
     shell = (
         f"export AR_NORM_DEVICES={shlex.quote(devices)}; "
         f"export GPT_OSS_DEFINITIVE_FUSION_MAX_M={cap}; "
@@ -107,6 +111,7 @@ def main() -> None:
     parser.add_argument("--devices", action="append", default=[])
     parser.add_argument("--stage", choices=tuple(STAGES), default="core")
     parser.add_argument("--output-root", type=Path)
+    parser.add_argument("--resume", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -143,6 +148,7 @@ def main() -> None:
             block_offset=block_offset,
             stage=args.stage,
             output_root=output_root,
+            resume=args.resume,
         )
         for ws in spec["world_sizes"]
     }
@@ -188,7 +194,7 @@ def main() -> None:
                     commands[ws],
                     env={
                         **os.environ,
-                        "PYTHONPATH": f"{REPO_ROOT / 'python'}:{REPO_ROOT}",
+                        "PYTHONPATH": _runtime_pythonpath(),
                     },
                     log=log,
                     timeout=int(spec.get("e2e_world_timeout_seconds", 21600)),

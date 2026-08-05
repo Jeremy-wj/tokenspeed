@@ -86,16 +86,12 @@ The few-hour campaign provides three-arm eager, graph, marker, and serving
 screens. Promotion still requires the full safety ladder, marker-aligned trace,
 and 15 pairs per contrast on the target rank set.
 
-### 2. Mixed transport transitions
+### 2. Mixed transport transitions — closed
 
-The synthetic sequence that mixes ordinary Iris and RCCL fallback under graph
-capture timed out, although bounded serving passed. Isolate graph-pool sharing,
-communicator epochs, and capture order while preserving:
-
-- complete unfused fallback;
-- separate state identities for incompatible graph/stream roles;
-- zeroed signal slots after every successful transition;
-- no weakening of production graph isolation.
+The timeout was teardown ordering, not RCCL execution: live captured collective
+graphs retained ProcessGroupNCCL work/events. Release and garbage-collect those
+graphs before communicator teardown. The definitive WS2/4/8 transition matrices
+now pass without weakening fallback or production graph isolation.
 
 ### 3. Overlap performance mode stability
 

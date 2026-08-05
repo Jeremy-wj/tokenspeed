@@ -26,6 +26,18 @@ CONTROL_ARMS = {"upstream_unfused", "iris_fused"}
 CANDIDATE_ARMS = {"triton_forced", "triton_profile"}
 
 
+def _runtime_pythonpath() -> str:
+    paths = [
+        str(REPO_ROOT.parent / "tokenspeed-kernel-amd" / "python"),
+        str(REPO_ROOT / "python"),
+        str(REPO_ROOT),
+    ]
+    inherited = os.environ.get("PYTHONPATH")
+    if inherited:
+        paths.append(inherited)
+    return os.pathsep.join(paths)
+
+
 @dataclass(frozen=True)
 class Run:
     block: str
@@ -202,7 +214,7 @@ def _run_env(
             ),
             "BENCH_IMPL": run.bench_impl,
             "BENCH_JSON": str(output),
-            "PYTHONPATH": f"{REPO_ROOT / 'python'}:{REPO_ROOT}",
+            "PYTHONPATH": _runtime_pythonpath(),
         }
     )
     if run.arm == "triton_forced":

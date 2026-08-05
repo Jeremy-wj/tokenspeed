@@ -1,0 +1,250 @@
+{
+  "attempts": {
+    "eager": {
+      "complete": true,
+      "scheduled": 18
+    },
+    "end_to_end": {
+      "completed_server_lifecycles": 45,
+      "core_server_lifecycles": 27,
+      "extension_additional_server_lifecycles": 18,
+      "status": "complete"
+    },
+    "graph": {
+      "complete": true,
+      "final_run_completed": 84,
+      "final_run_skipped_valid_resume": 78,
+      "retained_pre_fix_timeouts": 1,
+      "scheduled": 162
+    },
+    "transitions": {
+      "replays_each": 1000,
+      "status": "pass",
+      "world_sizes": [
+        2,
+        4,
+        8
+      ]
+    }
+  },
+  "campaign_id": "gpt-oss-120b-mi350x-definitive-v1",
+  "decision": {
+    "deployment_change": false,
+    "live_default": "explicit upstream-unfused",
+    "promotion_pairs_required": 15,
+    "promotion_stage_run": false,
+    "rationale": "WS4 clears the five-pair directional capacity screen (+1.27% throughput, CI95 +0.49% to +2.01%) with improved median TPOT, but promotion requires 15 pairs. WS2 is inconclusive and WS8 is a loss.",
+    "value": "definitive_screen_promising"
+  },
+  "end_to_end": {
+    "artifact": "end-to-end-summary.json",
+    "status": "complete",
+    "stopping_stage": "extension",
+    "world_sizes": {
+      "2": {
+        "decision": "definitive_screen_inconclusive",
+        "median_tpot_pct": {
+          "ci95_high": 1.0721538403917563,
+          "ci95_low": -2.0318743194784616,
+          "mean": -0.47986023954335266,
+          "n_blocks": 5,
+          "n_pairs": 5
+        },
+        "output_throughput_pct": {
+          "ci95_high": 3.1084820101460497,
+          "ci95_low": -0.8941805787508027,
+          "mean": 1.0961280738993007,
+          "n_blocks": 5,
+          "n_pairs": 5
+        }
+      },
+      "4": {
+        "decision": "definitive_screen_promising",
+        "median_tpot_pct": {
+          "ci95_high": -0.6307603617536839,
+          "ci95_low": -1.9115417287804746,
+          "mean": -1.2953225629043796,
+          "n_blocks": 5,
+          "n_pairs": 5
+        },
+        "output_throughput_pct": {
+          "ci95_high": 2.0087486135664934,
+          "ci95_low": 0.49385614720323545,
+          "mean": 1.272564128097402,
+          "n_blocks": 5,
+          "n_pairs": 5
+        }
+      },
+      "8": {
+        "decision": "definitive_screen_loss",
+        "median_tpot_pct": {
+          "ci95_high": 1.2488864929392696,
+          "ci95_low": 0.02569920674292181,
+          "mean": 0.6317583942406113,
+          "n_blocks": 5,
+          "n_pairs": 5
+        },
+        "output_throughput_pct": {
+          "ci95_high": 0.2171136905199944,
+          "ci95_low": -6.932858339046495,
+          "mean": -2.480273762079695,
+          "n_blocks": 5,
+          "n_pairs": 5
+        }
+      }
+    }
+  },
+  "failures": [
+    {
+      "phase": "graph probe teardown",
+      "status": "fixed",
+      "summary": "Captured RCCL graphs were released and garbage-collected before ProcessGroupNCCL teardown."
+    },
+    {
+      "phase": "graph fallback preflight",
+      "status": "fixed",
+      "summary": "Captured-decline cases now inspect profile state first and use ordinary fallback for retained preflight outputs."
+    },
+    {
+      "phase": "serving setup",
+      "status": "fixed",
+      "summary": "Provenance handles bind-mount ownership, AMD-SMI no-process sentinels are ignored, E2E resume is wired through, and AR_NORM_DEVICES is propagated into the container."
+    }
+  ],
+  "forward_linkage": {
+    "all_valid": true,
+    "analysis_count": 18,
+    "artifact": "forward-cohorts.json",
+    "status": "complete"
+  },
+  "identity": {
+    "amendment": "raw/2026-08-04-definitive-v1/preflight-amendment-final.json",
+    "base_commit": "6e788124cfdfcb496e45e16345eb4fe069c5a6fe",
+    "container_image": "jeremwan/tokenspeed:rocm7.2.4-torch2.11-profiler",
+    "container_image_id": "sha256:ad3ea3f8cae8ca38cf12824b15c606d0630118c6e04b4087e191b04619a6c135",
+    "model_actual_path": "/data/models/openai/gpt-oss-120b",
+    "model_realpath": "/data/dev/morhuang/models/gpt-oss-120b",
+    "preflight": "raw/2026-08-04-definitive-v1/preflight.json",
+    "raw_root": "raw/2026-08-04-definitive-v1"
+  },
+  "microbenchmark": {
+    "eager": {
+      "artifact": "eager-sweep-summary.json",
+      "m32_triton_vs_unfused_pct": {
+        "2": 7.191051271200788,
+        "4": 7.641056202331664,
+        "8": -1.3015501772508875
+      },
+      "status": "complete"
+    },
+    "graph": {
+      "artifact": "graph-sweep-summary.json",
+      "m32_triton_vs_reset_adjusted_unfused_pct": {
+        "2": 39.374317215662,
+        "4": 7.695406979473707,
+        "8": 10.841147672995643
+      },
+      "m32_triton_vs_unfused_pct": {
+        "2": 17.108827830395,
+        "4": -5.355668763496013,
+        "8": 1.5560010844077876
+      },
+      "status": "complete"
+    }
+  },
+  "schema_version": 1,
+  "selected_policy": {
+    "allowed_fusion_max_m": [
+      0,
+      64,
+      91,
+      384
+    ],
+    "schema_version": 1,
+    "selection_rule": "Freeze one allowed actual-M gate per world size from complete eager, graph, transition, and marker evidence before serving.",
+    "serving_authorized": true,
+    "status": "frozen",
+    "world_sizes": {
+      "2": {
+        "evidence": {
+          "decision": "retain_no_additional_gate",
+          "reason": "No positive cap is supported: the captured M32 candidate is 17.11% slower than upstream-unfused and every allowed positive cap includes M32. Cap 0 preserves the predeclared profile for the definitive serving screen.",
+          "transition_artifact": "raw/2026-08-04-definitive-v1/transitions-ws2.json",
+          "transition_status": "pass"
+        },
+        "fusion_max_m": 0
+      },
+      "4": {
+        "evidence": {
+          "decision": "retain_no_additional_gate",
+          "reason": "No positive cap is supported: the captured M32 candidate is 5.36% faster in raw replay but 7.70% slower after removing the unfused benchmark-reset copy, and eager M32 is 7.64% slower. Cap 0 preserves the predeclared profile for the definitive serving screen.",
+          "transition_artifact": "raw/2026-08-04-definitive-v1/transitions-ws4.json",
+          "transition_status": "pass"
+        },
+        "fusion_max_m": 0
+      },
+      "8": {
+        "evidence": {
+          "decision": "retain_no_additional_gate",
+          "reason": "No positive cap is supported: the captured M32 candidate is 1.56% slower in raw replay and 10.84% slower after removing the unfused benchmark-reset copy. Cap 0 preserves the predeclared profile for the definitive serving screen.",
+          "transition_artifact": "raw/2026-08-04-definitive-v1/transitions-ws8.json",
+          "transition_status": "pass"
+        },
+        "fusion_max_m": 0
+      }
+    }
+  },
+  "status": "complete_extension_screen",
+  "topology": {
+    "nested_topology_balanced": true,
+    "preflight_idle": true,
+    "world_sizes": {
+      "2": {
+        "hip": [
+          1,
+          5
+        ],
+        "physical": [
+          0,
+          4
+        ]
+      },
+      "4": {
+        "hip": [
+          1,
+          2,
+          5,
+          6
+        ],
+        "physical": [
+          0,
+          2,
+          4,
+          6
+        ]
+      },
+      "8": {
+        "hip": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "physical": [
+          3,
+          0,
+          2,
+          1,
+          7,
+          4,
+          6,
+          5
+        ]
+      }
+    }
+  }
+}

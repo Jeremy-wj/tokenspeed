@@ -17,6 +17,7 @@ from benchmark.run_ar_rmsnorm_graph_sweep import (
     REPO_ROOT,
     _parse_devices,
     _run_process,
+    _runtime_pythonpath,
 )
 
 
@@ -107,7 +108,7 @@ def _env(spec: dict, run: EagerRun, devices: str, output: Path) -> dict[str, str
             "BENCH_N_REPEAT": str(eager["iterations"]),
             "BENCH_IMPL": run.bench_impl,
             "BENCH_JSON": str(output),
-            "PYTHONPATH": f"{REPO_ROOT / 'python'}:{REPO_ROOT}",
+            "PYTHONPATH": _runtime_pythonpath(),
         }
     )
     return env

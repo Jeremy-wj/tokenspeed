@@ -349,6 +349,11 @@ The legacy `probe_inkernel_barrier_graph` remains a `triton_shmem`-specific
 barrier diagnostic. The post-rebase transition probe compares production
 dispatch and retains failures across backend/path changes.
 
+Before destroying ProcessGroupNCCL, release and garbage-collect every captured
+collective graph, synchronize, and barrier. Keeping graph-owned collective
+events alive through communicator teardown can hang an otherwise successful
+probe.
+
 5. Communication correctness:
 
 ```bash

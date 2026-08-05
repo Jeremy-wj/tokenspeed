@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "pending_microbenchmark",
+  "status": "frozen",
   "selection_rule": "Freeze one allowed actual-M gate per world size from complete eager, graph, transition, and marker evidence before serving.",
   "allowed_fusion_max_m": [
     0,
@@ -10,16 +10,32 @@
   ],
   "world_sizes": {
     "2": {
-      "fusion_max_m": null,
-      "evidence": null
+      "fusion_max_m": 0,
+      "evidence": {
+        "decision": "retain_no_additional_gate",
+        "reason": "No positive cap is supported: the captured M32 candidate is 17.11% slower than upstream-unfused and every allowed positive cap includes M32. Cap 0 preserves the predeclared profile for the definitive serving screen.",
+        "transition_artifact": "raw/2026-08-04-definitive-v1/transitions-ws2.json",
+        "transition_status": "pass"
+      }
     },
     "4": {
-      "fusion_max_m": null,
-      "evidence": null
+      "fusion_max_m": 0,
+      "evidence": {
+        "decision": "retain_no_additional_gate",
+        "reason": "No positive cap is supported: the captured M32 candidate is 5.36% faster in raw replay but 7.70% slower after removing the unfused benchmark-reset copy, and eager M32 is 7.64% slower. Cap 0 preserves the predeclared profile for the definitive serving screen.",
+        "transition_artifact": "raw/2026-08-04-definitive-v1/transitions-ws4.json",
+        "transition_status": "pass"
+      }
     },
     "8": {
-      "fusion_max_m": null,
-      "evidence": null
+      "fusion_max_m": 0,
+      "evidence": {
+        "decision": "retain_no_additional_gate",
+        "reason": "No positive cap is supported: the captured M32 candidate is 1.56% slower in raw replay and 10.84% slower after removing the unfused benchmark-reset copy. Cap 0 preserves the predeclared profile for the definitive serving screen.",
+        "transition_artifact": "raw/2026-08-04-definitive-v1/transitions-ws8.json",
+        "transition_status": "pass"
+      }
     }
-  }
+  },
+  "serving_authorized": true
 }

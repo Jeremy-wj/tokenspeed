@@ -262,6 +262,20 @@ def test_parse_amd_smi_ignores_zero_usage_ghosts():
     assert parsed[3][0]["pid"] == 2
 
 
+def test_parse_amd_smi_ignores_no_process_sentinel():
+    payload = json.dumps(
+        [
+            {
+                "gpu": 0,
+                "process_list": [
+                    {"process_info": "No running processes detected"}
+                ],
+            }
+        ]
+    )
+    assert parse_amd_smi_processes(payload) == {}
+
+
 def test_partition_live_gpu_processes_preserves_transient_queries():
     active = {0: [{"pid": 10}], 1: [{"pid": 20}, {"pid": 30}]}
     live, transient = partition_live_gpu_processes(

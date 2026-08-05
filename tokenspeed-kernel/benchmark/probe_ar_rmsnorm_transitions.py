@@ -41,6 +41,7 @@ private signal storage.
 
 from __future__ import annotations
 
+import gc
 import hashlib
 import json
 import os
@@ -657,6 +658,7 @@ def _rank_main(
         "steps": [],
         "preflight": [],
     }
+    cases: dict[int, ProbeCase] = {}
     try:
         os.environ["TS_ARNORM_BACKEND"] = (
             "triton_shmem"
@@ -754,6 +756,16 @@ def _rank_main(
         config.pop("_weight", None)
         os.environ.pop("TS_ARNORM_BACKEND", None)
         if dist.is_initialized():
+            # Release graphs that own captured RCCL work before communicator
+            # teardown. ProcessGroupNCCL can otherwise wait indefinitely on
+            # graph-owned events even after every replay has completed.
+            for case in cases.values():
+                case.graph_outputs.clear()
+                case.graph = None
+            cases.clear()
+            gc.collect()
+            torch.cuda.synchronize()
+            dist.barrier(group=group)
             dist.destroy_process_group()
 
 

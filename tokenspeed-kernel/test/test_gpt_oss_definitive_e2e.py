@@ -54,6 +54,7 @@ def test_e2e_command_uses_common_control_triplet_and_selected_cap(tmp_path):
         block_offset=0,
         stage="core",
         output_root=tmp_path,
+        resume=True,
     )
     shell = command[-1]
     assert "--comparison three_backend" in shell
@@ -62,3 +63,4 @@ def test_e2e_command_uses_common_control_triplet_and_selected_cap(tmp_path):
     assert "--seeds 0" in shell
     assert "GPT_OSS_DEFINITIVE_FUSION_MAX_M=64" in shell
     assert "--definitive-diagnostics" in shell
+    assert "--resume" in shell

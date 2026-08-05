@@ -1,0 +1,3526 @@
+{
+  "aggregation": "Arithmetic mean of pass-level max-rank-per-iteration p50 values; single pass where no confirmation pass exists.",
+  "arms": [
+    "upstream_unfused",
+    "iris_fused",
+    "triton_profile"
+  ],
+  "candidate_arm": "triton_profile",
+  "comparisons": [
+    {
+      "M": 1,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 29.904340983738376,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 24.078649744343437,
+      "triton_vs_unfused_adjusted_pct": 113.93618266632939,
+      "triton_vs_unfused_forward_delta_ms": 0.33378350734710693,
+      "triton_vs_unfused_pct": 61.18355225191032,
+      "unfused_benchmark_reset_copy_us_per_site": 1.8683471199538972,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 1.790042756016974,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 15.049394478687873,
+      "triton_vs_unfused_adjusted_pct": 39.374317215662,
+      "triton_vs_unfused_forward_delta_ms": 0.15818095207214355,
+      "triton_vs_unfused_pct": 17.108827830395,
+      "unfused_benchmark_reset_copy_us_per_site": 2.0514027112060127,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 2.322774095053348,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 6.19575297955155,
+      "triton_vs_unfused_adjusted_pct": 25.477990589731235,
+      "triton_vs_unfused_forward_delta_ms": 0.09767064452171326,
+      "triton_vs_unfused_pct": 8.662440419807439,
+      "unfused_benchmark_reset_copy_us_per_site": 2.0986249049504595,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 0.9533686732161373,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 6.438655064837162,
+      "triton_vs_unfused_adjusted_pct": 24.220269180836553,
+      "triton_vs_unfused_forward_delta_ms": 0.0853705108165741,
+      "triton_vs_unfused_pct": 7.453407858417904,
+      "unfused_benchmark_reset_copy_us_per_site": 2.1472361145748033,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": -4.580766791164259,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 3.5765339371043092,
+      "triton_vs_unfused_adjusted_pct": 11.599492552864742,
+      "triton_vs_unfused_forward_delta_ms": -0.016350239515304565,
+      "triton_vs_unfused_pct": -1.168065532925544,
+      "unfused_benchmark_reset_copy_us_per_site": 2.2241805369655294,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": -33.22971037315243,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 1.9457929455204415,
+      "triton_vs_unfused_adjusted_pct": -26.027887715083853,
+      "triton_vs_unfused_forward_delta_ms": -0.6448957324028015,
+      "triton_vs_unfused_pct": -31.93049878788967,
+      "unfused_benchmark_reset_copy_us_per_site": 2.2383471950888634,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": -27.2080939556112,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 6.485851188726954,
+      "triton_vs_unfused_adjusted_pct": -16.31642305914267,
+      "triton_vs_unfused_forward_delta_ms": -0.49392449855804443,
+      "triton_vs_unfused_pct": -22.486919252134207,
+      "unfused_benchmark_reset_copy_us_per_site": 2.249458390805456,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": -18.022320560512007,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 6.081856615924508,
+      "triton_vs_unfused_adjusted_pct": -7.946067261568124,
+      "triton_vs_unfused_forward_delta_ms": -0.39530253410339355,
+      "triton_vs_unfused_pct": -13.036555639940117,
+      "unfused_benchmark_reset_copy_us_per_site": 2.3289026899470224,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": -13.05478306592428,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 2.5768133416080197,
+      "triton_vs_unfused_adjusted_pct": -5.841879079479783,
+      "triton_vs_unfused_forward_delta_ms": -0.43114399909973145,
+      "triton_vs_unfused_pct": -10.814367116076973,
+      "unfused_benchmark_reset_copy_us_per_site": 2.924184056205882,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": -13.225673031523023,
+      "triton_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "triton_vs_iris_pct": 15.25124807696725,
+      "triton_vs_unfused_adjusted_pct": 0.008455512507743457,
+      "triton_vs_unfused_forward_delta_ms": 0.0003399848937988281,
+      "triton_vs_unfused_pct": 0.008494841558093214,
+      "unfused_benchmark_reset_copy_us_per_site": 2.9441874681247606,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": -11.574505157734505,
+      "triton_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "triton_vs_iris_pct": 12.964072869314958,
+      "triton_vs_unfused_adjusted_pct": -0.128268172412771,
+      "triton_vs_unfused_forward_delta_ms": -0.005499839782714844,
+      "triton_vs_unfused_pct": -0.11095957133087087,
+      "unfused_benchmark_reset_copy_us_per_site": 3.2366944683922663,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 23.283297883922227,
+      "triton_path": "oneshot_wholerow_padded",
+      "triton_vs_iris_pct": -19.110519340154873,
+      "triton_vs_unfused_adjusted_pct": 18.935694038167927,
+      "triton_vs_unfused_forward_delta_ms": -0.0023199915885925293,
+      "triton_vs_unfused_pct": -0.2767806013654672,
+      "unfused_benchmark_reset_copy_us_per_site": 1.8805693835020065,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 9.745263560542616,
+      "triton_path": "oneshot_wholerow_padded",
+      "triton_vs_iris_pct": -13.75998547373115,
+      "triton_vs_unfused_adjusted_pct": 7.695406979473707,
+      "triton_vs_unfused_forward_delta_ms": -0.06531074643135071,
+      "triton_vs_unfused_pct": -5.355668763496013,
+      "unfused_benchmark_reset_copy_us_per_site": 2.0525208156969814,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 15.433644452989137,
+      "triton_path": "oneshot_wholerow_padded",
+      "triton_vs_iris_pct": -11.10452108986003,
+      "triton_vs_unfused_adjusted_pct": 14.035258071753276,
+      "triton_vs_unfused_forward_delta_ms": 0.040881216526031494,
+      "triton_vs_unfused_pct": 2.6152910599129164,
+      "unfused_benchmark_reset_copy_us_per_site": 2.1741874516010284,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 12.44651077552328,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 11.052601883317248,
+      "triton_vs_unfused_adjusted_pct": 38.390552059612574,
+      "triton_vs_unfused_forward_delta_ms": 0.3952930271625519,
+      "triton_vs_unfused_pct": 24.87477594322329,
+      "unfused_benchmark_reset_copy_us_per_site": 2.155569485492176,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 10.17614095413859,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 4.326307431429632,
+      "triton_vs_unfused_adjusted_pct": 26.130170287943443,
+      "triton_vs_unfused_forward_delta_ms": 0.28070223331451416,
+      "triton_vs_unfused_pct": 14.942699527899883,
+      "unfused_benchmark_reset_copy_us_per_site": 2.314180549648073,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": -25.6535831493353,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 3.086061427172715,
+      "triton_vs_unfused_adjusted_pct": -18.72121959042643,
+      "triton_vs_unfused_forward_delta_ms": -0.6534249782562256,
+      "triton_vs_unfused_pct": -23.359207056421894,
+      "unfused_benchmark_reset_copy_us_per_site": 2.216958337359958,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": -12.012592933256173,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -3.3662756702628416,
+      "triton_vs_unfused_adjusted_pct": -9.841947655414051,
+      "triton_vs_unfused_forward_delta_ms": -0.425182580947876,
+      "triton_vs_unfused_pct": -14.974491610239093,
+      "unfused_benchmark_reset_copy_us_per_site": 2.2450139125188193,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 64.42275920281509,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -20.815660433106697,
+      "triton_vs_unfused_adjusted_pct": 38.8533638075327,
+      "triton_vs_unfused_forward_delta_ms": 0.8275260925292969,
+      "triton_vs_unfused_pct": 30.197075972412392,
+      "unfused_benchmark_reset_copy_us_per_site": 2.3727915767166348,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 82.33923837725719,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -20.073800669978105,
+      "triton_vs_unfused_adjusted_pct": 55.825275406270535,
+      "triton_vs_unfused_forward_delta_ms": 1.4921706914901733,
+      "triton_vs_unfused_pct": 45.73682312225036,
+      "unfused_benchmark_reset_copy_us_per_site": 2.9336388947235212,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 82.78537344825017,
+      "triton_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "triton_vs_iris_pct": -45.25702881234378,
+      "triton_vs_unfused_adjusted_pct": 0.09757094009670286,
+      "triton_vs_unfused_forward_delta_ms": 0.0020307302474975586,
+      "triton_vs_unfused_pct": 0.06214432202542586,
+      "unfused_benchmark_reset_copy_us_per_site": 2.952378398428361,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 111.68857489019342,
+      "triton_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "triton_vs_iris_pct": -52.851694835284846,
+      "triton_vs_unfused_adjusted_pct": -0.19161604870656657,
+      "triton_vs_unfused_forward_delta_ms": -0.0072574615478515625,
+      "triton_vs_unfused_pct": -0.1924247119350242,
+      "unfused_benchmark_reset_copy_us_per_site": 3.2544652413990764,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 26.43655634177835,
+      "triton_path": "oneshot_wholerow_padded",
+      "triton_vs_iris_pct": -16.446666409477718,
+      "triton_vs_unfused_adjusted_pct": 17.397945572672047,
+      "triton_vs_unfused_forward_delta_ms": 0.07694101333618164,
+      "triton_vs_unfused_pct": 5.64195770061473,
+      "unfused_benchmark_reset_copy_us_per_site": 1.8966806431611378,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 15.443337218876362,
+      "triton_path": "oneshot_wholerow_padded",
+      "triton_vs_iris_pct": -12.02956919734457,
+      "triton_vs_unfused_adjusted_pct": 10.841147672995643,
+      "triton_vs_unfused_forward_delta_ms": 0.027650505304336548,
+      "triton_vs_unfused_pct": 1.5560010844077876,
+      "unfused_benchmark_reset_copy_us_per_site": 2.0675138673848577,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 11.225578457635743,
+      "triton_path": "oneshot_wholerow_padded",
+      "triton_vs_iris_pct": -5.2366604577273375,
+      "triton_vs_unfused_adjusted_pct": 13.015708352418764,
+      "triton_vs_unfused_forward_delta_ms": 0.12462097406387329,
+      "triton_vs_unfused_pct": 5.401072571666221,
+      "unfused_benchmark_reset_copy_us_per_site": 2.159180533554819,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 10.826997084930024,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 32.45634419327801,
+      "triton_vs_unfused_adjusted_pct": 57.45457537444425,
+      "triton_vs_unfused_forward_delta_ms": 1.0902189016342163,
+      "triton_vs_unfused_pct": 46.7973887178891,
+      "unfused_benchmark_reset_copy_us_per_site": 2.1900139335128994,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 12.752803944776957,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 18.314520419555237,
+      "triton_vs_unfused_adjusted_pct": 41.77782620552839,
+      "triton_vs_unfused_forward_delta_ms": 0.9151774048805237,
+      "triton_vs_unfused_pct": 33.402939246864214,
+      "unfused_benchmark_reset_copy_us_per_site": 2.247805603676372,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": -26.988551262403437,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 16.193592036309035,
+      "triton_vs_unfused_adjusted_pct": -11.885518624505709,
+      "triton_vs_unfused_forward_delta_ms": -0.6575849056243896,
+      "triton_vs_unfused_pct": -15.165375114038149,
+      "unfused_benchmark_reset_copy_us_per_site": 2.2416806055439844,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 66.76879802255561,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 6.681475332074327,
+      "triton_vs_unfused_adjusted_pct": 91.7426826056585,
+      "triton_vs_unfused_forward_delta_ms": 1.7592530250549316,
+      "triton_vs_unfused_pct": 77.91141412402953,
+      "unfused_benchmark_reset_copy_us_per_site": 2.2622361365291805,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 202.66849294691528,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -31.337127593305702,
+      "triton_vs_unfused_adjusted_pct": 122.6526158818011,
+      "triton_vs_unfused_forward_delta_ms": 2.7581217288970947,
+      "triton_vs_unfused_pct": 107.82088112740493,
+      "unfused_benchmark_reset_copy_us_per_site": 2.3666945182614856,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 208.31003759837608,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -26.493346595430232,
+      "triton_vs_unfused_adjusted_pct": 142.63951569116537,
+      "triton_vs_unfused_forward_delta_ms": 4.07863187789917,
+      "triton_vs_unfused_pct": 126.62839074893708,
+      "unfused_benchmark_reset_copy_us_per_site": 2.9519652533862324,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 122.52025276821344,
+      "triton_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "triton_vs_iris_pct": -55.11057551873208,
+      "triton_vs_unfused_adjusted_pct": -0.10536464023922498,
+      "triton_vs_unfused_forward_delta_ms": -0.005030632019042969,
+      "triton_vs_unfused_pct": -0.1119391780863288,
+      "unfused_benchmark_reset_copy_us_per_site": 2.959743038647705,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "calls_per_graph": 72,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 263.34685480513934,
+      "triton_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "triton_vs_iris_pct": -72.36938554328682,
+      "triton_vs_unfused_adjusted_pct": 0.44115293994568816,
+      "triton_vs_unfused_forward_delta_ms": 0.013839960098266602,
+      "triton_vs_unfused_pct": 0.39496859180145893,
+      "unfused_benchmark_reset_copy_us_per_site": 3.270569360918469,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    }
+  ],
+  "frontiers": [
+    {
+      "N": 2880,
+      "calls_per_graph": 72,
+      "triton_vs_iris": {
+        "first_measured_loss_after_profit": null,
+        "first_profitable_m": null,
+        "last_profitable_m": null,
+        "profitable_m_values": []
+      },
+      "triton_vs_unfused": {
+        "first_measured_loss_after_profit": null,
+        "first_profitable_m": 91,
+        "last_profitable_m": 512,
+        "profitable_m_values": [
+          91,
+          92,
+          128,
+          256,
+          384,
+          512
+        ]
+      },
+      "triton_vs_unfused_adjusted": {
+        "first_measured_loss_after_profit": null,
+        "first_profitable_m": 92,
+        "last_profitable_m": 512,
+        "profitable_m_values": [
+          92,
+          128,
+          256,
+          384,
+          512
+        ]
+      },
+      "world_size": 2
+    },
+    {
+      "N": 2880,
+      "calls_per_graph": 72,
+      "triton_vs_iris": {
+        "first_measured_loss_after_profit": null,
+        "first_profitable_m": 1,
+        "last_profitable_m": 512,
+        "profitable_m_values": [
+          1,
+          32,
+          64,
+          128,
+          256,
+          384,
+          385,
+          512
+        ]
+      },
+      "triton_vs_unfused": {
+        "first_measured_loss_after_profit": null,
+        "first_profitable_m": 1,
+        "last_profitable_m": 512,
+        "profitable_m_values": [
+          1,
+          32,
+          92,
+          128,
+          512
+        ]
+      },
+      "triton_vs_unfused_adjusted": {
+        "first_measured_loss_after_profit": null,
+        "first_profitable_m": 92,
+        "last_profitable_m": 512,
+        "profitable_m_values": [
+          92,
+          128,
+          512
+        ]
+      },
+      "world_size": 4
+    },
+    {
+      "N": 2880,
+      "calls_per_graph": 72,
+      "triton_vs_iris": {
+        "first_measured_loss_after_profit": null,
+        "first_profitable_m": 1,
+        "last_profitable_m": 512,
+        "profitable_m_values": [
+          1,
+          32,
+          64,
+          256,
+          384,
+          385,
+          512
+        ]
+      },
+      "triton_vs_unfused": {
+        "first_measured_loss_after_profit": 512,
+        "first_profitable_m": 92,
+        "last_profitable_m": 385,
+        "profitable_m_values": [
+          92,
+          385
+        ]
+      },
+      "triton_vs_unfused_adjusted": {
+        "first_measured_loss_after_profit": 512,
+        "first_profitable_m": 92,
+        "last_profitable_m": 385,
+        "profitable_m_values": [
+          92,
+          385
+        ]
+      },
+      "world_size": 8
+    }
+  ],
+  "incomplete_cases": [],
+  "rows": [
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 9.847994272907576,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 708.6859941482544,
+      "p50_us_per_site": 9.842861029836866,
+      "p95_us_per_site": 9.876750409603119,
+      "p99_us_per_site": 9.895082977082994,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        9.842861029836866
+      ],
+      "passes": 1,
+      "payload_bytes": 5760,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 12.21756031943692,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 879.3280124664307,
+      "p50_us_per_site": 12.21288906203376,
+      "p95_us_per_site": 12.236778106954363,
+      "p99_us_per_site": 12.255652911133236,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        12.21288906203376
+      ],
+      "passes": 1,
+      "payload_bytes": 5760,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 1.8683471199538972,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 7.580900123549832,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 545.5445051193237,
+      "p50_us_per_site": 7.577007015546163,
+      "p95_us_per_site": 7.6134031017621355,
+      "p99_us_per_site": 7.630624704890781,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        7.577007015546163
+      ],
+      "passes": 1,
+      "payload_bytes": 5760,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 5.708659895592266,
+      "world_size": 2
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 13.085708602021139,
+      "p50_pass_spread_pct": 0.04665679810453849,
+      "p50_us_per_graph": 941.1074817180634,
+      "p50_us_per_site": 13.070937246084213,
+      "p95_us_per_site": 13.101771059963438,
+      "p99_us_per_site": 13.21482616994116,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        13.067888716856638,
+        13.073985775311789
+      ],
+      "passes": 2,
+      "payload_bytes": 184320,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 15.040554254419273,
+      "p50_pass_spread_pct": 1.727203694165702,
+      "p50_us_per_graph": 1082.73845911026,
+      "p50_us_per_site": 15.038034154309166,
+      "p95_us_per_site": 15.090666711330414,
+      "p99_us_per_site": 15.111784968111252,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        15.166790948973762,
+        14.909277359644571
+      ],
+      "passes": 2,
+      "payload_bytes": 184320,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.0514027112060127,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 12.848032049834728,
+      "p50_pass_spread_pct": 0.4619353999936848,
+      "p50_us_per_graph": 924.5575070381165,
+      "p50_us_per_site": 12.841076486640507,
+      "p95_us_per_site": 12.955367979076174,
+      "p99_us_per_site": 13.013992872503069,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        12.870666881402334,
+        12.81148609187868
+      ],
+      "passes": 2,
+      "payload_bytes": 184320,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 10.789673775434494,
+      "world_size": 2
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 16.02569704171684,
+      "p50_pass_spread_pct": 0.07292380852266245,
+      "p50_us_per_graph": 1153.7085175514221,
+      "p50_us_per_site": 16.023729410436417,
+      "p95_us_per_site": 16.060402823819054,
+      "p99_us_per_site": 16.090402172671425,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        16.02956983778212,
+        16.017888983090717
+      ],
+      "passes": 2,
+      "payload_bytes": 368640,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 17.045942815641563,
+      "p50_pass_spread_pct": 1.106241119472573,
+      "p50_us_per_graph": 1225.189447402954,
+      "p50_us_per_site": 17.01652010281881,
+      "p95_us_per_site": 17.295965717898476,
+      "p99_us_per_site": 18.093194398615097,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        16.92291597525279,
+        17.110124230384827
+      ],
+      "passes": 2,
+      "payload_bytes": 368640,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.0986249049504595,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 15.669918815294901,
+      "p50_pass_spread_pct": 0.03730218934505647,
+      "p50_us_per_graph": 1127.5188028812408,
+      "p50_us_per_site": 15.659983373350567,
+      "p95_us_per_site": 15.764013760619694,
+      "p99_us_per_site": 15.828180644247267,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        15.662903587023417,
+        15.657063159677717
+      ],
+      "passes": 2,
+      "payload_bytes": 368640,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 13.561358468400108,
+      "world_size": 2
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 16.062244350711502,
+      "p50_pass_spread_pct": 0.06570836171517769,
+      "p50_us_per_graph": 1156.3087403774261,
+      "p50_us_per_site": 16.05984361635314,
+      "p95_us_per_site": 16.093457738558453,
+      "p99_us_per_site": 16.115402181943256,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        16.054569019211662,
+        16.065118213494618
+      ],
+      "passes": 2,
+      "payload_bytes": 374400,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 17.11338299595647,
+      "p50_pass_spread_pct": 2.266202969942066,
+      "p50_us_per_graph": 1230.759471654892,
+      "p50_us_per_site": 17.09388155076239,
+      "p95_us_per_site": 17.3593122098181,
+      "p99_us_per_site": 17.53540999359555,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        16.902360651228165,
+        17.285402450296615
+      ],
+      "passes": 2,
+      "payload_bytes": 374400,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.1472361145748033,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 15.915085391865837,
+      "p50_pass_spread_pct": 0.038245408104731204,
+      "p50_us_per_graph": 1145.3889608383179,
+      "p50_us_per_site": 15.908180011643303,
+      "p95_us_per_site": 15.998465319474539,
+      "p99_us_per_site": 16.048173109690346,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        15.905138519075182,
+        15.911221504211426
+      ],
+      "passes": 2,
+      "payload_bytes": 374400,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 13.7609438970685,
+      "world_size": 2
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 18.555014537440407,
+      "p50_pass_spread_pct": 0.16792544499706352,
+      "p50_us_per_graph": 1335.6505036354065,
+      "p50_us_per_site": 18.550701439380646,
+      "p95_us_per_site": 18.59486848115921,
+      "p99_us_per_site": 18.618479371070862,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        18.56626404656304,
+        18.53513883219825
+      ],
+      "passes": 2,
+      "payload_bytes": 524160,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 19.21568921042813,
+      "p50_pass_spread_pct": 0.10855979990476161,
+      "p50_us_per_graph": 1383.4204971790314,
+      "p50_us_per_site": 19.214173571930992,
+      "p95_us_per_site": 19.2784791191419,
+      "p99_us_per_site": 19.30764565865199,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        19.22459734810723,
+        19.20374979575475
+      ],
+      "passes": 2,
+      "payload_bytes": 524160,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.2241805369655294,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 19.472574331694176,
+      "p50_pass_spread_pct": 0.8754890480898947,
+      "p50_us_per_graph": 1399.770736694336,
+      "p50_us_per_site": 19.441260231865776,
+      "p95_us_per_site": 19.92793795135286,
+      "p99_us_per_site": 20.19044508536657,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        19.52599237362544,
+        19.356528090106117
+      ],
+      "passes": 2,
+      "payload_bytes": 524160,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 17.21707969490025,
+      "world_size": 2
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 18.76093826442957,
+      "p50_pass_spread_pct": 0.13950992571853948,
+      "p50_us_per_graph": 1348.550021648407,
+      "p50_us_per_site": 18.729861411783432,
+      "p95_us_per_site": 18.768471976121265,
+      "p99_us_per_site": 20.17514573203193,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        18.716805511050755,
+        18.742917312516106
+      ],
+      "passes": 2,
+      "payload_bytes": 529920,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 19.097478282948337,
+      "p50_pass_spread_pct": 0.1834663324655761,
+      "p50_us_per_graph": 1374.7900128364563,
+      "p50_us_per_site": 19.09430573383967,
+      "p95_us_per_site": 19.19930511050754,
+      "p99_us_per_site": 19.24514522155126,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        19.111805491977268,
+        19.076805975702072
+      ],
+      "passes": 2,
+      "payload_bytes": 529920,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.2383471950888634,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 28.066006244884598,
+      "p50_pass_spread_pct": 0.0921666170245583,
+      "p50_us_per_graph": 2019.6857452392578,
+      "p50_us_per_site": 28.051190906100803,
+      "p95_us_per_site": 28.12104258272383,
+      "p99_us_per_site": 28.998277253574795,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        28.064111868540447,
+        28.03826994366116
+      ],
+      "passes": 2,
+      "payload_bytes": 529920,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 25.81284371101194,
+      "world_size": 2
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 22.207962435152794,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 1598.8720059394836,
+      "p50_us_per_site": 22.206555638048386,
+      "p95_us_per_site": 22.256832983758713,
+      "p99_us_per_site": 22.29238881005181,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        22.206555638048386
+      ],
+      "passes": 1,
+      "payload_bytes": 737280,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 23.648708583580124,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 1702.5724649429321,
+      "p50_us_per_site": 23.646839790874058,
+      "p95_us_per_site": 23.709055450227524,
+      "p99_us_per_site": 23.735180497169495,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        23.646839790874058
+      ],
+      "passes": 1,
+      "payload_bytes": 737280,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.249458390805456,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 30.511910180250805,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 2196.4969635009766,
+      "p50_us_per_site": 30.506902270846897,
+      "p95_us_per_site": 30.583014090855915,
+      "p99_us_per_site": 30.618568261464436,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        30.506902270846897
+      ],
+      "passes": 1,
+      "payload_bytes": 737280,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 28.25744388004144,
+      "world_size": 2
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 34.62948034538163,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 2485.7780933380127,
+      "p50_us_per_site": 34.52469574080573,
+      "p95_us_per_site": 34.92748737335205,
+      "p99_us_per_site": 36.76582045025296,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        34.52469574080573
+      ],
+      "passes": 1,
+      "payload_bytes": 1474560,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 36.6271213359303,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 2636.9595527648926,
+      "p50_us_per_site": 36.62443823284573,
+      "p95_us_per_site": 36.69470879766676,
+      "p99_us_per_site": 36.731931898328995,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        36.62443823284573
+      ],
+      "passes": 1,
+      "payload_bytes": 1474560,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.3289026899470224,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 42.193079832527374,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 3032.262086868286,
+      "p50_us_per_site": 42.114751206503975,
+      "p95_us_per_site": 43.0136521657308,
+      "p99_us_per_site": 43.4353318479326,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        42.114751206503975
+      ],
+      "passes": 1,
+      "payload_bytes": 1474560,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 39.78584851655695,
+      "world_size": 2
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 48.168401547604134,
+      "p50_pass_spread_pct": 0.050832305472958694,
+      "p50_us_per_graph": 3466.3062691688538,
+      "p50_us_per_site": 48.143142627345185,
+      "p95_us_per_site": 48.39897983604007,
+      "p99_us_per_site": 48.58370125293732,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        48.13090960184733,
+        48.15537565284305
+      ],
+      "passes": 2,
+      "payload_bytes": 2211840,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 49.38505570093791,
+      "p50_pass_spread_pct": 1.6080173416616939,
+      "p50_us_per_graph": 3555.6265115737915,
+      "p50_us_per_site": 49.383701549635994,
+      "p95_us_per_site": 49.46287473042806,
+      "p99_us_per_site": 49.494541353649566,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        49.77758394347297,
+        48.98981915579902
+      ],
+      "passes": 2,
+      "payload_bytes": 2211840,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.924184056205882,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 55.37504904303286,
+      "p50_pass_spread_pct": 0.010962386932078516,
+      "p50_us_per_graph": 3986.770510673523,
+      "p50_us_per_site": 55.37181264824338,
+      "p95_us_per_site": 55.455701218711006,
+      "p99_us_per_site": 55.498757296138336,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        55.37484751807319,
+        55.36877777841356
+      ],
+      "passes": 2,
+      "payload_bytes": 2211840,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 52.44762859203749,
+      "world_size": 2
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 48.31055656572183,
+      "p50_pass_spread_pct": 0.10938591605329506,
+      "p50_us_per_graph": 3472.9264974594116,
+      "p50_us_per_site": 48.23509024249182,
+      "p95_us_per_site": 48.97538158628676,
+      "p99_us_per_site": 49.562874767515396,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        48.26145701938205,
+        48.2087234656016
+      ],
+      "passes": 2,
+      "payload_bytes": 2217600,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": 2.9444582760334015,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 55.61137680709362,
+      "p50_pass_spread_pct": 0.1821519688295581,
+      "p50_us_per_graph": 4002.591133117676,
+      "p50_us_per_site": 55.59154351552327,
+      "p95_us_per_site": 55.69765302870009,
+      "p99_us_per_site": 55.94375729560852,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        55.54095904032389,
+        55.642127990722656
+      ],
+      "passes": 2,
+      "payload_bytes": 2217600,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 52.647085239489876,
+      "world_size": 2
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.9441874681247606,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 55.601527354783485,
+      "p50_pass_spread_pct": 0.03489093306434654,
+      "p50_us_per_graph": 4002.251148223877,
+      "p50_us_per_site": 55.586821503109405,
+      "p95_us_per_site": 55.694040324952866,
+      "p99_us_per_site": 56.15793665250142,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        55.59651719199287,
+        55.57712581422594
+      ],
+      "passes": 2,
+      "payload_bytes": 2217600,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 52.64263403498464,
+      "world_size": 2
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 60.97016891505983,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 4382.912158966064,
+      "p50_us_per_site": 60.873779985639786,
+      "p95_us_per_site": 61.65322330262926,
+      "p99_us_per_site": 62.10711267259386,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        60.873779985639786
+      ],
+      "passes": 1,
+      "payload_bytes": 2949120,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 2
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": 3.244458387295405,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 68.77332434389326,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 4951.11608505249,
+      "p50_us_per_site": 68.76550118128459,
+      "p95_us_per_site": 68.86605421702068,
+      "p99_us_per_site": 68.93661287095811,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        68.76550118128459
+      ],
+      "passes": 1,
+      "payload_bytes": 2949120,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 65.52104279398918,
+      "world_size": 2
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 3.2366944683922663,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 68.85997030470106,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 4956.615924835205,
+      "p50_us_per_site": 68.84188784493341,
+      "p95_us_per_site": 68.96050108803644,
+      "p99_us_per_site": 69.27605470021565,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        68.84188784493341
+      ],
+      "passes": 1,
+      "payload_bytes": 2949120,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 65.60519337654114,
+      "world_size": 2
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 14.367222734623486,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 1033.3679914474487,
+      "p50_us_per_site": 14.3523332145479,
+      "p95_us_per_site": 14.392332898245918,
+      "p99_us_per_site": 14.430652062098185,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        14.3523332145479
+      ],
+      "passes": 1,
+      "payload_bytes": 5760,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_wholerow_padded",
+      "max_token_num": 2048,
+      "mean_us_per_site": 11.61626670592361,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 835.8860015869141,
+      "p50_us_per_site": 11.60952779981825,
+      "p95_us_per_site": 11.659527818361918,
+      "p99_us_per_site": 11.68897251288096,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        11.60952779981825
+      ],
+      "passes": 1,
+      "payload_bytes": 5760,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 1.8805693835020065,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 11.64638285090526,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 838.2059931755066,
+      "p50_us_per_site": 11.64174990521537,
+      "p95_us_per_site": 11.70674959818522,
+      "p99_us_per_site": 11.73897253142463,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        11.64174990521537
+      ],
+      "passes": 1,
+      "payload_bytes": 5760,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 9.761180521713364,
+      "world_size": 4
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 18.592178995410602,
+      "p50_pass_spread_pct": 0.08057360709112782,
+      "p50_us_per_graph": 1338.3100032806396,
+      "p50_us_per_site": 18.58763893445333,
+      "p95_us_per_site": 18.627923395898605,
+      "p99_us_per_site": 18.6537504196167,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        18.595124284426372,
+        18.580153584480286
+      ],
+      "passes": 2,
+      "payload_bytes": 184320,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_wholerow_padded",
+      "max_token_num": 2048,
+      "mean_us_per_site": 16.042918022308086,
+      "p50_pass_spread_pct": 0.09886843564093084,
+      "p50_us_per_graph": 1154.158741235733,
+      "p50_us_per_site": 16.029982517162956,
+      "p95_us_per_site": 16.134839918878342,
+      "p99_us_per_site": 16.201236181788975,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        16.022062136067284,
+        16.037902898258633
+      ],
+      "passes": 2,
+      "payload_bytes": 184320,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.0525208156969814,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 16.969482263757122,
+      "p50_pass_spread_pct": 0.25296746150356153,
+      "p50_us_per_graph": 1219.4694876670837,
+      "p50_us_per_site": 16.937076217598385,
+      "p95_us_per_site": 17.198464936680267,
+      "p99_us_per_site": 17.34708332353168,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        16.915680633650886,
+        16.958471801545883
+      ],
+      "passes": 2,
+      "payload_bytes": 184320,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 14.884555401901405,
+      "world_size": 4
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 25.09103468226062,
+      "p50_pass_spread_pct": 0.26425675146677374,
+      "p50_us_per_graph": 1804.4140040874481,
+      "p50_us_per_site": 25.06130561232567,
+      "p95_us_per_site": 25.745750301414066,
+      "p99_us_per_site": 26.028534604443443,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        25.028236210346222,
+        25.094375014305115
+      ],
+      "passes": 2,
+      "payload_bytes": 368640,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_wholerow_padded",
+      "max_token_num": 2048,
+      "mean_us_per_site": 22.28266815923982,
+      "p50_pass_spread_pct": 0.28837530542240586,
+      "p50_us_per_graph": 1604.0424704551697,
+      "p50_us_per_site": 22.27836764521069,
+      "p95_us_per_site": 22.376284831100037,
+      "p99_us_per_site": 22.42434024810791,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        22.310444050365025,
+        22.246291240056355
+      ],
+      "passes": 2,
+      "payload_bytes": 368640,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.1741874516010284,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 21.771269751091797,
+      "p50_pass_spread_pct": 0.06268385538283905,
+      "p50_us_per_graph": 1563.1612539291382,
+      "p50_us_per_site": 21.71057297123803,
+      "p95_us_per_site": 21.858784887525772,
+      "p99_us_per_site": 22.120701769987743,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        21.703770591153038,
+        21.71737535132302
+      ],
+      "passes": 2,
+      "payload_bytes": 368640,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 19.536385519637,
+      "world_size": 4
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 24.874374854895805,
+      "p50_pass_spread_pct": 2.3292639392323844,
+      "p50_us_per_graph": 1786.923497915268,
+      "p50_us_per_site": 24.81838191548983,
+      "p95_us_per_site": 25.387972593307495,
+      "p99_us_per_site": 25.659916301568348,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        24.532666636837853,
+        25.10409719414181
+      ],
+      "passes": 2,
+      "payload_bytes": 374400,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 27.60832446730799,
+      "p50_pass_spread_pct": 1.1340775843656115,
+      "p50_us_per_graph": 1984.425038099289,
+      "p50_us_per_site": 27.561458862490124,
+      "p95_us_per_site": 27.640215224689907,
+      "p99_us_per_site": 27.7010483874215,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        27.71686183081733,
+        27.406055894162918
+      ],
+      "passes": 2,
+      "payload_bytes": 374400,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.155569485492176,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 22.091472439467907,
+      "p50_pass_spread_pct": 2.2139909343075637,
+      "p50_us_per_graph": 1589.132010936737,
+      "p50_us_per_site": 22.071277929676903,
+      "p95_us_per_site": 22.43572887447145,
+      "p99_us_per_site": 22.700729469458263,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        22.31293088859982,
+        21.829624970753986
+      ],
+      "passes": 2,
+      "payload_bytes": 374400,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 19.91570844418473,
+      "world_size": 4
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 28.760215010907913,
+      "p50_pass_spread_pct": 0.03397117962775642,
+      "p50_us_per_graph": 2069.6855187416077,
+      "p50_us_per_site": 28.745632204744552,
+      "p95_us_per_site": 28.907999396324158,
+      "p99_us_per_site": 29.00465991761949,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        28.74075041876899,
+        28.750513990720112
+      ],
+      "passes": 2,
+      "payload_bytes": 524160,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 29.990199357271194,
+      "p50_pass_spread_pct": 0.054799156370211044,
+      "p50_us_per_graph": 2159.2264771461487,
+      "p50_us_per_site": 29.989256627029846,
+      "p95_us_per_site": 30.096618665589226,
+      "p99_us_per_site": 30.143284135394623,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        29.98104194800059,
+        29.997471306059097
+      ],
+      "passes": 2,
+      "payload_bytes": 524160,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.314180549648073,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 26.103859499924713,
+      "p50_pass_spread_pct": 0.1311732535342225,
+      "p50_us_per_graph": 1878.5242438316345,
+      "p50_us_per_site": 26.09061449766159,
+      "p95_us_per_site": 26.303534706433616,
+      "p99_us_per_site": 26.432430578602684,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        26.073513759507073,
+        26.10771523581611
+      ],
+      "passes": 2,
+      "payload_bytes": 524160,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 23.77643394801352,
+      "world_size": 4
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 28.88563952346643,
+      "p50_pass_spread_pct": 0.07200940766958208,
+      "p50_us_per_graph": 2079.6855688095093,
+      "p50_us_per_site": 28.884521789020962,
+      "p95_us_per_site": 28.950216041670906,
+      "p99_us_per_site": 28.982715474234688,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        28.894917832480537,
+        28.874125745561386
+      ],
+      "passes": 2,
+      "payload_bytes": 529920,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 29.77654812567764,
+      "p50_pass_spread_pct": 0.3580788896557552,
+      "p50_us_per_graph": 2143.865942955017,
+      "p50_us_per_site": 29.775915874375237,
+      "p95_us_per_site": 29.86633943186866,
+      "p99_us_per_site": 29.899951484468247,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        29.722700516382854,
+        29.829131232367622
+      ],
+      "passes": 2,
+      "payload_bytes": 529920,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.216958337359958,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 38.85843278467655,
+      "p50_pass_spread_pct": 0.39027866995255955,
+      "p50_us_per_graph": 2797.2909212112427,
+      "p50_us_per_site": 38.85126279460059,
+      "p95_us_per_site": 38.929457465807594,
+      "p99_us_per_site": 38.98307018809848,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        38.926929235458374,
+        38.77559635374281
+      ],
+      "passes": 2,
+      "payload_bytes": 529920,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 36.63430445724063,
+      "world_size": 4
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 34.699735363324486,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 2498.296022415161,
+      "p50_us_per_site": 34.698555866877236,
+      "p95_us_per_site": 34.78134671847025,
+      "p99_us_per_site": 34.81356965170966,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        34.698555866877236
+      ],
+      "passes": 1,
+      "payload_bytes": 737280,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 33.530093885130356,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 2414.196491241455,
+      "p50_us_per_site": 33.53050682279799,
+      "p95_us_per_site": 33.643013901180694,
+      "p99_us_per_site": 33.70244304339091,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        33.53050682279799
+      ],
+      "passes": 1,
+      "payload_bytes": 737280,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.2450139125188193,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 39.44195083114836,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 2839.379072189331,
+      "p50_us_per_site": 39.43582044707404,
+      "p95_us_per_site": 39.506375789642334,
+      "p99_us_per_site": 39.53692979282803,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        39.43582044707404
+      ],
+      "passes": 1,
+      "payload_bytes": 737280,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 37.19080653455522,
+      "world_size": 4
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 62.68371552891202,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 4505.870819091797,
+      "p50_us_per_site": 62.581539154052734,
+      "p95_us_per_site": 62.71098719702827,
+      "p99_us_per_site": 62.7598762512207,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        62.581539154052734
+      ],
+      "passes": 1,
+      "payload_bytes": 1474560,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 49.558587577607895,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 3567.944049835205,
+      "p50_us_per_site": 49.5547784699334,
+      "p95_us_per_site": 49.67200093799167,
+      "p99_us_per_site": 49.728665086958145,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        49.5547784699334
+      ],
+      "passes": 1,
+      "payload_bytes": 1474560,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.3727915767166348,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 38.06847117013402,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 2740.417957305908,
+      "p50_us_per_site": 38.06136051813761,
+      "p95_us_per_site": 38.124154011408486,
+      "p99_us_per_site": 38.15804256333245,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        38.06136051813761
+      ],
+      "passes": 1,
+      "payload_bytes": 1474560,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 35.68856894142098,
+      "world_size": 4
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 82.76582649681303,
+      "p50_pass_spread_pct": 0.08893281979507339,
+      "p50_us_per_graph": 5948.844909667969,
+      "p50_us_per_site": 82.62284596761069,
+      "p95_us_per_site": 82.71590206358167,
+      "p99_us_per_site": 83.03645915455289,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        82.58612288369073,
+        82.65956905153062
+      ],
+      "passes": 2,
+      "payload_bytes": 2211840,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 66.03895913561185,
+      "p50_pass_spread_pct": 0.05159134160259704,
+      "p50_us_per_graph": 4754.685640335083,
+      "p50_us_per_site": 66.03730056020947,
+      "p95_us_per_site": 66.16938776440091,
+      "p99_us_per_site": 66.2263400024838,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        66.05433093176947,
+        66.02027018864949
+      ],
+      "passes": 2,
+      "payload_bytes": 2211840,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.9336388947235212,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 45.31638451748424,
+      "p50_pass_spread_pct": 0.05567912857229462,
+      "p50_us_per_graph": 3262.5149488449097,
+      "p50_us_per_site": 45.31270762284596,
+      "p95_us_per_site": 45.38089533646902,
+      "p99_us_per_site": 45.41617963049147,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        45.32531897226969,
+        45.30009627342224
+      ],
+      "passes": 2,
+      "payload_bytes": 2211840,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 42.37906872812245,
+      "world_size": 4
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 82.96068517698183,
+      "p50_pass_spread_pct": 0.067488922545067,
+      "p50_us_per_graph": 5972.99599647522,
+      "p50_us_per_site": 82.9582777288225,
+      "p95_us_per_site": 83.05340343051486,
+      "p99_us_per_site": 83.09480547904968,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        82.93029334810045,
+        82.98626210954454
+      ],
+      "passes": 2,
+      "payload_bytes": 2217600,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": 2.9391804710030556,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 45.41958048774137,
+      "p50_pass_spread_pct": 0.07150091377474688,
+      "p50_us_per_graph": 3269.7954773902893,
+      "p50_us_per_site": 45.41382607486513,
+      "p95_us_per_site": 45.48340870274438,
+      "p99_us_per_site": 45.518957906299164,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        45.4300559229321,
+        45.397596226798164
+      ],
+      "passes": 2,
+      "payload_bytes": 2217600,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 42.47464560386207,
+      "world_size": 4
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.952378398428361,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 45.393912610080505,
+      "p50_pass_spread_pct": 0.10913949959643343,
+      "p50_us_per_graph": 3267.7647471427917,
+      "p50_us_per_site": 45.38562148809433,
+      "p95_us_per_site": 45.45839627583821,
+      "p99_us_per_site": 45.49784627225664,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        45.360868175824486,
+        45.410374800364174
+      ],
+      "passes": 2,
+      "payload_bytes": 2217600,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 42.433243089665964,
+      "world_size": 4
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 110.88120138645172,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 7984.014511108398,
+      "p50_us_per_site": 110.8890904320611,
+      "p95_us_per_site": 111.10465394126044,
+      "p99_us_per_site": 111.2040811114841,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        110.8890904320611
+      ],
+      "passes": 1,
+      "payload_bytes": 2949120,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 4
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": 3.247805560628573,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 52.28960429959827,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 3764.3275260925293,
+      "p50_us_per_site": 52.282326751285126,
+      "p95_us_per_site": 52.36426326963637,
+      "p99_us_per_site": 52.399820751614044,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        52.282326751285126
+      ],
+      "passes": 1,
+      "payload_bytes": 2949120,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 49.034521190656555,
+      "world_size": 4
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 3.2544652413990764,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 52.38977198137177,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 3771.584987640381,
+      "p50_us_per_site": 52.38312482833862,
+      "p95_us_per_site": 52.46036251386007,
+      "p99_us_per_site": 52.4925688902537,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        52.38312482833862
+      ],
+      "passes": 1,
+      "payload_bytes": 2949120,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 49.12865958693955,
+      "world_size": 4
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 23.959414379464256,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 1724.2519855499268,
+      "p50_us_per_site": 23.94794424374898,
+      "p95_us_per_site": 23.988500237464905,
+      "p99_us_per_site": 24.011833800209892,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        23.94794424374898
+      ],
+      "passes": 1,
+      "payload_bytes": 5760,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_wholerow_padded",
+      "max_token_num": 2048,
+      "mean_us_per_site": 20.11315626402696,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 1440.6700134277344,
+      "p50_us_per_site": 20.009305742051865,
+      "p95_us_per_site": 20.496805508931477,
+      "p99_us_per_site": 20.7856943209966,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        20.009305742051865
+      ],
+      "passes": 1,
+      "payload_bytes": 5760,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 1.8966806431611378,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 18.969577838977177,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 1363.7290000915527,
+      "p50_us_per_site": 18.94068055682712,
+      "p95_us_per_site": 19.63791747887929,
+      "p99_us_per_site": 19.97291710641649,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        18.94068055682712
+      ],
+      "passes": 1,
+      "payload_bytes": 5760,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 17.043999913665985,
+      "world_size": 8
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 28.502062218056786,
+      "p50_pass_spread_pct": 0.6376060485831836,
+      "p50_us_per_graph": 2051.45525932312,
+      "p50_us_per_site": 28.492434157265556,
+      "p95_us_per_site": 28.539937403466965,
+      "p99_us_per_site": 28.610770901044212,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        28.582980235417683,
+        28.40188807911343
+      ],
+      "passes": 2,
+      "payload_bytes": 184320,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_wholerow_padded",
+      "max_token_num": 2048,
+      "mean_us_per_site": 25.07417980995443,
+      "p50_pass_spread_pct": 0.1884630390881714,
+      "p50_us_per_graph": 1804.6740293502808,
+      "p50_us_per_site": 25.064917074309456,
+      "p95_us_per_site": 25.137972500589157,
+      "p99_us_per_site": 25.171569652027554,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        25.088513890902203,
+        25.04132025771671
+      ],
+      "passes": 2,
+      "payload_bytes": 184320,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.0675138673848577,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 24.73363175739845,
+      "p50_pass_spread_pct": 0.6970085156944084,
+      "p50_us_per_graph": 1777.0235240459442,
+      "p50_us_per_site": 24.680882278415893,
+      "p95_us_per_site": 25.08629858493805,
+      "p99_us_per_site": 25.18213126394484,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        24.595167073938583,
+        24.766597482893204
+      ],
+      "passes": 2,
+      "payload_bytes": 184320,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 22.613368411031033,
+      "world_size": 8
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 35.679140627384186,
+      "p50_pass_spread_pct": 1.1970270305380337,
+      "p50_us_per_graph": 2566.349506378174,
+      "p50_us_per_site": 35.643743144141304,
+      "p95_us_per_site": 36.05777025222778,
+      "p99_us_per_site": 36.50027182367113,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        35.855806536144684,
+        35.431679752137924
+      ],
+      "passes": 2,
+      "payload_bytes": 368640,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_wholerow_padded",
+      "max_token_num": 2048,
+      "mean_us_per_site": 33.83378576404519,
+      "p50_pass_spread_pct": 0.1150766724140384,
+      "p50_us_per_graph": 2431.958496570587,
+      "p50_us_per_site": 33.777201341258156,
+      "p95_us_per_site": 34.23136803838942,
+      "p99_us_per_site": 34.4080345498191,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        33.796625004874336,
+        33.757777677641975
+      ],
+      "passes": 2,
+      "payload_bytes": 368640,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.159180533554819,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 32.09271700017982,
+      "p50_pass_spread_pct": 0.6538366641993587,
+      "p50_us_per_graph": 2307.337522506714,
+      "p50_us_per_site": 32.04635447925992,
+      "p95_us_per_site": 32.37691024939219,
+      "p99_us_per_site": 33.271360728475784,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        32.15077850553725,
+        31.941930452982586
+      ],
+      "passes": 2,
+      "payload_bytes": 368640,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 29.887173945705094,
+      "world_size": 8
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 35.913023142351044,
+      "p50_pass_spread_pct": 0.19008319386351058,
+      "p50_us_per_graph": 2581.889510154724,
+      "p50_us_per_site": 35.85957652992673,
+      "p95_us_per_site": 36.299715439478554,
+      "p99_us_per_site": 37.09610965516832,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        35.825527376598785,
+        35.89362568325467
+      ],
+      "passes": 2,
+      "payload_bytes": 374400,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 47.50170433686839,
+      "p50_pass_spread_pct": 0.13274978030257678,
+      "p50_us_per_graph": 3419.876456260681,
+      "p50_us_per_site": 47.49828411473168,
+      "p95_us_per_site": 47.582305139965484,
+      "p99_us_per_site": 47.615647315979004,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        47.52979013654921,
+        47.466778092914154
+      ],
+      "passes": 2,
+      "payload_bytes": 374400,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.1900139335128994,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 32.4048993686835,
+      "p50_pass_spread_pct": 0.20267584567787988,
+      "p50_us_per_graph": 2329.657554626465,
+      "p50_us_per_site": 32.35635492536757,
+      "p95_us_per_site": 32.84163773059845,
+      "p99_us_per_site": 33.00081359015571,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        32.3891109890408,
+        32.323598861694336
+      ],
+      "passes": 2,
+      "payload_bytes": 374400,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 30.166340991854668,
+      "world_size": 8
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 42.98063066105048,
+      "p50_pass_spread_pct": 4.959573120498906,
+      "p50_us_per_graph": 3089.213728904724,
+      "p50_us_per_site": 42.905746234787834,
+      "p95_us_per_site": 43.979229198561775,
+      "p99_us_per_site": 44.12756197982364,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        41.867521074083115,
+        43.943971395492554
+      ],
+      "passes": 2,
+      "payload_bytes": 524160,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 50.77191163433923,
+      "p50_pass_spread_pct": 0.9875377659595674,
+      "p50_us_per_graph": 3654.988408088684,
+      "p50_us_per_site": 50.763727890120606,
+      "p95_us_per_site": 50.87706281079186,
+      "p99_us_per_site": 50.92678467432658,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        51.01315180460612,
+        50.5143039756351
+      ],
+      "passes": 2,
+      "payload_bytes": 524160,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.247805603676372,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 38.05595115820567,
+      "p50_pass_spread_pct": 0.09556323323329785,
+      "p50_us_per_graph": 2739.8110032081604,
+      "p50_us_per_site": 38.05293060011334,
+      "p95_us_per_site": 38.39584688345591,
+      "p99_us_per_site": 38.548347022798325,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        38.07110422187381,
+        38.03475697835287
+      ],
+      "passes": 2,
+      "payload_bytes": 524160,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 35.805124996436966,
+      "world_size": 8
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 43.70190488464303,
+      "p50_pass_spread_pct": 0.25944262610186897,
+      "p50_us_per_graph": 3165.844976902008,
+      "p50_us_per_site": 43.970069123639,
+      "p95_us_per_site": 44.15340224901835,
+      "p99_us_per_site": 44.23867993884616,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        43.913104467921784,
+        44.027033779356216
+      ],
+      "passes": 2,
+      "payload_bytes": 529920,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 51.09634189638827,
+      "p50_pass_spread_pct": 0.26796224151894865,
+      "p50_us_per_graph": 3678.508996963501,
+      "p50_us_per_site": 51.09040273560419,
+      "p95_us_per_site": 51.20985375510321,
+      "p99_us_per_site": 51.26401450898912,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        51.02204283078512,
+        51.15876264042325
+      ],
+      "passes": 2,
+      "payload_bytes": 529920,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.2416806055439844,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 60.3216383225388,
+      "p50_pass_spread_pct": 0.5948282261158955,
+      "p50_us_per_graph": 4336.093902587891,
+      "p50_us_per_site": 60.22352642483182,
+      "p95_us_per_site": 60.31991706954108,
+      "p99_us_per_site": 60.39714150958591,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        60.40210856331719,
+        60.044944286346436
+      ],
+      "passes": 2,
+      "payload_bytes": 529920,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 57.98184581928783,
+      "world_size": 8
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 52.28690978222423,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 3765.6679153442383,
+      "p50_us_per_site": 52.300943268669975,
+      "p95_us_per_site": 52.52150032255385,
+      "p99_us_per_site": 52.605943547354805,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        52.300943268669975
+      ],
+      "passes": 1,
+      "payload_bytes": 737280,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 55.79958098464542,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 4017.270088195801,
+      "p50_us_per_site": 55.795417891608345,
+      "p95_us_per_site": 55.897083547380234,
+      "p99_us_per_site": 55.93597226672702,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        55.795417891608345
+      ],
+      "passes": 1,
+      "payload_bytes": 737280,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.2622361365291805,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 31.365965018669765,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 2258.017063140869,
+      "p50_us_per_site": 31.361348099178738,
+      "p95_us_per_site": 31.448569562700058,
+      "p99_us_per_site": 31.4780142572191,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        31.361348099178738
+      ],
+      "passes": 1,
+      "payload_bytes": 737280,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 29.09911196264956,
+      "world_size": 8
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 107.519523885515,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 7742.438554763794,
+      "p50_us_per_site": 107.5338688161638,
+      "p95_us_per_site": 108.4174844953749,
+      "p99_us_per_site": 108.7280445628696,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        107.5338688161638
+      ],
+      "passes": 1,
+      "payload_bytes": 1474560,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 73.8614776134491,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 5316.18070602417,
+      "p50_us_per_site": 73.83584313922458,
+      "p95_us_per_site": 74.03777705298529,
+      "p99_us_per_site": 74.13722409142389,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        73.83584313922458
+      ],
+      "passes": 1,
+      "payload_bytes": 1474560,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.3666945182614856,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 35.532902889781525,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 2558.058977127075,
+      "p50_us_per_site": 35.52859690454271,
+      "p95_us_per_site": 35.62137484550476,
+      "p99_us_per_site": 35.675820377137924,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        35.52859690454271
+      ],
+      "passes": 1,
+      "payload_bytes": 1474560,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 33.16190238628123,
+      "world_size": 8
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 138.01755287912158,
+      "p50_pass_spread_pct": 1.0919737177394584,
+      "p50_us_per_graph": 9930.49931526184,
+      "p50_us_per_site": 137.9236016008589,
+      "p95_us_per_site": 138.77722289827136,
+      "p99_us_per_site": 139.1219430499607,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        137.17464605967203,
+        138.67255714204578
+      ],
+      "passes": 2,
+      "payload_bytes": 2211840,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "max_token_num": 2048,
+      "mean_us_per_site": 101.41286075115204,
+      "p50_pass_spread_pct": 0.12382628448199817,
+      "p50_us_per_graph": 7299.577713012695,
+      "p50_us_per_site": 101.38302379184299,
+      "p95_us_per_site": 101.57331162028842,
+      "p99_us_per_site": 101.68079866303339,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        101.44575436909993,
+        101.32029321458604
+      ],
+      "passes": 2,
+      "payload_bytes": 2211840,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.9519652533862324,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 45.327876064512466,
+      "p50_pass_spread_pct": 1.1768052060220802,
+      "p50_us_per_graph": 3220.9458351135254,
+      "p50_us_per_site": 44.73535882102119,
+      "p95_us_per_site": 45.406478974554275,
+      "p99_us_per_site": 64.94300729698605,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        44.473674562242294,
+        44.99704307980008
+      ],
+      "passes": 2,
+      "payload_bytes": 2211840,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 41.78339356763495,
+      "world_size": 8
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 138.99801776144238,
+      "p50_pass_spread_pct": 0.2165416347642779,
+      "p50_us_per_graph": 10000.229835510254,
+      "p50_us_per_site": 138.89208104875354,
+      "p95_us_per_site": 139.81583383348254,
+      "p99_us_per_site": 140.33805661731296,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        138.74186409844293,
+        139.04229799906412
+      ],
+      "passes": 2,
+      "payload_bytes": 2217600,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": 2.952520839042134,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 62.374301175276436,
+      "p50_pass_spread_pct": 0.3835596785974227,
+      "p50_us_per_graph": 4489.0456199646,
+      "p50_us_per_site": 62.34785583284166,
+      "p95_us_per_site": 62.462439139684044,
+      "p99_us_per_site": 62.76717450883653,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        62.22851408852471,
+        62.46719757715861
+      ],
+      "passes": 2,
+      "payload_bytes": 2217600,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 59.39533499379952,
+      "world_size": 8
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 2.959743038647705,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 62.445578181081345,
+      "p50_pass_spread_pct": 0.1836426169391503,
+      "p50_us_per_graph": 4494.076251983643,
+      "p50_us_per_site": 62.41772572199504,
+      "p95_us_per_site": 62.5452200571696,
+      "p99_us_per_site": 63.699404398600265,
+      "pass_names": [
+        "graph-pass1",
+        "graph-pass2"
+      ],
+      "pass_p50_us_per_site": [
+        62.36046552658081,
+        62.47498591740926
+      ],
+      "passes": 2,
+      "payload_bytes": 2217600,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 59.45798268334733,
+      "world_size": 8
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "iris_fused",
+      "benchmark_reset_copy_p50_us_per_site": null,
+      "calls_per_graph": 72,
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 176.81624058882394,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 12731.913566589355,
+      "p50_us_per_site": 176.8321328692966,
+      "p95_us_per_site": 177.8313053978814,
+      "p99_us_per_site": 178.25298839145236,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        176.8321328692966
+      ],
+      "passes": 1,
+      "payload_bytes": 2949120,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": null,
+      "world_size": 8
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "triton_profile",
+      "benchmark_reset_copy_p50_us_per_site": 3.262520767748356,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 48.95771715044975,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 3517.9059505462646,
+      "p50_us_per_site": 48.85980486869812,
+      "p95_us_per_site": 49.00313748253716,
+      "p99_us_per_site": 49.957040283415054,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        48.85980486869812
+      ],
+      "passes": 1,
+      "payload_bytes": 2949120,
+      "policy": "candidate",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 45.597284100949764,
+      "world_size": 8
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "benchmark_reset_copy_p50_us_per_site": 3.270569360918469,
+      "calls_per_graph": 72,
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "max_token_num": 2048,
+      "mean_us_per_site": 49.06785943110784,
+      "p50_pass_spread_pct": 0.0,
+      "p50_us_per_graph": 3504.065990447998,
+      "p50_us_per_site": 48.66758320066664,
+      "p95_us_per_site": 49.26870928870307,
+      "p99_us_per_site": 54.06040284368727,
+      "pass_names": [
+        "graph-pass1"
+      ],
+      "pass_p50_us_per_site": [
+        48.66758320066664
+      ],
+      "passes": 1,
+      "payload_bytes": 2949120,
+      "policy": "control",
+      "replays_per_pass": 1000,
+      "serving_faithful_p50_us_per_site": 45.39701383974817,
+      "world_size": 8
+    }
+  ],
+  "schema_version": 2,
+  "source_root": "/home/jeremwan/tokenspeed/tokenspeed-kernel/benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/graph-clean"
+}

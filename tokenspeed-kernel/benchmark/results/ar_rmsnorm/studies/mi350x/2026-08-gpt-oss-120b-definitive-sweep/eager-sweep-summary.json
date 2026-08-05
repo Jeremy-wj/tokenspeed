@@ -1,0 +1,3136 @@
+{
+  "arms": [
+    "upstream_unfused",
+    "iris_fused",
+    "triton_profile"
+  ],
+  "candidate_arm": "triton_profile",
+  "comparisons": [
+    {
+      "M": 1,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 10.528856977066003,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -7.039155146508913,
+      "triton_vs_unfused_pct": 2.748559252787386,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 12.343595040176837,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -4.58641524435226,
+      "triton_vs_unfused_pct": 7.191051271200788,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 14.220034973605888,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -5.069756460717834,
+      "triton_vs_unfused_pct": 8.429357371097336,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 13.73992996885891,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -5.081355328945147,
+      "triton_vs_unfused_pct": 7.960399976247823,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 12.14482066678022,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -4.81871634075336,
+      "triton_vs_unfused_pct": 6.740879868001537,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 27.58218183316188,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -3.492446489918677,
+      "triton_vs_unfused_pct": 23.12644240196795,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 26.599100033153643,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -3.7046441705729127,
+      "triton_vs_unfused_pct": 21.90905385377764,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 26.82598609567537,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -5.735262883030112,
+      "triton_vs_unfused_pct": 19.552182389093176,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 14.959982312069453,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -8.139701235690122,
+      "triton_vs_unfused_pct": 5.602583211264789,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 16.626835234352445,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -9.572604032934374,
+      "triton_vs_unfused_pct": 5.462610101225085,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 2.428595843478454,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -13.03135897006581,
+      "triton_vs_unfused_pct": -10.919242168883137,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 1024,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": -22.64282962216574,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 8.366763507268038,
+      "triton_vs_unfused_pct": -16.170538120737945,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 2048,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": -16.820774907489188,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": 5.490947552746728,
+      "triton_vs_unfused_pct": -12.253447282878282,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 2
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 12.396382518413462,
+      "triton_path": "oneshot_wholerow_padded",
+      "triton_vs_iris_pct": -9.177337471506608,
+      "triton_vs_unfused_pct": 2.0813871889332036,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 16.172625537081252,
+      "triton_path": "oneshot_wholerow_padded",
+      "triton_vs_iris_pct": -7.343872358317649,
+      "triton_vs_unfused_pct": 7.641056202331664,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 15.901533287824243,
+      "triton_path": "oneshot_wholerow_padded",
+      "triton_vs_iris_pct": -6.243454493904355,
+      "triton_vs_unfused_pct": 8.66527379926152,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 16.223557626028562,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -6.3473745938711135,
+      "triton_vs_unfused_pct": 8.846413057180879,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 16.159154504285333,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -5.821317351180355,
+      "triton_vs_unfused_pct": 9.39716148814298,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 30.467557996257312,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -7.452788672254817,
+      "triton_vs_unfused_pct": 20.744086612944756,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 25.098796677586634,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -5.9155676893415166,
+      "triton_vs_unfused_pct": 17.698492681572265,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 32.30040373623737,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -11.540498818981714,
+      "triton_vs_unfused_pct": 17.03227720554885,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 35.69132070761518,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -13.856272154416038,
+      "triton_vs_unfused_pct": 16.889562020446537,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 34.95623864314705,
+      "triton_path": "twoshot_blocked",
+      "triton_vs_iris_pct": 16.755577081456074,
+      "triton_vs_unfused_pct": 57.56893523523337,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 45.81983063953656,
+      "triton_path": "twoshot_blocked",
+      "triton_vs_iris_pct": 2.140486745380832,
+      "triton_vs_unfused_pct": 48.94108478651265,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 1024,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 61.10851046589589,
+      "triton_path": "twoshot_blocked",
+      "triton_vs_iris_pct": -31.258793746927182,
+      "triton_vs_unfused_pct": 10.747933470614889,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 2048,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 74.25134869481053,
+      "triton_path": "twoshot_blocked",
+      "triton_vs_iris_pct": -33.442686622354834,
+      "triton_vs_unfused_pct": 15.977016215578278,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 4
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 5.5754121166984305,
+      "triton_path": "oneshot_wholerow_padded",
+      "triton_vs_iris_pct": -9.964397423716276,
+      "triton_vs_unfused_pct": -4.94454152833571,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 8.18832621644605,
+      "triton_path": "oneshot_wholerow_padded",
+      "triton_vs_iris_pct": -8.77162696344066,
+      "triton_vs_unfused_pct": -1.3015501772508875,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 5.669505036890188,
+      "triton_path": "oneshot_wholerow_padded",
+      "triton_vs_iris_pct": -7.22652298987152,
+      "triton_vs_unfused_pct": -1.9667260378841256,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 7.5481533696572845,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -7.029307716582601,
+      "triton_vs_unfused_pct": -0.011737274198120318,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 6.852081934457566,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -8.59628702491836,
+      "triton_vs_unfused_pct": -2.333229720729335,
+      "unfused_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": -2.3564666204535567,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -8.20058648259362,
+      "triton_vs_unfused_pct": -10.363809019903435,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 11.58711329079878,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -8.089285585805584,
+      "triton_vs_unfused_pct": 2.560513019749644,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 44.266655136118516,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -28.667707338229853,
+      "triton_vs_unfused_pct": 2.908712655042711,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 84.08292710357317,
+      "triton_path": "oneshot_blocked",
+      "triton_vs_iris_pct": -24.28518372704157,
+      "triton_vs_unfused_pct": 39.37805004635442,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 51.02737752808206,
+      "triton_path": "twoshot_blocked",
+      "triton_vs_iris_pct": -24.392057994621176,
+      "triton_vs_unfused_pct": 14.188692013676828,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 131.93920786856415,
+      "triton_path": "twoshot_blocked",
+      "triton_vs_iris_pct": -39.78002506315044,
+      "triton_vs_unfused_pct": 39.67373284717672,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 1024,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 190.76797151674444,
+      "triton_path": "twoshot_blocked",
+      "triton_vs_iris_pct": -61.2843272203057,
+      "triton_vs_unfused_pct": 12.572776400577501,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    },
+    {
+      "M": 2048,
+      "N": 2880,
+      "iris_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iris_vs_unfused_pct": 237.97935052979028,
+      "triton_path": "twoshot_blocked",
+      "triton_vs_iris_pct": -72.41518369062332,
+      "triton_vs_unfused_pct": -6.769016992733001,
+      "unfused_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "world_size": 8
+    }
+  ],
+  "incomplete_cases": [],
+  "mode": "eager",
+  "rows": [
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 93.9112001657486,
+      "p50_pass_spread_pct": 15.043369355096292,
+      "p50_us": 90.49024991691113,
+      "p95_us": 123.04099649190903,
+      "p99_us": 147.12099730968475,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        96.82049974799156,
+        84.16000008583069
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 86.30954653024673,
+      "p50_pass_spread_pct": 16.024547725502014,
+      "p50_us": 84.1205008327961,
+      "p95_us": 99.78000074625015,
+      "p99_us": 125.94100087881088,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        90.36049991846085,
+        77.88050174713135
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 82.12270026405653,
+      "p50_pass_spread_pct": 23.567044953533568,
+      "p50_us": 81.87024854123592,
+      "p95_us": 90.46049788594246,
+      "p99_us": 105.26049882173538,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        90.50050005316734,
+        73.2399970293045
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 92.87811651825905,
+      "p50_pass_spread_pct": 17.348066333201274,
+      "p50_us": 89.83049914240837,
+      "p95_us": 120.81999704241753,
+      "p99_us": 140.66050201654434,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        97.00049832463264,
+        82.6604999601841
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 92.48716667294502,
+      "p50_pass_spread_pct": 17.097152935690364,
+      "p50_us": 85.71049943566322,
+      "p95_us": 117.8010031580925,
+      "p99_us": 275.5424939095974,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        92.460498213768,
+        78.96050065755844
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 80.54922657708327,
+      "p50_pass_spread_pct": 19.490805062038664,
+      "p50_us": 79.96049895882607,
+      "p95_us": 90.30050039291382,
+      "p99_us": 101.62049904465675,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        87.06099912524223,
+        72.8599987924099
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 92.98744335770607,
+      "p50_pass_spread_pct": 15.912485496918949,
+      "p50_us": 89.56050127744675,
+      "p95_us": 125.1010000705719,
+      "p99_us": 146.6209962964058,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        96.16100043058395,
+        82.96000212430954
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 86.4967268705368,
+      "p50_pass_spread_pct": 20.259064012162597,
+      "p50_us": 85.02000197768211,
+      "p95_us": 93.46050024032593,
+      "p99_us": 130.4209977388382,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        92.84000098705292,
+        77.20000296831131
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 79.64431342979273,
+      "p50_pass_spread_pct": 17.563696698561927,
+      "p50_us": 78.41050066053867,
+      "p95_us": 90.44050052762032,
+      "p99_us": 111.42100021243095,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        84.74050089716911,
+        72.08050042390823
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 92.92732000350952,
+      "p50_pass_spread_pct": 13.236692090946667,
+      "p50_us": 89.73000012338161,
+      "p95_us": 123.68049845099449,
+      "p99_us": 142.4805000424385,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        95.30000016093254,
+        84.16000008583069
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 86.77526652812958,
+      "p50_pass_spread_pct": 18.495151068240556,
+      "p50_us": 85.17049998044968,
+      "p95_us": 95.14100104570389,
+      "p99_us": 130.90099766850471,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        92.38000214099884,
+        77.96099781990051
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 79.50455675522487,
+      "p50_pass_spread_pct": 14.841949648661457,
+      "p50_us": 78.89050059020519,
+      "p95_us": 87.12049946188927,
+      "p99_us": 107.80099779367447,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        84.34050157666206,
+        73.44049960374832
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 91.78183351953824,
+      "p50_pass_spread_pct": 10.896711453344743,
+      "p50_us": 88.8307522982359,
+      "p95_us": 118.59999969601631,
+      "p99_us": 139.72100615501404,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        93.42050179839134,
+        84.24100279808044
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 86.32394351065159,
+      "p50_pass_spread_pct": 16.79550917218988,
+      "p50_us": 84.55025032162666,
+      "p95_us": 96.60099819302559,
+      "p99_us": 111.34050041437149,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        91.10049903392792,
+        78.00000160932541
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 81.18307001888752,
+      "p50_pass_spread_pct": 12.929262593690538,
+      "p50_us": 79.21074889600277,
+      "p95_us": 89.8205004632473,
+      "p99_us": 110.27999967336655,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        84.02049914002419,
+        74.40099865198135
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 91.56505999465783,
+      "p50_pass_spread_pct": 12.053530699041048,
+      "p50_us": 88.49100023508072,
+      "p95_us": 116.9004999101162,
+      "p99_us": 142.18100160360336,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        93.52099895477295,
+        83.46100151538849
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 86.43660674492517,
+      "p50_pass_spread_pct": 18.74848638158508,
+      "p50_us": 85.40049940347672,
+      "p95_us": 95.48049792647362,
+      "p99_us": 110.36049947142601,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        92.72000193595886,
+        78.08099687099457
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 73.66397308806579,
+      "p50_pass_spread_pct": 21.244017626386412,
+      "p50_us": 69.35999915003777,
+      "p95_us": 81.16050064563751,
+      "p99_us": 114.04049769043922,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        76.019998639822,
+        62.699999660253525
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 91.43852358063063,
+      "p50_pass_spread_pct": 13.22178143441597,
+      "p50_us": 88.53075094521046,
+      "p95_us": 116.56099930405617,
+      "p99_us": 145.04100382328033,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        94.02050077915192,
+        83.041001111269
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 94.57478346923986,
+      "p50_pass_spread_pct": 21.19847719381609,
+      "p50_us": 85.25100164115429,
+      "p95_us": 113.61999809741974,
+      "p99_us": 519.8034979403019,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        93.42100098729134,
+        77.08100229501724
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 104.9352994437019,
+      "p50_pass_spread_pct": 20.04404821589898,
+      "p50_us": 69.93000023066998,
+      "p95_us": 87.68100291490555,
+      "p99_us": 1253.0684620141983,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        76.299998909235,
+        63.56000155210495
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 92.41093998154005,
+      "p50_pass_spread_pct": 10.37147375775358,
+      "p50_us": 89.45100009441376,
+      "p95_us": 116.60100147128105,
+      "p99_us": 140.16100019216537,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        93.86100247502327,
+        85.04099771380424
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 85.8890098085006,
+      "p50_pass_spread_pct": 15.430947001617445,
+      "p50_us": 84.32075008749962,
+      "p95_us": 93.08050200343132,
+      "p99_us": 107.02049732208252,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        90.36049991846085,
+        78.28100025653839
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 117.42709683875243,
+      "p50_pass_spread_pct": 15.557760900117579,
+      "p50_us": 70.53049840033054,
+      "p95_us": 82.9005017876625,
+      "p99_us": 2257.436513900757,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        75.62099769711494,
+        65.43999910354614
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 96.22795981665452,
+      "p50_pass_spread_pct": 6.54554389797446,
+      "p50_us": 92.14100055396557,
+      "p95_us": 126.64049863815308,
+      "p99_us": 149.94099736213684,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        95.06100043654442,
+        89.22100067138672
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 93.61653643349806,
+      "p50_pass_spread_pct": 20.58873286681242,
+      "p50_us": 84.6409983932972,
+      "p95_us": 111.80099844932556,
+      "p99_us": 335.6824852526188,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        92.54099801182747,
+        76.74099877476692
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 94.73822981119156,
+      "p50_pass_spread_pct": 9.050540559513776,
+      "p50_us": 80.15049993991852,
+      "p95_us": 101.98049992322922,
+      "p99_us": 468.4630148112774,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        83.62049981951714,
+        76.6805000603199
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 97.11389005184174,
+      "p50_pass_spread_pct": 6.75307300605712,
+      "p50_us": 93.08075159788132,
+      "p95_us": 131.2204971909523,
+      "p99_us": 151.96099877357483,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        96.12100198864937,
+        90.04050120711327
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 85.80843331913152,
+      "p50_pass_spread_pct": 13.196469413418633,
+      "p50_us": 84.1704998165369,
+      "p95_us": 93.98049861192703,
+      "p99_us": 113.76100033521652,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        89.38049897551537,
+        78.96050065755844
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 84.89197008311749,
+      "p50_pass_spread_pct": 8.164395580691863,
+      "p50_us": 79.8107497394085,
+      "p95_us": 91.26050025224686,
+      "p99_us": 112.44099959731102,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        82.94099941849709,
+        76.6805000603199
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 98.96511683861415,
+      "p50_pass_spread_pct": 2.2938003321549383,
+      "p50_us": 96.15075029432774,
+      "p95_us": 118.3210015296936,
+      "p99_us": 152.08099782466888,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        95.06050124764442,
+        97.24099934101105
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 85.66074306766191,
+      "p50_pass_spread_pct": 11.642478671780609,
+      "p50_us": 83.62100087106228,
+      "p95_us": 92.98050031065941,
+      "p99_us": 124.94100257754326,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        88.2210023701191,
+        79.02099937200546
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 144.31621911625066,
+      "p50_pass_spread_pct": 9.81213723269323,
+      "p50_us": 93.87100301682949,
+      "p95_us": 110.10100319981575,
+      "p99_us": 2372.915957123041,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        98.26100245118141,
+        89.48100358247757
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 1024,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 112.91546975572903,
+      "p50_pass_spread_pct": 0.08977729858687944,
+      "p50_us": 111.99074797332287,
+      "p95_us": 115.04099890589714,
+      "p99_us": 117.40100011229515,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        112.04099655151367,
+        111.94049939513206
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 1024,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 122.45595981677373,
+      "p50_pass_spread_pct": 0.3958888044444775,
+      "p50_us": 121.36074900627136,
+      "p95_us": 124.440997838974,
+      "p99_us": 125.98049640655518,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        121.12099677324295,
+        121.60050123929977
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 1024,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 165.0657098988692,
+      "p50_pass_spread_pct": 4.8245278380735,
+      "p50_us": 144.7709985077381,
+      "p95_us": 158.94149988889694,
+      "p99_us": 800.5054965615273,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        148.1809988617897,
+        141.36099815368652
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 2048,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 210.44008051355678,
+      "p50_pass_spread_pct": 1.2492669238999277,
+      "p50_us": 209.42199975252151,
+      "p95_us": 212.02199906110764,
+      "p99_us": 215.20200371742249,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        210.72199940681458,
+        208.12200009822845
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 2048,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 222.2011801103751,
+      "p50_pass_spread_pct": 0.9640177637492142,
+      "p50_us": 220.92125192284584,
+      "p95_us": 224.9009981751442,
+      "p99_us": 228.2020002603531,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        219.8614999651909,
+        221.9810038805008
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 2048,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 289.1584639251232,
+      "p50_pass_spread_pct": 3.1713773031484704,
+      "p50_us": 251.77200138568878,
+      "p95_us": 264.3420100212097,
+      "p99_us": 1590.6310230493546,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        255.70200383663177,
+        247.8419989347458
+      ],
+      "passes": 2,
+      "world_size": 2
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 97.77919995288053,
+      "p50_pass_spread_pct": 26.61473487286965,
+      "p50_us": 92.30075031518936,
+      "p95_us": 135.10100170969963,
+      "p99_us": 157.3205031454563,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        103.14099863171577,
+        81.46050199866295
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_wholerow_padded",
+      "iterations_per_pass": 150,
+      "mean_us": 87.2532599667708,
+      "p50_pass_spread_pct": 13.307893928373748,
+      "p50_us": 83.82999897003174,
+      "p95_us": 96.88100218772888,
+      "p99_us": 155.9009999036789,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        89.06000107526779,
+        78.59999686479568
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 85.29217657943568,
+      "p50_pass_spread_pct": 17.247792794595117,
+      "p50_us": 82.1207482367754,
+      "p95_us": 106.22049868106842,
+      "p99_us": 149.1215005517006,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        88.6404998600483,
+        75.6009966135025
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 97.46187975009283,
+      "p50_pass_spread_pct": 29.92345718128069,
+      "p50_us": 92.59074740111828,
+      "p95_us": 117.20049753785133,
+      "p99_us": 165.9409999847412,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        104.64099794626236,
+        80.5404968559742
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_wholerow_padded",
+      "iterations_per_pass": 150,
+      "mean_us": 87.7985667437315,
+      "p50_pass_spread_pct": 18.072982187675922,
+      "p50_us": 85.79100109636784,
+      "p95_us": 95.940500497818,
+      "p99_us": 114.40099775791168,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        92.90100261569023,
+        78.68099957704544
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 81.55564337968826,
+      "p50_pass_spread_pct": 13.21544445963685,
+      "p50_us": 79.7010026872158,
+      "p95_us": 89.90100026130676,
+      "p99_us": 129.22099977731705,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        84.6410021185875,
+        74.76100325584412
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 97.82774977385998,
+      "p50_pass_spread_pct": 28.648205940566317,
+      "p50_us": 92.42074936628342,
+      "p95_us": 119.94049698114395,
+      "p99_us": 151.4809988439083,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        104.00049760937691,
+        80.84100112318993
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_wholerow_padded",
+      "iterations_per_pass": 150,
+      "mean_us": 88.6614132920901,
+      "p50_pass_spread_pct": 14.958976084773813,
+      "p50_us": 86.65050193667412,
+      "p95_us": 97.05999866127968,
+      "p99_us": 124.12099912762642,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        92.68050268292427,
+        80.62050119042397
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 81.91871002316475,
+      "p50_pass_spread_pct": 11.455032113039486,
+      "p50_us": 79.7407478094101,
+      "p95_us": 93.34100037813187,
+      "p99_us": 129.16100025177002,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        84.06049758195877,
+        75.42099803686142
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 97.78136990964413,
+      "p50_pass_spread_pct": 29.5033556314922,
+      "p50_us": 92.49099902808666,
+      "p95_us": 123.80100041627884,
+      "p99_us": 154.38099578022957,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        104.38099876046181,
+        80.60099929571152
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 89.45553677777448,
+      "p50_pass_spread_pct": 16.11704105229501,
+      "p50_us": 86.62024885416031,
+      "p95_us": 97.84100204706192,
+      "p99_us": 124.54100325703621,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        93.07999908924103,
+        80.16049861907959
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 81.45934340854485,
+      "p50_pass_spread_pct": 10.417042607898752,
+      "p50_us": 79.58025112748146,
+      "p95_us": 90.7605029642582,
+      "p99_us": 111.3005019724369,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        83.52000266313553,
+        75.64049959182739
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 98.65041673183441,
+      "p50_pass_spread_pct": 28.900314474256362,
+      "p50_us": 92.59075112640858,
+      "p95_us": 127.52050161361694,
+      "p99_us": 148.78099784255028,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        104.2810007929802,
+        80.90050145983696
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 89.15914659698804,
+      "p50_pass_spread_pct": 15.627279915811698,
+      "p50_us": 87.20074966549873,
+      "p95_us": 95.24049982428551,
+      "p99_us": 109.14099961519241,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        93.52049976587296,
+        80.88099956512451
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 82.175796503822,
+      "p50_pass_spread_pct": 9.486798362566962,
+      "p50_us": 79.71024885773659,
+      "p95_us": 94.50099989771843,
+      "p99_us": 135.54099947214127,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        83.3199992775917,
+        76.10049843788147
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 98.19162661830583,
+      "p50_pass_spread_pct": 26.067421486849575,
+      "p50_us": 92.71024912595749,
+      "p95_us": 129.8610009253025,
+      "p99_us": 165.78149795532227,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        103.40049862861633,
+        82.01999962329865
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 93.55068005621433,
+      "p50_pass_spread_pct": 15.795295276584675,
+      "p50_us": 85.80075018107891,
+      "p95_us": 108.88049751520157,
+      "p99_us": 284.1619923710823,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        92.08099916577339,
+        79.52050119638443
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 75.68169370293617,
+      "p50_pass_spread_pct": 14.812578372708085,
+      "p50_us": 71.06000185012817,
+      "p95_us": 85.40000021457672,
+      "p99_us": 114.741001278162,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        75.96000283956528,
+        66.16000086069107
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 97.1865531305472,
+      "p50_pass_spread_pct": 23.258540225949844,
+      "p50_us": 91.96075052022934,
+      "p95_us": 119.06100437045097,
+      "p99_us": 142.96099916100502,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        101.54100134968758,
+        82.3804996907711
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 88.53005677461624,
+      "p50_pass_spread_pct": 15.062579331007097,
+      "p50_us": 86.52075007557869,
+      "p95_us": 94.92100030183792,
+      "p99_us": 124.50050190091133,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        92.58050099015236,
+        80.46099916100502
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 79.61081338425478,
+      "p50_pass_spread_pct": 19.434321910444474,
+      "p50_us": 73.51049967110157,
+      "p95_us": 87.40099892020226,
+      "p99_us": 110.10099947452545,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        80.02099767327309,
+        67.00000166893005
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 104.03288664917152,
+      "p50_pass_spread_pct": 21.455817085166153,
+      "p50_us": 98.26050139963627,
+      "p95_us": 129.68049943447113,
+      "p99_us": 161.82149946689606,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        107.78050124645233,
+        88.7405015528202
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 89.3407866358757,
+      "p50_pass_spread_pct": 14.087883747781316,
+      "p50_us": 86.92074939608574,
+      "p95_us": 99.28049892187119,
+      "p99_us": 109.80049893260002,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        92.64050051569939,
+        81.20099827647209
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 120.90299693246682,
+      "p50_pass_spread_pct": 12.443419760126485,
+      "p50_us": 74.27074946463108,
+      "p95_us": 93.76049786806107,
+      "p99_us": 2568.478502333164,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        78.62100005149841,
+        69.92049887776375
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 104.41766348977883,
+      "p50_pass_spread_pct": 13.950331789860758,
+      "p50_us": 99.38100166618824,
+      "p95_us": 120.08100003004074,
+      "p99_us": 154.6810008585453,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        105.86100071668625,
+        92.90100261569023
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 88.0678735425075,
+      "p50_pass_spread_pct": 14.992370312859737,
+      "p50_us": 85.61049960553646,
+      "p95_us": 95.76050192117691,
+      "p99_us": 112.58099973201752,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        91.58049896359444,
+        79.64050024747849
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 180.1699890444676,
+      "p50_pass_spread_pct": 4.069378835088533,
+      "p50_us": 73.2404999434948,
+      "p95_us": 96.54100239276886,
+      "p99_us": 2752.080552279949,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        74.70100000500679,
+        71.7799998819828
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 104.03327321012816,
+      "p50_pass_spread_pct": 10.560207169676982,
+      "p50_us": 99.49075058102608,
+      "p95_us": 122.38099798560143,
+      "p99_us": 143.76100152730942,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        104.48050126433372,
+        94.50099989771843
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "twoshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 121.16312019526958,
+      "p50_pass_spread_pct": 12.864093957555301,
+      "p50_us": 116.16099998354912,
+      "p95_us": 147.1009999513626,
+      "p99_us": 218.2210013270378,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        123.18100035190582,
+        109.14099961519241
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 77.95151342948279,
+      "p50_pass_spread_pct": 9.133912406087031,
+      "p50_us": 73.72074946761131,
+      "p95_us": 90.50000086426735,
+      "p99_us": 108.16049948334694,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        76.94049924612045,
+        70.50099968910217
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 117.93015693624815,
+      "p50_pass_spread_pct": 0.29621738308034384,
+      "p50_us": 114.9505004286766,
+      "p95_us": 118.66100132465363,
+      "p99_us": 122.88049980998039,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        115.12050032615662,
+        114.7805005311966
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "twoshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 122.3892734448115,
+      "p50_pass_spread_pct": 11.778392785580838,
+      "p50_us": 117.41100065410137,
+      "p95_us": 147.78099954128265,
+      "p99_us": 200.66100358963013,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        123.94100055098534,
+        110.88100075721741
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 159.4923231502374,
+      "p50_pass_spread_pct": 7.884969058533886,
+      "p50_us": 78.83049920201302,
+      "p95_us": 101.85999795794487,
+      "p99_us": 3726.6450002789497,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        81.82049915194511,
+        75.84049925208092
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 1024,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 173.15403655171394,
+      "p50_pass_spread_pct": 1.1607191431362018,
+      "p50_us": 169.8409952223301,
+      "p95_us": 177.4209961295128,
+      "p99_us": 185.7210025191307,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        168.8609942793846,
+        170.82099616527557
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 1024,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "twoshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 122.06688687205315,
+      "p50_pass_spread_pct": 10.133592225093956,
+      "p50_us": 116.75074882805347,
+      "p95_us": 147.02100306749344,
+      "p99_us": 197.20149785280228,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        122.38099798560143,
+        111.12049967050552
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 1024,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 123.60916689038277,
+      "p50_pass_spread_pct": 1.9931980439335195,
+      "p50_us": 105.42025044560432,
+      "p95_us": 115.8205009996891,
+      "p99_us": 1089.0480428934097,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        106.46050050854683,
+        104.38000038266182
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 2048,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 283.2315734028816,
+      "p50_pass_spread_pct": 0.47883695097290513,
+      "p50_us": 280.5119976401329,
+      "p95_us": 290.96199572086334,
+      "p99_us": 296.8420088291168,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        281.1819911003113,
+        279.84200417995453
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 2048,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "twoshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 188.91575942436856,
+      "p50_pass_spread_pct": 0.149813131949883,
+      "p50_us": 186.70124933123589,
+      "p95_us": 191.24150276184082,
+      "p99_us": 194.12149488925934,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        186.8409961462021,
+        186.56150251626968
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 2048,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 212.64147753516832,
+      "p50_pass_spread_pct": 0.647817421900343,
+      "p50_us": 160.98124906420708,
+      "p95_us": 176.9614964723587,
+      "p99_us": 3156.42112493515,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        161.50099784135818,
+        160.46150028705597
+      ],
+      "passes": 2,
+      "world_size": 4
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 93.29365350306034,
+      "p50_pass_spread_pct": 3.888611546173437,
+      "p50_us": 88.61050009727478,
+      "p95_us": 126.52099877595901,
+      "p99_us": 157.5010046362877,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        90.30050039291382,
+        86.92049980163574
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_wholerow_padded",
+      "iterations_per_pass": 150,
+      "mean_us": 83.98956323663393,
+      "p50_pass_spread_pct": 0.7548961314180369,
+      "p50_us": 79.78099770843983,
+      "p95_us": 88.65999802947044,
+      "p99_us": 124.80100244283676,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        80.08099719882011,
+        79.48099821805954
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 1,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 86.72005347907543,
+      "p50_pass_spread_pct": 20.57791464517664,
+      "p50_us": 83.93100090324879,
+      "p95_us": 101.32050141692162,
+      "p99_us": 135.80100238323212,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        91.76100045442581,
+        76.10100135207176
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 92.11091309785843,
+      "p50_pass_spread_pct": 5.526400905179352,
+      "p50_us": 88.13075162470341,
+      "p95_us": 125.38100406527519,
+      "p99_us": 149.76099878549576,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        90.50050005316734,
+        85.76100319623947
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_wholerow_padded",
+      "iterations_per_pass": 150,
+      "mean_us": 83.07063343624273,
+      "p50_pass_spread_pct": 1.8585204368831043,
+      "p50_us": 80.400250852108,
+      "p95_us": 88.42099830508232,
+      "p99_us": 107.02100023627281,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        81.14049956202507,
+        79.66000214219093
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 32,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 83.66538010537624,
+      "p50_pass_spread_pct": 12.52413347638397,
+      "p50_us": 81.4605001360178,
+      "p95_us": 92.740498483181,
+      "p99_us": 116.22049659490585,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        86.26100048422813,
+        76.65999978780746
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 91.18080973625183,
+      "p50_pass_spread_pct": 3.937438865591525,
+      "p50_us": 87.04050071537495,
+      "p95_us": 122.42100387811661,
+      "p99_us": 140.94100147485733,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        88.72099965810776,
+        85.36000177264214
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_wholerow_padded",
+      "iterations_per_pass": 150,
+      "mean_us": 83.58798004686832,
+      "p50_pass_spread_pct": 1.1708977003017873,
+      "p50_us": 80.75049892067909,
+      "p95_us": 89.20050039887428,
+      "p99_us": 115.26099964976311,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        81.22050017118454,
+        80.28049767017365
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 64,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 84.4279100249211,
+      "p50_pass_spread_pct": 9.700862421751587,
+      "p50_us": 82.37050101161003,
+      "p95_us": 93.32050010561943,
+      "p99_us": 107.46100172400475,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        86.18099987506866,
+        78.5600021481514
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 91.06546667714915,
+      "p50_pass_spread_pct": 3.5538730925473105,
+      "p50_us": 87.06049993634224,
+      "p95_us": 111.80099844932556,
+      "p99_us": 142.98100024461746,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        88.58050033450127,
+        85.54049953818321
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 83.69706993301709,
+      "p50_pass_spread_pct": 2.1976983986616627,
+      "p50_us": 80.94074949622154,
+      "p95_us": 88.7409970164299,
+      "p99_us": 111.14050075411797,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        81.82049915194511,
+        80.06099984049797
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 65,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 83.57843677202861,
+      "p50_pass_spread_pct": 10.58721299509262,
+      "p50_us": 80.95025084912777,
+      "p95_us": 91.21999889612198,
+      "p99_us": 115.00049754977226,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        85.02000197768211,
+        76.88049972057343
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 91.88741661608219,
+      "p50_pass_spread_pct": 1.165929236057961,
+      "p50_us": 87.95075118541718,
+      "p95_us": 123.60100075602531,
+      "p99_us": 143.20150017738342,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        88.46050128340721,
+        87.44100108742714
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 83.88154998421669,
+      "p50_pass_spread_pct": 4.08667131970335,
+      "p50_us": 80.39025217294693,
+      "p95_us": 88.68049830198288,
+      "p99_us": 111.820999532938,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        82.0000022649765,
+        78.78050208091736
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 91,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "iris",
+      "expected_path": "ordinary_iris_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 86.13939007123312,
+      "p50_pass_spread_pct": 6.550150412911027,
+      "p50_us": 82.310751080513,
+      "p95_us": 102.00100019574165,
+      "p99_us": 122.88100272417068,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        84.92100238800049,
+        79.70049977302551
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 92.18042008578777,
+      "p50_pass_spread_pct": 1.2314771998775287,
+      "p50_us": 88.28024938702583,
+      "p95_us": 116.12050235271454,
+      "p99_us": 140.1209980249405,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        88.82049843668938,
+        87.74000033736229
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 83.75637352466583,
+      "p50_pass_spread_pct": 1.9933675433029485,
+      "p50_us": 81.04075118899345,
+      "p95_us": 91.58049896359444,
+      "p99_us": 105.82100227475166,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        81.84050023555756,
+        80.24100214242935
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 92,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 163.9434327185154,
+      "p50_pass_spread_pct": 0.5106445100830248,
+      "p50_us": 90.41074849665165,
+      "p95_us": 131.461001932621,
+      "p99_us": 2411.3380014896393,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        90.18049761652946,
+        90.64099937677383
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 91.67842335999012,
+      "p50_pass_spread_pct": 2.0191406075325657,
+      "p50_us": 88.02074939012527,
+      "p95_us": 112.30099946260452,
+      "p99_us": 144.24099773168564,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        88.90049904584885,
+        87.1409997344017
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 83.49678983290991,
+      "p50_pass_spread_pct": 2.0984104240099333,
+      "p50_us": 80.90049959719181,
+      "p95_us": 87.38050237298012,
+      "p99_us": 109.30049791932106,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        80.06050065159798,
+        81.74049854278564
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 128,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 117.83416089912257,
+      "p50_pass_spread_pct": 0.30408787260236547,
+      "p50_us": 78.88074778020382,
+      "p95_us": 132.6409950852394,
+      "p99_us": 1528.5300463438034,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        79.00049909949303,
+        78.76099646091461
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 115.9943031768004,
+      "p50_pass_spread_pct": 3.785460592699108,
+      "p50_us": 114.1004990786314,
+      "p95_us": 126.88100337982178,
+      "p99_us": 134.36099886894226,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        111.98100075125694,
+        116.21999740600586
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 84.38303674260774,
+      "p50_pass_spread_pct": 2.5634482139671677,
+      "p50_us": 81.3905019313097,
+      "p95_us": 89.14050087332726,
+      "p99_us": 113.64100128412247,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        80.36050200462341,
+        82.42050185799599
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 256,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 221.8792000164588,
+      "p50_pass_spread_pct": 5.588773077045239,
+      "p50_us": 79.09000106155872,
+      "p95_us": 621.4440166950226,
+      "p99_us": 4815.394997596741,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        76.94000005722046,
+        81.24000206589699
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 146.59924680987996,
+      "p50_pass_spread_pct": 1.1834885028520814,
+      "p50_us": 144.45125311613083,
+      "p95_us": 155.3410068154335,
+      "p99_us": 167.56150126457214,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        143.60149949789047,
+        145.30100673437119
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "oneshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 111.74295671284199,
+      "p50_pass_spread_pct": 1.2697713985758696,
+      "p50_us": 109.3710009008646,
+      "p95_us": 114.12099748849869,
+      "p99_us": 118.96099895238876,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        108.68100076913834,
+        110.06100103259087
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 384,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 192.8289147466421,
+      "p50_pass_spread_pct": 2.8178909062198665,
+      "p50_us": 78.4707497805357,
+      "p95_us": 497.3229914903641,
+      "p99_us": 3597.2660779953003,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        79.56099882721901,
+        77.38050073385239
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 146.25309338172278,
+      "p50_pass_spread_pct": 1.3355306349120077,
+      "p50_us": 144.76124942302704,
+      "p95_us": 154.10099923610687,
+      "p99_us": 162.82100230455399,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        143.8009962439537,
+        145.72150260210037
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "twoshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 114.42510977387428,
+      "p50_pass_spread_pct": 1.1578658548379028,
+      "p50_us": 109.45100151002407,
+      "p95_us": 147.6610004901886,
+      "p99_us": 187.7410039305687,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        108.82100090384483,
+        110.08100211620331
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 385,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 234.08324964344501,
+      "p50_pass_spread_pct": 5.774949850476152,
+      "p50_us": 95.8509985357523,
+      "p95_us": 1604.4124700129032,
+      "p99_us": 2222.2764417529106,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        93.16099807620049,
+        98.54099899530411
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 182.83975288271904,
+      "p50_pass_spread_pct": 2.518640983432441,
+      "p50_us": 181.70175328850746,
+      "p95_us": 191.38149917125702,
+      "p99_us": 195.90149819850922,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        179.44200336933136,
+        183.96150320768356
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "twoshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 117.43302325407664,
+      "p50_pass_spread_pct": 0.6606433559840807,
+      "p50_us": 109.42075029015541,
+      "p95_us": 143.74099671840668,
+      "p99_us": 320.0024962425232,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        109.06049981713295,
+        109.78100076317787
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 512,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 162.2363354762395,
+      "p50_pass_spread_pct": 0.6653427211831708,
+      "p50_us": 78.34024913609028,
+      "p95_us": 185.28100103139877,
+      "p99_us": 3786.6069078445435,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        78.60000059008598,
+        78.08049768209457
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 1024,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 281.56584709882736,
+      "p50_pass_spread_pct": 1.104881561796156,
+      "p50_us": 280.3025022149086,
+      "p95_us": 295.6020087003708,
+      "p99_us": 302.56199836730957,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        278.76250445842743,
+        281.84249997138977
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 1024,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "twoshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 113.82230994602045,
+      "p50_pass_spread_pct": 1.9728046636622087,
+      "p50_us": 108.5209995508194,
+      "p95_us": 134.1409981250763,
+      "p99_us": 186.96150183677673,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        107.46100172400475,
+        109.58099737763405
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 1024,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 262.3390627900759,
+      "p50_pass_spread_pct": 4.4110253159627355,
+      "p50_us": 96.40074893832207,
+      "p95_us": 846.345491707325,
+      "p99_us": 3900.0675678253174,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        94.32049840688705,
+        98.48099946975708
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 2048,
+      "N": 2880,
+      "arm": "iris_fused",
+      "expected_backend": "iris",
+      "expected_path": "fused_iris_allreduce_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 449.54997658729553,
+      "p50_pass_spread_pct": 0.004345552347095882,
+      "p50_us": 448.87375086545944,
+      "p95_us": 468.7040001153946,
+      "p99_us": 481.30351305007935,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        448.8835036754608,
+        448.86399805545807
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 2048,
+      "N": 2880,
+      "arm": "triton_profile",
+      "expected_backend": "triton_shmem",
+      "expected_path": "twoshot_blocked",
+      "iterations_per_pass": 150,
+      "mean_us": 125.74716657400131,
+      "p50_pass_spread_pct": 0.5506886527003152,
+      "p50_us": 123.82099963724613,
+      "p95_us": 127.64099985361099,
+      "p99_us": 136.34099811315536,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        123.48100170493126,
+        124.160997569561
+      ],
+      "passes": 2,
+      "world_size": 8
+    },
+    {
+      "M": 2048,
+      "N": 2880,
+      "arm": "upstream_unfused",
+      "expected_backend": "rccl",
+      "expected_path": "rccl_all_reduce+triton_residual_rmsnorm",
+      "iterations_per_pass": 150,
+      "mean_us": 203.86253039042154,
+      "p50_pass_spread_pct": 0.8316860329034226,
+      "p50_us": 132.81099870800972,
+      "p95_us": 158.10149908065796,
+      "p99_us": 4033.5484743118286,
+      "pass_names": [
+        "eager-pass1",
+        "eager-pass2"
+      ],
+      "pass_p50_us": [
+        132.2610005736351,
+        133.36099684238434
+      ],
+      "passes": 2,
+      "world_size": 8
+    }
+  ],
+  "schema_version": 1,
+  "source_root": "/home/jeremwan/tokenspeed/tokenspeed-kernel/benchmark/results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/raw/2026-08-04-definitive-v1/eager-clean"
+}

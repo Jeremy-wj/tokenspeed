@@ -9,8 +9,8 @@ Studies are dated evidence. Live deployment decisions are model-scoped:
 Read these newest-to-oldest:
 
 1. [Definitive current-machine sweep](mi350x/2026-08-gpt-oss-120b-definitive-sweep/README.md)
-   — planned WS=2/4/8 eager, graph, and three-arm serving comparison. The
-   campaign has not been run.
+   — complete WS=2/4/8 eager, graph, transition, marker, and five-triplet
+   serving screen. WS4 is promising; WS2 is inconclusive and WS8 loses.
 2. [Default compatibility](mi350x/2026-07-default-compatibility/README.md) —
    restored base TokenSpeed defaults, final Perfetto traces, and the clean
    matched no-overlap non-promotion decision on HIP `1,2,5,6`.
