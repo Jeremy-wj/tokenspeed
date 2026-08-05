@@ -867,6 +867,10 @@ class TritonShmemAllReduceResidualRMSNorm:
             )
         else:
             self._oneshot_kernel = self.kernel  # ws<=2 is already one-shot
+            if self._oneshot_variant == "blocked":
+                self._oneshot_kernel = "oneshot_blocked"
+            elif self._oneshot_variant == "padded":
+                self._oneshot_kernel = "oneshot_wholerow_padded"
             self._oneshot_scratch = self._scratch
         configured_oneshot_num_warps = _oneshot_num_warps()
         self._oneshot_num_warps = configured_oneshot_num_warps or (

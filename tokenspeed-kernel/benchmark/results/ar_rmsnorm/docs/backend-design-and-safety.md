@@ -76,6 +76,8 @@ Kernel variants:
 The padded kernel keeps runtime M non-specialized. Scalar M1 specialization
 expanded its persistent row loop into a much larger branch-heavy gfx950
 program; `do_not_specialize=["M"]` restores the compact M2 code shape.
+Explicit diagnostic `padded`/`blocked` variant selection applies when WS<=2 is
+already one-shot as well as to the small-M overlay at WS>=4.
 
 At TP=4 or TP=8, the state is normally two-shot, while the call-level
 one-shot overlay handles small token counts. GPT-OSS core-v3 uses padded
@@ -215,6 +217,10 @@ policy.
   kernel and passed a bounded 70-replay M1/M2/M42 eager/graph integration probe.
   It remains 3.9% behind unfused at WS4, so profile v2 retains M1 fallback
   pending qualified WS8 timing.
+- GLM definitive MI355X sweep: all 105 forced candidate artifacts resolved the
+  four-warp padded path across WS2/4/8. The complete 315-result matrix confirms
+  the WS8 raw M1-M42 window and M43 RCCL loss border. This is cross-machine
+  operator evidence and does not requalify the MI350X profile.
 
 Producer-direct inputs and any genericization of borrowed outputs or
 trailing-barrier removal require the separate

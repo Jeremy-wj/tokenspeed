@@ -399,6 +399,7 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
     )
     dist.barrier(group=group)
 
+    reset_graph = None
     reset_rank_samples_us = None
     if impl == "production_unfused" or fallback_used or graph_decline_expected:
         reset_graph = torch.cuda.CUDAGraph()
@@ -531,11 +532,11 @@ def _worker(rank: int, ws: int, port: int, out) -> None:
         if impl == "triton_shmem":
             result["signal_zero_status"] = "not_exposed_by_safe_public_api"
         out.append(result)
-    # ProcessGroupNCCL teardown can wait indefinitely while a live CUDAGraph
-    # still owns captured collective work/events. Release all graph references
-    # before destroying the communicator.
+    # RCCL graph work must be released before its process group. Keeping a
+    # captured collective graph alive during communicator teardown can leave
+    # watchdog threads waiting on graph-owned events.
     del captured_outputs, graph
-    if reset_rank_samples_us is not None:
+    if reset_graph is not None:
         del reset_graph
     gc.collect()
     torch.cuda.synchronize()

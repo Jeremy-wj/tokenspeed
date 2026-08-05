@@ -30,8 +30,10 @@ Read these newest-to-oldest:
 Read newest-to-oldest:
 
 1. [Definitive cross-world-size sweep](mi350x/2026-08-glm-5.2-fp8-definitive-sweep/README.md)
-   — planned WS=2/4/8 comparison of upstream-unfused, default Iris fused, and
-   forced padded Triton. The campaign has not been run.
+   — completed MI355X execution of the predeclared WS=2/4/8 comparison of
+   upstream-unfused, default Iris fused, and forced padded Triton. WS=8 confirms
+   the raw M1-M42 opportunity and M43 RCCL loss border, but does not requalify
+   MI350X policy.
 2. [Representative WS=8 baseline](mi350x/2026-08-glm-5.2-fp8-baseline/README.md)
    — N=6144 profile-v2 profitable-window and transition evidence.
 

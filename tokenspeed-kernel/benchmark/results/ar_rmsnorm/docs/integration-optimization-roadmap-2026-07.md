@@ -50,7 +50,10 @@ qualified; model graph serving and end-to-end performance are not. The
 [baseline study](../studies/mi350x/2026-08-glm-5.2-fp8-baseline/README.md)
 owns the current evidence, and the
 [definitive sweep](../studies/mi350x/2026-08-glm-5.2-fp8-definitive-sweep/README.md)
-owns the pending WS=2/4/8 campaign contract.
+owns the completed MI355X execution of the predeclared WS=2/4/8 campaign.
+Model-faithful WS8 raw replay favors padded Triton at M1-M42 and loses at the
+M43 RCCL switch; reset-copy-adjusted timing favors M1-M40. This cross-machine
+result does not change the MI350X profile or deployment policy.
 
 ## GPT-OSS-120B closed work
 
@@ -131,8 +134,9 @@ dense and active MoE paths, or requires weaker fallback/lifetime semantics.
 
 ## GLM-5.2-FP8 remaining work
 
-1. Run the definitive operator campaign without changing its predeclared
-   matrix; retain failures and report WS=2/4 as scaling evidence only.
+1. Decide whether to repeat the definitive matrix on MI350X or create and
+   independently qualify an MI355X-specific profile; do not transfer the
+   MI355X M1 result or adjusted M40 border into MI350X policy.
 2. Resolve the AMD block-FP8 GEMM/MoE serving baseline and bounded graph
    startup before another AR+RMSNorm end-to-end campaign.
 3. Capture `tokenspeed.model_forward.v1` markers and compare executed decode M

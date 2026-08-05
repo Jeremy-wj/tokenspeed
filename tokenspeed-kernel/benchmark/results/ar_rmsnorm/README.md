@@ -26,7 +26,10 @@ MI350X. Captured 156-site graphs establish a diagnostic profile-v2 opportunity
 at M=2-42, with ordinary fallback at M=1 and M>=43. This is operator evidence,
 not a serving claim; explicit upstream-unfused remains the deployment default.
 A [definitive cross-world-size sweep](studies/mi350x/2026-08-glm-5.2-fp8-definitive-sweep/README.md)
-is specified but has not been run.
+completed the predeclared matrix on 8x MI355X. Its model-faithful WS=8 rows
+favor padded Triton through M42 by raw replay timing and through M40 after
+reset-copy adjustment, then lose to RCCL at M43. The hardware change prevents
+that result from overriding the MI350X profile or deployment decision.
 
 ## Evidence map
 
@@ -49,7 +52,7 @@ is specified but has not been run.
 - [GLM-5.2-FP8 baseline](studies/mi350x/2026-08-glm-5.2-fp8-baseline/README.md)
   — WS=8/N=6144 profile-v2 characterization and validation.
 - [GLM-5.2-FP8 definitive sweep](studies/mi350x/2026-08-glm-5.2-fp8-definitive-sweep/README.md)
-  — unrun WS=2/4/8 campaign contract and reporting layout.
+  — completed MI355X execution of the predeclared WS=2/4/8 operator campaign.
 
 ## Durable references
 
