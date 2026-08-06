@@ -17,13 +17,14 @@ The profile is safety-qualified, but default-compatible performance did not
 promote. See the
 [GPT-OSS status](../../results/ar_rmsnorm/docs/gpt-oss-120b-status.md).
 
-The planned current-machine campaign uses
+The completed current-machine definitive campaign used
 `gpt_oss_120b_mi350x_definitive_ws{2,4,8}.env`. These wrappers require an
 explicit preflight-qualified device set and bind profile identity to world size
 and an optional actual-M gate (`0`, `64`, `91`, or `384`). They keep the 2048
-workspace cap and 72-site ownership contract. WS2/8 use no transferred grid
-cap; none of these profiles is qualified until its campaign gates pass. See the
-[definitive study](../../results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/README.md).
+workspace cap and 72-site ownership contract. The matrix selected gate `0` for
+all world sizes; WS2 was inconclusive, WS4 passed only the five-pair screen, and
+WS8 lost. These campaign wrappers are not deployment-qualified profiles. See
+the [definitive study](../../results/ar_rmsnorm/studies/mi350x/2026-08-gpt-oss-120b-definitive-sweep/README.md).
 
 ### GLM-5.2-FP8 MI350X
 

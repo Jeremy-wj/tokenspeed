@@ -3,6 +3,19 @@
 This project integrates fused all-reduce + residual-add + RMSNorm from
 triton-shmem into TokenSpeed and optimizes it against end-to-end model serving.
 
+## Final synthesis
+
+The [final results and public handoff](docs/final-results-and-handoff-2026-08.md)
+synthesizes the completed GLM-5.2-FP8 and GPT-OSS-120B campaigns, the four
+headline figures, the engineering changes that produced the current backend,
+and bounded restart points for future contributors.
+
+No further development or benchmarking is planned in this branch.
+GPT-OSS-120B's 15-pair promotion stage remains intentionally incomplete.
+Explicit upstream-unfused remains the deployment default for both models; the
+results identify promising model- and world-size-specific fusion opportunities,
+not a universal promotion.
+
 ## Current checkpoints
 
 Each model has one live decision page. Dated studies supply evidence but do not
@@ -68,8 +81,9 @@ that result from overriding the MI350X profile or deployment decision.
 
 ## Artifact policy
 
-Study READMEs and compact JSON/CSV summaries are tracked. Raw logs, traces, and
-campaign trees under either `raw/` or `studies/**/raw/` are local and ignored.
-The CSV manifests under `manifests/` describe only the 2026-07-24 consolidation;
-later campaigns keep generated provenance in their ignored raw roots.
+Study READMEs, synthesis figures, and compact JSON/CSV summaries are tracked.
+Raw logs, traces, and campaign trees under either `raw/` or `studies/**/raw/`
+are local and ignored. The CSV manifests under `manifests/` describe only the
+2026-07-24 consolidation; later campaigns keep generated provenance in their
+ignored raw roots.
 

@@ -15,7 +15,7 @@ Exact values and provenance are in [summary.json](summary.json),
 
 At model-faithful WS=8/N=6144 with 156 captured sites:
 
-- padded Triton is 2.9%-19.6% faster than raw upstream-unfused at every
+- padded Triton is 2.9%-23.0% faster than raw upstream-unfused at every
   measured M from 1 through 42;
 - after removing the benchmark-only reset copy, the profitable values are
   M=`1,2,4,8,16,24,32,36,40`; M41 is effectively tied (+0.17%) and M42 loses

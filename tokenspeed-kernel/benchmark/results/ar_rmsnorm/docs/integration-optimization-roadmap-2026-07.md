@@ -1,8 +1,11 @@
 # AR+RMSNorm integration roadmap
 
-Updated: 2026-08-03
+Updated: 2026-08-05
 
-This document records remaining engineering directions and their dependencies.
+This document records optional future restart points and their dependencies.
+The current project is complete and no further development or benchmarking is
+planned in this branch. Final conclusions and public handoff guidance are in
+[the synthesis report](final-results-and-handoff-2026-08.md).
 Deployment policy remains in the model status pages:
 [GPT-OSS-120B](gpt-oss-120b-status.md) and
 [GLM-5.2-FP8](glm-5.2-fp8-status.md).
@@ -75,19 +78,21 @@ The [realignment](../studies/mi350x/2026-07-triton-shmem-realignment/README.md)
 and [decomposition](../studies/mi350x/2026-07-triton-shmem-decomposition/README.md)
 studies contain the closure evidence.
 
-## GPT-OSS-120B remaining work
+## GPT-OSS-120B future restart points
 
 ### 1. Rank-set and world-size qualification
 
 Requalify each topology independently. A profile must record logical rank, HIP
 index, physical GPU, NUMA placement, and peer-access matrix. Decline the fused
-path unless every rank resolves the same supported profile. WS=8 remains
-unqualified; the planned current-machine WS2/4/8 campaign is its active
-qualification path.
+path unless every rank resolves the same supported profile. The completed
+current-machine WS2/4/8 screen left WS2 inconclusive, found a promising WS4
+direction, and rejected WS8. None of those five-pair results changes deployment
+qualification.
 
-The few-hour campaign provides three-arm eager, graph, marker, and serving
-screens. Promotion still requires the full safety ladder, marker-aligned trace,
-and 15 pairs per contrast on the target rank set.
+Any future promotion attempt still requires the full safety ladder,
+marker-aligned trace, and 15 correctly randomized pairs per contrast on the
+target rank set. For WS4 that means a separate ten-pair extension after fixing
+the arm-order schedule; no continuation is currently planned.
 
 ### 2. Mixed transport transitions — closed
 
@@ -132,7 +137,7 @@ insufficient. See the
 Stop if the design replaces one staging copy with another, cannot support both
 dense and active MoE paths, or requires weaker fallback/lifetime semantics.
 
-## GLM-5.2-FP8 remaining work
+## GLM-5.2-FP8 future restart points
 
 1. Decide whether to repeat the definitive matrix on MI350X or create and
    independently qualify an MI355X-specific profile; do not transfer the

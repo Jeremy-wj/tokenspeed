@@ -1,6 +1,6 @@
 # AR+RMSNorm profiling workflow
 
-Updated: 2026-08-03
+Updated: 2026-08-05
 
 Pre-rebase traces remain legacy. New runs must record the resolved ordinary AR
 backend, fused backend, rank-side selected-backend log, kernel signatures, and
@@ -116,11 +116,11 @@ Zero disables the additional gate. The value 256 proved dispatch mechanics but
 timed out under the stable repeatability control; do not rerun it without a
 transition-safe fallback redesign.
 
-The planned GPT definitive campaign does not reuse M256. It keeps the 2048
-workspace identity and permits only predeclared actual-M gates at 64, 91, or
-384 after two graph passes, eager evidence, and serving-M markers agree. The
-selected gate is encoded in a fail-closed profile ID and requalified before any
-end-to-end comparison.
+The completed GPT definitive campaign did not reuse M256. It kept the 2048
+workspace identity and tested only predeclared actual-M gates at 64, 91, or 384
+after two graph passes, eager evidence, and serving-M markers agreed. The
+complete matrix supported no positive gate, so gate `0` was frozen in the
+fail-closed campaign profiles before end-to-end comparison.
 
 `TS_TRITON_SHMEM_FUSION_MIN_M` is a separate lower performance gate. GLM
 profile v2 sets it to 2 so M1 captures complete ordinary fallback; its

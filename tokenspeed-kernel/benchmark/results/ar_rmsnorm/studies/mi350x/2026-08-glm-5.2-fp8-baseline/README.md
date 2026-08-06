@@ -170,7 +170,7 @@ docker exec jeremwan-tokenspeed-profiler bash -lc '
 '
 ```
 
-The planned successor is the
-[definitive WS=2/4/8 sweep](../2026-08-glm-5.2-fp8-definitive-sweep/README.md).
-Do not combine its future results with this baseline until its complete
-three-arm matrix and retained failures are available.
+The
+[definitive WS=2/4/8 sweep](../2026-08-glm-5.2-fp8-definitive-sweep/README.md)
+subsequently completed its full three-arm matrix on MI355X. Its cross-machine
+results are separate evidence and do not rewrite this MI350X baseline.
